@@ -13,7 +13,6 @@ final class QuackConnectionInfo
         public readonly ?string $serverDuckdbVersion = null,
         public readonly ?string $serverPlatform = null,
         public readonly ?QuackVersion $quackVersion = null,
-        public readonly ?int $heartbeatTimeout = null,
     ) {
     }
 }

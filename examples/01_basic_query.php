@@ -12,13 +12,12 @@ require __DIR__ . '/../vendor/autoload.php';
 
 use Quack\Protocol\QuackClient;
 
-echo 'connecting to quack:127.0.0.1:9494', PHP_EOL;
+echo 'connecting to http://127.0.0.1:9494', PHP_EOL;
 $client = QuackClient::connect(
-    'quack:127.0.0.1:9494',
+    'http://127.0.0.1:9494',
     'secret',
     10.0,
     300.0,
-    false,
 );
 
 $info = $client->info;

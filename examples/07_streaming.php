@@ -17,11 +17,10 @@ require __DIR__ . '/../vendor/autoload.php';
 use Quack\Protocol\QuackClient;
 
 $client = QuackClient::connect(
-    'quack:127.0.0.1:9494',
+    'http://127.0.0.1:9494',
     'secret',
     10.0,
     300.0,
-    false,
 );
 
 // range(1, 100000) is far larger than one fetch batch. Nothing but the first

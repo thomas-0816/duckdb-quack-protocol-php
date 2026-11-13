@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Quack\Protocol\Inspection;
 
-use Quack\Protocol\Connection\Constants;
 use Quack\Protocol\Error\QuackError;
 use Quack\Protocol\Error\ServerError;
 use Quack\Protocol\Exceptions\InspectionException;
@@ -128,7 +127,7 @@ final class Inspector
                 && $quackVersion->number() === 3
                 && $message->heartbeatTimeoutSeconds !== null) {
                 $seconds = (int) $message->heartbeatTimeoutSeconds;
-                if ($seconds >= 1 && $seconds <= Constants::MAX_HEARTBEAT_TIMEOUT_SECS) {
+                if ($seconds >= 1) {
                     $heartbeatTimeout = $seconds;
                 }
             }

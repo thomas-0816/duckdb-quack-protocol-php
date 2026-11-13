@@ -25,28 +25,21 @@ final class Transport
         private readonly bool $ssl,
         private float $timeout,
         private readonly float $connectTimeout,
-        private readonly ?string $pinnedPublicKey,
+        private readonly ?string $sslCertificate,
     ) {
     }
 
     public static function new(
         string $uri,
-        bool $ssl,
         float $connectTimeout,
         float $timeout,
-        ?string $sslFingerprint,
+        ?string $sslCertificate = null,
     ): self {
-        $pin = self::certificatePin($sslFingerprint);
-        if ($pin !== null && $ssl === false) {
+        $parsed = UriParser::parseQuackUri($uri);
+
+        if ($sslCertificate !== null && !$parsed->ssl) {
             throw new ProtocolException(
-                'ssl_fingerprint requires HTTPS, but ssl is set to false',
-            );
-        }
-        $ssl = $pin !== null ? true : $ssl;
-        $parsed = UriParser::parseQuackUri($uri, $ssl);
-        if ($pin !== null && !$parsed->ssl) {
-            throw new ProtocolException(
-                "ssl_fingerprint requires HTTPS, but {$uri} is an http URL",
+                'ssl_certificate requires an https:// URL',
             );
         }
 
@@ -57,28 +50,13 @@ final class Transport
             throw new ProtocolException('Quack connect timeout must be greater than zero');
         }
 
-        $pinnedPublicKey = $pin === null
-            ? null
-            : self::resolvePinnedPublicKey($parsed, $pin, $connectTimeout, $timeout);
-
         return new self(
             rtrim($parsed->baseUrl, '/'),
             $parsed->ssl,
             $timeout,
             $connectTimeout,
-            $pinnedPublicKey,
+            $sslCertificate,
         );
-    }
-
-    /**
-     * Parses and validates the pin once, so a malformed fingerprint fails
-     * before any connection is attempted.
-     */
-    private static function certificatePin(?string $sslFingerprint): ?CertificatePin
-    {
-        return $sslFingerprint === null
-            ? null
-            : CertificatePin::parse($sslFingerprint);
     }
 
     public function baseUrl(): string
@@ -89,6 +67,15 @@ final class Transport
     public function timeout(): float
     {
         return $this->timeout;
+    }
+
+    /**
+     * The heartbeat lease matching the request timeout, so a request cannot
+     * outlive it.
+     */
+    public function heartbeatTimeout(): int
+    {
+        return (int) ceil($this->timeout);
     }
 
     public function withTimeout(float $timeout): self
@@ -126,23 +113,18 @@ final class Transport
             CURLOPT_HTTPHEADER => $headers,
             CURLOPT_TIMEOUT_MS => $timeoutMs,
             CURLOPT_CONNECTTIMEOUT_MS => $connectTimeoutMs,
-            CURLOPT_FOLLOWLOCATION => true,
-            CURLOPT_MAXREDIRS => 10,
+            CURLOPT_PROTOCOLS => CURLPROTO_HTTPS | CURLPROTO_HTTP,
+            CURLOPT_REDIR_PROTOCOLS => CURLPROTO_HTTPS,
+            CURLOPT_FOLLOWLOCATION => false,
+            CURLOPT_MAXREDIRS => 0,
+            CURLOPT_BUFFERSIZE => 8192,
         ];
         if ($this->ssl) {
-            if ($this->pinnedPublicKey !== null) {
-                $options[CURLOPT_SSL_VERIFYPEER] = false;
-                $options[CURLOPT_SSL_VERIFYHOST] = 0;
-                $options[CURLOPT_PINNEDPUBLICKEY] = $this->pinnedPublicKey;
-            } else {
-                $options[CURLOPT_SSL_VERIFYPEER] = true;
-                $options[CURLOPT_SSL_VERIFYHOST] = 2;
+            $options[CURLOPT_SSL_VERIFYPEER] = true;
+            $options[CURLOPT_SSL_VERIFYHOST] = 2;
+            if ($this->sslCertificate !== null) {
+                $options[CURLOPT_CAINFO_BLOB] = $this->sslCertificate;
             }
-            $options[CURLOPT_PROTOCOLS] = CURLPROTO_HTTPS;
-            $options[CURLOPT_REDIR_PROTOCOLS] = CURLPROTO_HTTPS;
-        } else {
-            $options[CURLOPT_PROTOCOLS] = CURLPROTO_HTTP;
-            $options[CURLOPT_REDIR_PROTOCOLS] = CURLPROTO_HTTP;
         }
         self::applyCurlOptions($curl, $options);
 
@@ -214,78 +196,5 @@ final class Transport
             $kind,
             $message === '' ? "curl error {$errno}" : "curl error {$errno}: {$message}",
         );
-    }
-
-    private static function resolvePinnedPublicKey(
-        ParsedQuackUri $parsed,
-        CertificatePin $pin,
-        float $connectTimeout,
-        float $timeout,
-    ): string {
-        $curl = curl_init(rtrim($parsed->baseUrl, '/') . Constants::QUACK_ENDPOINT);
-        if ($curl === false) {
-            throw new TransportException(
-                TransportErrorKind::Other,
-                'failed to initialise curl',
-            );
-        }
-        $timeoutMs = (int) max(1, round($timeout * 1000));
-        $connectTimeoutMs = (int) max(1, round(
-            min($connectTimeout, $timeout) * 1000,
-        ));
-        $options = [
-            CURLOPT_CONNECT_ONLY => true,
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_CERTINFO => true,
-            CURLOPT_SSL_VERIFYPEER => false,
-            CURLOPT_SSL_VERIFYHOST => 0,
-            CURLOPT_TIMEOUT_MS => $timeoutMs,
-            CURLOPT_CONNECTTIMEOUT_MS => $connectTimeoutMs,
-            CURLOPT_PROTOCOLS => CURLPROTO_HTTPS,
-        ];
-        if (defined('CURLOPT_PROTOCOLS_STR')) {
-            $options[constant('CURLOPT_PROTOCOLS_STR')] = 'https';
-        }
-        self::applyCurlOptions($curl, $options);
-
-        $ok = curl_exec($curl);
-        if ($ok === false) {
-            $errno = curl_errno($curl);
-            $error = curl_error($curl);
-            throw self::transportError($errno, $error);
-        }
-
-        $certInfo = curl_getinfo($curl, CURLINFO_CERTINFO);
-        $leafPem = null;
-        if (isset($certInfo[0])) {
-            $leafPem = $certInfo[0]['Cert'] ?? $certInfo[0]['cert'] ?? null;
-        }
-        if (!is_string($leafPem) || $leafPem === '') {
-            throw new TransportException(
-                TransportErrorKind::Other,
-                'server did not present a TLS certificate',
-            );
-        }
-        $der = CertificatePin::pemToDer($leafPem);
-        if ($der === null) {
-            throw new TransportException(
-                TransportErrorKind::Other,
-                'server certificate could not be decoded',
-            );
-        }
-        if (!$pin->matchesDer($der)) {
-            throw new TransportException(
-                TransportErrorKind::Other,
-                'server certificate does not match the pinned ssl_fingerprint',
-            );
-        }
-        $publicKey = CertificatePin::publicKeyPin($der);
-        if ($publicKey === null) {
-            throw new TransportException(
-                TransportErrorKind::Other,
-                'server certificate has no readable subject public key',
-            );
-        }
-        return $publicKey;
     }
 }

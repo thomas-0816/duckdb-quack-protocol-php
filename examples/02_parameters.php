@@ -22,11 +22,10 @@ use Quack\Protocol\Sql\SqlFormatter;
 use Quack\Protocol\Sql\SqlParameter;
 
 $client = QuackClient::connect(
-    'quack:127.0.0.1:9494',
+    'http://127.0.0.1:9494',
     'secret',
     10.0,
     300.0,
-    false,
 );
 
 // Scalars, lists, and structs are detected without wrapping them in Value.

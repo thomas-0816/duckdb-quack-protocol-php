@@ -4,100 +4,50 @@ declare(strict_types=1);
 
 namespace Quack\Protocol\Transport;
 
-use Quack\Protocol\Connection\Constants;
 use Quack\Protocol\Exceptions\ProtocolException;
 use Quack\Protocol\Exceptions\UrlException;
 
 /**
- * Parses the URI forms DuckDB's Quack client accepts:
+ * Parses the listen URL advertised by `quack_serve`.
  *
- *   quack://host:port, quack:host:port, host:port, and http(s)://host:port
+ * The URL must be http:// or https://; the scheme selects the transport
+ * security. A missing port defaults to 80 for http and 443 for https.
  */
 final class UriParser
 {
-    public static function parseQuackUri(string $input, ?bool $sslOverride = null): ParsedQuackUri
+    public static function parseQuackUri(string $input): ParsedQuackUri
     {
         $uri = trim($input);
         if ($uri === '') {
             throw new ProtocolException('Quack URI is empty');
         }
 
-        if (str_starts_with($uri, 'http://') || str_starts_with($uri, 'https://')) {
-            $parts = parse_url($uri);
-            if ($parts === false || !isset($parts['scheme'], $parts['host'])) {
-                throw new UrlException("invalid Quack URI {$input}");
-            }
-            $scheme = strtolower((string) $parts['scheme']);
-            $ssl = $scheme === 'https';
-            $port = isset($parts['port'])
-                ? (int) $parts['port']
-                : ($ssl ? 443 : 80);
-            $host = self::stripBrackets((string) $parts['host']);
-            if ($host === '') {
-                throw new ProtocolException("invalid Quack URI host {$input}");
-            }
-            return new ParsedQuackUri(
-                baseUrl: $scheme . '://' . self::hostForBaseUrl($host) . ':' . $port,
-                host: $host,
-                port: $port,
-                ssl: $ssl,
+        if (!str_starts_with($uri, 'http://') && !str_starts_with($uri, 'https://')) {
+            throw new ProtocolException(
+                "invalid Quack URI {$input}: expected an http:// or https:// URL",
             );
         }
 
-        $rest = $uri;
-        if (str_starts_with($rest, 'quack://')) {
-            $rest = substr($rest, strlen('quack://'));
-        } elseif (str_starts_with($rest, 'quack:')) {
-            $rest = substr($rest, strlen('quack:'));
+        $parts = parse_url($uri);
+        if ($parts === false || !isset($parts['scheme'], $parts['host'])) {
+            throw new UrlException("invalid Quack URI {$input}");
         }
-        if ($rest === '') {
-            throw new ProtocolException("invalid Quack URI {$input}");
+        $scheme = strtolower((string) $parts['scheme']);
+        $ssl = $scheme === 'https';
+        $port = isset($parts['port'])
+            ? self::parsePort((string) $parts['port'])
+            : ($ssl ? 443 : 80);
+        $host = self::stripBrackets((string) $parts['host']);
+        if ($host === ''
+            || ($host === $parts['host'] && str_contains($host, ':'))) {
+            throw new ProtocolException("invalid Quack URI host {$input}");
         }
-
-        [$host, $port] = self::parseHostPort($rest);
-        $ssl = $sslOverride ?? false;
-        $protocol = $ssl ? 'https' : 'http';
 
         return new ParsedQuackUri(
-            baseUrl: $protocol . '://' . self::hostForBaseUrl($host) . ':' . $port,
+            baseUrl: $scheme . '://' . self::hostForBaseUrl($host) . ':' . $port,
             host: $host,
             port: $port,
             ssl: $ssl,
-        );
-    }
-
-    /**
-     * @return array{0:string,1:int}
-     */
-    private static function parseHostPort(string $value): array
-    {
-        if (str_starts_with($value, '[')) {
-            $end = strpos($value, ']');
-            if ($end === false) {
-                throw new ProtocolException("invalid IPv6 Quack URI host {$value}");
-            }
-            $host = substr($value, 1, $end - 1);
-            $suffix = substr($value, $end + 1);
-            $port = str_starts_with($suffix, ':')
-                ? self::parsePort(substr($suffix, 1))
-                : Constants::DEFAULT_QUACK_PORT;
-            return [$host, $port];
-        }
-
-        $colonCount = substr_count($value, ':');
-        if ($colonCount === 0) {
-            return [$value, Constants::DEFAULT_QUACK_PORT];
-        }
-        if ($colonCount === 1) {
-            [$host, $port] = explode(':', $value, 2);
-            if ($host === '') {
-                throw new ProtocolException("invalid Quack URI host {$value}");
-            }
-            return [$host, self::parsePort($port)];
-        }
-
-        throw new ProtocolException(
-            "IPv6 Quack URI hosts must be enclosed in []: {$value}",
         );
     }
 

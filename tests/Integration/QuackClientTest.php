@@ -9,16 +9,27 @@ use Quack\Protocol\QuackClient;
 
 final class QuackClientTest extends TestCase
 {
-    public function testQueryParametersPoolComplexTypesAndJson(): void
+    public function testConnectSsl(): void
     {
         $client = QuackClient::connect(
-            'quack:127.0.0.1:9494',
+            'https://localhost:9495',
             'secret',
             10,
             300,
-            false,
+            sslCertificate: self::sslCertificate(),
         );
-        self::assertSame(3, $client->info?->quackVersion->number());
+        self::assertSame(3, $client->info?->quackVersion?->number());
+    }
+
+    public function testConnect(): void
+    {
+        $client = QuackClient::connect(
+            'http://127.0.0.1:9494',
+            'secret',
+            10,
+            300,
+        );
+        self::assertSame(3, $client->info?->quackVersion?->number());
 
         $stream = $client->query(
             "SELECT * FROM (VALUES (1::INTEGER, 'one'::VARCHAR), (2, 'two')) AS t(id, label) ORDER BY id",
@@ -570,14 +581,33 @@ final class QuackClientTest extends TestCase
         );
     }
 
+    /**
+     * Certificate DuckDB generates when the test server starts with SSL
+     * enabled; passing it lets the client pin the server without trusting a CA.
+     */
+    private static function sslCertificate(): string
+    {
+        $home = getenv('HOME');
+        if ($home === false) {
+            self::fail('HOME is not set; cannot locate the DuckDB SSL certificate.');
+        }
+        $certFile = $home . '/.duckdb/extension_data/quack/server.pem';
+        $deadline = microtime(true) + 10.0;
+        $pem = file_get_contents($certFile);
+        if ($pem === false) {
+            self::fail("Could not read the SSL certificate at {$certFile}.");
+        }
+
+        return $pem;
+    }
+
     private function queryValue(string $sql): mixed
     {
         $client = QuackClient::connect(
-            'quack:127.0.0.1:9494',
+            'http://127.0.0.1:9494',
             'secret',
             10,
             300,
-            false,
         );
 
         return $client->query($sql)->one()['v'];

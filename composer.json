@@ -24,8 +24,7 @@
         }
     },
     "scripts": {
-        "test": "phpunit",
-        "test:integration": "phpunit --testsuite integration",
+        "test": "bash tests/run.sh",
         "cs": "php-cs-fixer fix",
         "cs:check": "php-cs-fixer fix --dry-run --diff",
         "stan": "phpstan analyse --memory-limit=512M",

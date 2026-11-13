@@ -5,29 +5,28 @@ declare(strict_types=1);
 namespace Quack\Protocol\Tests\Unit\Transport;
 
 use PHPUnit\Framework\TestCase;
-use Quack\Protocol\Exceptions\ProtocolException;
+use Quack\Protocol\Error\QuackError;
 use Quack\Protocol\Transport\ParsedQuackUri;
 use Quack\Protocol\Transport\UriParser;
 
 final class UriParserTest extends TestCase
 {
-    public function testParsesDocumentedUriForms(): void
+    public function testParsesListenUrls(): void
     {
         $cases = [
-            ['localhost:9494', null, 'http://localhost:9494', 'localhost', 9494, false],
-            ['localhost', null, 'http://localhost:9494', 'localhost', 9494, false],
-            ['quack:localhost', null, 'http://localhost:9494', 'localhost', 9494, false],
-            ['quack://localhost:9000', null, 'http://localhost:9000', 'localhost', 9000, false],
-            ['quack:[::1]:9494', null, 'http://[::1]:9494', '::1', 9494, false],
-            ['http://localhost:9000', null, 'http://localhost:9000', 'localhost', 9000, false],
-            ['https://localhost', null, 'https://localhost:443', 'localhost', 443, true],
-            ['localhost:9494', true, 'https://localhost:9494', 'localhost', 9494, true],
+            ['http://localhost:9494', 'http://localhost:9494', 'localhost', 9494, false],
+            ['https://localhost:9495', 'https://localhost:9495', 'localhost', 9495, true],
+            ['http://localhost', 'http://localhost:80', 'localhost', 80, false],
+            ['https://localhost', 'https://localhost:443', 'localhost', 443, true],
+            ['http://[::1]:9494', 'http://[::1]:9494', '::1', 9494, false],
+            ['https://[::1]', 'https://[::1]:443', '::1', 443, true],
+            ['  http://localhost:9494  ', 'http://localhost:9494', 'localhost', 9494, false],
         ];
 
-        foreach ($cases as [$input, $sslOverride, $baseUrl, $host, $port, $ssl]) {
+        foreach ($cases as [$input, $baseUrl, $host, $port, $ssl]) {
             self::assertEquals(
                 new ParsedQuackUri($baseUrl, $host, $port, $ssl),
-                UriParser::parseQuackUri($input, $sslOverride),
+                UriParser::parseQuackUri($input),
             );
         }
     }
@@ -36,19 +35,22 @@ final class UriParserTest extends TestCase
     {
         $cases = [
             '',
-            'localhost:0',
-            'localhost:abc',
-            'localhost:65536',
-            '[::1',
-            'a:b:c',
-            ':9494',
+            'localhost:9494',
+            'quack:localhost:9494',
+            'quack://localhost:9000',
+            'ftp://localhost:9494',
+            'http://',
+            'http://localhost:0',
+            'http://localhost:abc',
+            'http://localhost:65536',
+            'http://[::1',
         ];
 
         foreach ($cases as $input) {
             try {
                 UriParser::parseQuackUri($input);
                 self::fail("accepted invalid URI \"{$input}\"");
-            } catch (ProtocolException) {
+            } catch (QuackError) {
                 self::addToAssertionCount(1);
             }
         }

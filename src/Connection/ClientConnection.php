@@ -21,7 +21,6 @@ use Quack\Protocol\Messages\SuccessResponseMessage;
 use Quack\Protocol\QuackConnectionInfo;
 use Quack\Protocol\QuackVersion;
 use Quack\Protocol\Transport\Transport;
-use Quack\Protocol\Types\BigInt;
 use Quack\Protocol\Types\HugeIntParts;
 
 /**
@@ -42,7 +41,6 @@ final class ClientConnection
         private readonly Transport $transport,
         private readonly string $connectionId,
         private readonly QuackVersion $quackVersion,
-        private readonly ?int $heartbeatTimeout,
         private readonly ConnectionState $state,
     ) {
     }
@@ -53,7 +51,6 @@ final class ClientConnection
     public static function connect(
         Transport $transport,
         string $authToken,
-        ?int $heartbeatTimeout,
     ): array {
         $minVersion = QuackVersion::fromNumber(Constants::MIN_QUACK_VERSION);
         $maxVersion = QuackVersion::fromNumber(Constants::MAX_QUACK_VERSION);
@@ -78,14 +75,7 @@ final class ClientConnection
             );
         }
 
-        $heartbeatSeconds = $heartbeatTimeout ?? 60;
-        $hasV3 = in_array(3, array_map(
-            static fn (QuackVersion $version): int => $version->number(),
-            $versions,
-        ), true);
-        if ($hasV3) {
-            self::validateHeartbeatTimeout($heartbeatSeconds);
-        }
+        $heartbeatSeconds = $transport->heartbeatTimeout();
 
         $previousError = null;
         $lastIndex = count($versions) - 1;
@@ -135,15 +125,10 @@ final class ClientConnection
                 );
             }
 
-            $heartbeatTimeout = null;
-            if ($version->number() === 3) {
-                if ($response->heartbeatTimeoutSeconds === null) {
-                    throw new ProtocolException(
-                        'protocol v3 CONNECTION_RESPONSE did not include a heartbeat timeout',
-                    );
-                }
-                $heartbeatTimeout = self::validateHeartbeatTimeout(
-                    $response->heartbeatTimeoutSeconds,
+            if ($version->number() === 3
+                && $response->heartbeatTimeoutSeconds === null) {
+                throw new ProtocolException(
+                    'protocol v3 CONNECTION_RESPONSE did not include a heartbeat timeout',
                 );
             }
 
@@ -152,7 +137,6 @@ final class ClientConnection
                 $transport,
                 $connectionId,
                 $version,
-                $heartbeatTimeout,
                 $state,
             );
             return [
@@ -161,7 +145,6 @@ final class ClientConnection
                     serverDuckdbVersion: $response->serverDuckdbVersion,
                     serverPlatform: $response->serverPlatform,
                     quackVersion: $version,
-                    heartbeatTimeout: $heartbeatTimeout,
                 ),
             ];
         }
@@ -267,11 +250,11 @@ final class ClientConnection
     private function ensureLease(): void
     {
         $this->ensureOpen();
-        if ($this->quackVersion->number() !== 3 || $this->heartbeatTimeout === null) {
+        if ($this->quackVersion->number() !== 3) {
             return;
         }
 
-        $timeout = (float) $this->heartbeatTimeout;
+        $timeout = (float) $this->transport->heartbeatTimeout();
         $now = microtime(true);
         if ($now - $this->state->lastSuccessfulActivity() >= $timeout) {
             $this->state->close();
@@ -302,19 +285,6 @@ final class ClientConnection
             }
             // Transient failure: the next request retries before the lease ends.
         }
-    }
-
-    private static function validateHeartbeatTimeout(int|string $seconds): int
-    {
-        $value = BigInt::coerce($seconds);
-        if ($value->compare(BigInt::fromInt(1)) < 0
-            || $value->compare(BigInt::fromInt(Constants::MAX_HEARTBEAT_TIMEOUT_SECS)) > 0) {
-            throw new ProtocolException(
-                'heartbeat timeout must be between 1 and '
-                . Constants::MAX_HEARTBEAT_TIMEOUT_SECS . ' seconds',
-            );
-        }
-        return $value->toInt();
     }
 
     /**

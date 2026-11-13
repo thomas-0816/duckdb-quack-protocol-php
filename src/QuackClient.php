@@ -44,14 +44,17 @@ final class QuackClient
     public static function connect(
         string $uri,
         string $authToken,
-        float $connectTimeout,
-        float $timeout,
-        bool $ssl,
-        ?int $heartbeatTimeout = 60,
-        ?string $sslFingerprint = null,
+        float $connectTimeout = 10,
+        float $timeout = 120,
+        ?string $sslCertificate = null,
     ): self {
-        $transport = Transport::new($uri, $ssl, $connectTimeout, $timeout, $sslFingerprint);
-        [$connection, $info] = ClientConnection::connect($transport, $authToken, $heartbeatTimeout);
+        $transport = Transport::new(
+            $uri,
+            $connectTimeout,
+            $timeout,
+            $sslCertificate,
+        );
+        [$connection, $info] = ClientConnection::connect($transport, $authToken);
         return new self($connection, $connection->state(), $info);
     }
 

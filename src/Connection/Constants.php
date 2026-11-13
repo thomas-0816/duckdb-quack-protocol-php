@@ -15,9 +15,6 @@ final class Constants
     /** Newest Quack protocol version this client can negotiate (v3). */
     public const MAX_QUACK_VERSION = 3;
 
-    /** Default port used when a `quack:` URI omits one. */
-    public const DEFAULT_QUACK_PORT = 9494;
-
     /** HTTP path every Quack request is posted to. */
     public const QUACK_ENDPOINT = '/quack';
 
@@ -31,9 +28,6 @@ final class Constants
      * u64::MAX. Kept as a string because it exceeds PHP's signed int range.
      */
     public const OPTIONAL_INDEX_INVALID = '18446744073709551615';
-
-    /** Largest heartbeat lease a v3 client may request, in seconds. */
-    public const MAX_HEARTBEAT_TIMEOUT_SECS = 300;
 
     /** Default request timeout in seconds, used when no override is given. */
     public const DEFAULT_REQUEST_TIMEOUT_SECS = 300;
