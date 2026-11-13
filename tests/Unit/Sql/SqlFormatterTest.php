@@ -1,0 +1,214 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Quack\Protocol\Tests\Unit\Sql;
+
+use PHPUnit\Framework\TestCase;
+use Quack\Protocol\Exceptions\ProtocolException;
+use Quack\Protocol\Sql\SqlFormatter;
+use Quack\Protocol\Sql\SqlParameter;
+use Quack\Protocol\Sql\SqlParameters;
+use Quack\Protocol\Types\DateValue;
+use Quack\Protocol\Types\DecimalValue;
+use Quack\Protocol\Types\TimestampUnit;
+use Quack\Protocol\Types\TimestampValue;
+use Quack\Protocol\Types\Value;
+
+final class SqlFormatterTest extends TestCase
+{
+    public function testFormatsPositionalParameters(): void
+    {
+        $params = SqlParameters::positional([
+            SqlParameter::value(Value::int(41)),
+            SqlParameter::value(Value::string("can't")),
+        ]);
+
+        self::assertSame(
+            "SELECT 41 + 1 AS answer, 'can''t' AS label",
+            SqlFormatter::formatSql('SELECT ? + 1 AS answer, ? AS label', $params),
+        );
+    }
+
+    public function testPlaceholdersInsideStringsIdentifiersAndCommentsAreUntouched(): void
+    {
+        $sql = <<<'SQL'
+            SELECT '?' AS "?", ? AS real_value -- ? in a line comment
+            /* ? in a block comment */
+            SQL;
+        $params = SqlParameters::positional([SqlParameter::value(Value::int(7))]);
+
+        self::assertSame(
+            <<<'SQL'
+                SELECT '?' AS "?", 7 AS real_value -- ? in a line comment
+                /* ? in a block comment */
+                SQL,
+            SqlFormatter::formatSql($sql, $params),
+        );
+    }
+
+    public function testFormatsNamedParameters(): void
+    {
+        $params = SqlParameters::named([
+            'id' => SqlParameter::value(Value::int(7)),
+            'label' => SqlParameter::value(Value::string('seven')),
+        ]);
+
+        self::assertSame(
+            "SELECT 7 AS id, 'seven' AS label",
+            SqlFormatter::formatSql('SELECT :id AS id, :label AS label', $params),
+        );
+    }
+
+    public function testFormatsNestedLists(): void
+    {
+        $params = SqlParameters::positional([
+            SqlParameter::list([
+                SqlParameter::value(Value::int(1)),
+                SqlParameter::list([
+                    SqlParameter::value(Value::string('x')),
+                ]),
+            ]),
+        ]);
+
+        self::assertSame(
+            "SELECT [1, ['x']] AS value",
+            SqlFormatter::formatSql('SELECT ? AS value', $params),
+        );
+    }
+
+    public function testFormatsScalarLiterals(): void
+    {
+        $cases = [
+            [Value::null(), 'NULL'],
+            [Value::bool(true), 'TRUE'],
+            [Value::bool(false), 'FALSE'],
+            [Value::int(-3), '-3'],
+            [Value::hugeInt('170141183460469231731687303715884105727'), '170141183460469231731687303715884105727'],
+            [Value::double(1.5), '1.5'],
+            [Value::bytes("\x00\xff"), "from_hex('00ff')"],
+            [Value::decimal(new DecimalValue('1234', 10, 2)), '12.34'],
+            [Value::date(new DateValue(1)), "DATE '1970-01-02'"],
+        ];
+
+        foreach ($cases as [$value, $expected]) {
+            self::assertSame($expected, SqlFormatter::valueLiteral($value));
+        }
+    }
+
+    public function testFormatsTimestampsInUtcAndLocalForms(): void
+    {
+        self::assertSame(
+            "TIMESTAMP '1970-01-01 00:00:01.000'",
+            SqlFormatter::valueLiteral(Value::timestamp(
+                new TimestampValue(TimestampUnit::Seconds, 1),
+            )),
+        );
+        self::assertSame(
+            "TIMESTAMPTZ '1970-01-01 00:00:01.000+00'",
+            SqlFormatter::valueLiteral(Value::timestamp(
+                new TimestampValue(TimestampUnit::Seconds, 1, true),
+            )),
+        );
+    }
+
+    public function testDetectsPhpTypesAutomatically(): void
+    {
+        self::assertSame(
+            "SELECT 41, 'can''t', TRUE, 1.5, NULL",
+            SqlFormatter::formatSql(
+                'SELECT ?, ?, ?, ?, ?',
+                [41, "can't", true, 1.5, null],
+            ),
+        );
+    }
+
+    public function testDetectsSequentialArraysAsLists(): void
+    {
+        self::assertSame(
+            'SELECT [1, 2, 3] AS value',
+            SqlFormatter::formatSql('SELECT ? AS value', [[1, 2, 3]]),
+        );
+    }
+
+    public function testDetectsStringKeyedArraysAsStructs(): void
+    {
+        self::assertSame(
+            "SELECT {'name': 'Ada', 'tags': ['math', 'code']} AS value",
+            SqlFormatter::formatSql(
+                'SELECT ? AS value',
+                [['name' => 'Ada', 'tags' => ['math', 'code']]],
+            ),
+        );
+    }
+
+    public function testDetectsNamedRawArrays(): void
+    {
+        self::assertSame(
+            "SELECT 7 AS id, 'seven' AS label",
+            SqlFormatter::formatSql(
+                'SELECT :id AS id, :label AS label',
+                ['id' => 7, 'label' => 'seven'],
+            ),
+        );
+    }
+
+    public function testDetectsEnumsStringablesAndByteResources(): void
+    {
+        $stream = fopen('php://memory', 'r+');
+        self::assertIsResource($stream);
+        fwrite($stream, "\x00\xff");
+        rewind($stream);
+
+        self::assertSame(
+            "SELECT 2, 'Object', from_hex('00ff')",
+            SqlFormatter::formatSql(
+                'SELECT ?, ?, ?',
+                [ExampleBackedEnum::Two, ExampleUnitEnum::Object, $stream],
+            ),
+        );
+    }
+
+    public function testJsonEncodesArbitraryObjects(): void
+    {
+        self::assertSame(
+            'SELECT \'{"answer":42}\' AS value',
+            SqlFormatter::formatSql('SELECT ? AS value', [new ExampleJsonObject()]),
+        );
+    }
+
+    public function testRejectsPlaceholderCountMismatch(): void
+    {
+        $this->expectException(ProtocolException::class);
+
+        SqlFormatter::formatSql(
+            'SELECT ?',
+            SqlParameters::positional([]),
+        );
+    }
+
+    public function testRejectsMissingNamedParameter(): void
+    {
+        $this->expectException(ProtocolException::class);
+
+        SqlFormatter::formatSql(
+            'SELECT :missing',
+            SqlParameters::named([]),
+        );
+    }
+}
+
+enum ExampleBackedEnum: int
+{
+    case Two = 2;
+}
+
+enum ExampleUnitEnum
+{
+    case Object;
+}
+
+final class ExampleJsonObject
+{
+    public int $answer = 42;
+}

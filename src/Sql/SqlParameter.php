@@ -1,0 +1,188 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Quack\Protocol\Sql;
+
+use Quack\Protocol\Exceptions\ProtocolException;
+use Quack\Protocol\Types\Value;
+
+/**
+ * A value or a nested list of values supplied as a SQL parameter.
+ *
+ * Use {@see self::fromPhp()} when accepting arbitrary PHP values; it detects
+ * null, bool, int, float, string, enums, arrays, resources, and objects.
+ */
+final class SqlParameter
+{
+    public const VALUE = 'value';
+    public const LIST = 'list';
+
+    private function __construct(
+        public readonly string $kind,
+        public readonly mixed $value,
+    ) {
+    }
+
+    public static function value(Value $value): self
+    {
+        return new self(self::VALUE, $value);
+    }
+
+    /**
+     * @param list<self> $values
+     */
+    public static function list(array $values): self
+    {
+        return new self(self::LIST, $values);
+    }
+
+    /**
+     * Detects the DuckDB type of an arbitrary PHP value.
+     *
+     * Sequential arrays become LIST parameters and string-keyed arrays become
+     * STRUCT parameters. Scalars map to their natural DuckDB types, enums map
+     * to their backing value or name, resources map to BLOB, Stringable objects
+     * map to VARCHAR, and other objects are JSON-encoded to VARCHAR.
+     */
+    public static function fromPhp(mixed $value): self
+    {
+        if ($value instanceof self) {
+            return $value;
+        }
+
+        if (is_array($value)) {
+            if (array_is_list($value)) {
+                $items = [];
+                foreach ($value as $item) {
+                    $items[] = self::fromPhp($item);
+                }
+
+                return self::list($items);
+            }
+
+            $fields = [];
+            foreach ($value as $name => $item) {
+                if (!is_string($name)) {
+                    throw new ProtocolException('STRUCT parameter keys must be strings');
+                }
+                $fields[$name] = self::toValue($item);
+            }
+
+            return self::value(Value::struct($fields));
+        }
+
+        return self::value(self::toValue($value));
+    }
+
+    /**
+     * Converts an arbitrary PHP value, including nested arrays, into a Value.
+     */
+    private static function toValue(mixed $value): Value
+    {
+        if ($value instanceof Value) {
+            return $value;
+        }
+        if (is_array($value)) {
+            if (array_is_list($value)) {
+                return Value::list(array_map(
+                    static fn (mixed $item): Value => self::toValue($item),
+                    $value,
+                ));
+            }
+
+            $fields = [];
+            foreach ($value as $name => $item) {
+                if (!is_string($name)) {
+                    throw new ProtocolException('STRUCT parameter keys must be strings');
+                }
+                $fields[$name] = self::toValue($item);
+            }
+
+            return Value::struct($fields);
+        }
+
+        return self::valueFromPhp($value);
+    }
+
+    private static function valueFromPhp(mixed $value): Value
+    {
+        if ($value instanceof Value) {
+            return $value;
+        }
+        if ($value === null) {
+            return Value::null();
+        }
+        if (is_bool($value)) {
+            return Value::bool($value);
+        }
+        if (is_int($value)) {
+            return Value::int($value);
+        }
+        if (is_float($value)) {
+            return Value::double($value);
+        }
+        if (is_string($value)) {
+            return Value::string($value);
+        }
+        if ($value instanceof \BackedEnum) {
+            return self::valueFromPhp($value->value);
+        }
+        if ($value instanceof \UnitEnum) {
+            return Value::string($value->name);
+        }
+        if ($value instanceof \Stringable) {
+            return Value::string((string) $value);
+        }
+        if (is_resource($value)) {
+            $contents = stream_get_contents($value);
+            if ($contents === false) {
+                throw new ProtocolException('could not read resource SQL parameter');
+            }
+
+            return Value::bytes($contents);
+        }
+        if (is_object($value)) {
+            try {
+                return Value::string(json_encode($value, JSON_THROW_ON_ERROR));
+            } catch (\JsonException $error) {
+                throw new ProtocolException(
+                    'could not JSON-encode SQL parameter of type ' . get_debug_type($value),
+                    previous: $error,
+                );
+            }
+        }
+
+        throw new ProtocolException(
+            'unsupported SQL parameter type ' . get_debug_type($value),
+        );
+    }
+
+    public function asValue(): Value
+    {
+        if (!$this->value instanceof Value) {
+            throw new ProtocolException('SQL parameter is not a value parameter');
+        }
+
+        return $this->value;
+    }
+
+    /**
+     * @return list<self>
+     */
+    public function asList(): array
+    {
+        if (!is_array($this->value)) {
+            throw new ProtocolException('SQL parameter is not a list parameter');
+        }
+        $values = [];
+        foreach ($this->value as $item) {
+            if (!$item instanceof self) {
+                throw new ProtocolException('SQL list parameter contains an invalid element');
+            }
+            $values[] = $item;
+        }
+
+        return $values;
+    }
+}
