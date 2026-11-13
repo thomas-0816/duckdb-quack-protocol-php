@@ -12,12 +12,10 @@ use Quack\Protocol\Messages\ConnectionRequestMessage;
 use Quack\Protocol\Messages\ConnectionResponseMessage;
 use Quack\Protocol\Messages\DisconnectMessage;
 use Quack\Protocol\Messages\FetchRequestMessage;
-use Quack\Protocol\Messages\HeartbeatRequestMessage;
 use Quack\Protocol\Messages\MessageHeader;
 use Quack\Protocol\Messages\MessageType;
 use Quack\Protocol\Messages\PrepareRequestMessage;
 use Quack\Protocol\Messages\QuackMessage;
-use Quack\Protocol\Messages\SuccessResponseMessage;
 use Quack\Protocol\QuackConnectionInfo;
 use Quack\Protocol\QuackVersion;
 use Quack\Protocol\Transport\Transport;
@@ -26,10 +24,8 @@ use Quack\Protocol\Types\HugeIntParts;
 /**
  * One negotiated Quack session, minus the public client facade.
  *
- * This synchronous port has no background heartbeat task: a request first
- * checks the heartbeat lease and sends an opportunistic HEARTBEAT if one is
- * due. A heartbeat that fails before the lease expires is retried by the next
- * request.
+ * This synchronous port has no background keepalive: a client sends a
+ * best-effort DISCONNECT when it is dropped.
  */
 final class ClientConnection
 {
@@ -75,8 +71,6 @@ final class ClientConnection
             );
         }
 
-        $heartbeatSeconds = $transport->heartbeatTimeout();
-
         $previousError = null;
         $lastIndex = count($versions) - 1;
         foreach ($versions as $index => $version) {
@@ -88,7 +82,7 @@ final class ClientConnection
                         clientPlatform: 'quack-php',
                         minSupportedQuackVersion: $version->number(),
                         maxSupportedQuackVersion: $version->number(),
-                        heartbeatTimeoutSeconds: $heartbeatSeconds,
+                        heartbeatTimeoutSeconds: (int) ceil($transport->timeout()),
                     ),
                     $version,
                 );
@@ -122,13 +116,6 @@ final class ClientConnection
                     : (string) $response->quackVersion;
                 throw new ProtocolException(
                     "server selected Quack protocol version {$selected}, expected {$version}",
-                );
-            }
-
-            if ($version->number() === 3
-                && $response->heartbeatTimeoutSeconds === null) {
-                throw new ProtocolException(
-                    'protocol v3 CONNECTION_RESPONSE did not include a heartbeat timeout',
                 );
             }
 
@@ -171,11 +158,8 @@ final class ClientConnection
 
     public function send(QuackMessage $message): QuackMessage
     {
-        $this->ensureLease();
-        $response = $this->transport->send($message, $this->quackVersion);
-        $this->state->recordSuccess();
-
-        return $response;
+        $this->ensureOpen();
+        return $this->transport->send($message, $this->quackVersion);
     }
 
     public function prepare(string $sql): QuackMessage
@@ -244,46 +228,6 @@ final class ClientConnection
     {
         if ($this->state->isClosed()) {
             throw new ProtocolException('Quack client is not connected');
-        }
-    }
-
-    private function ensureLease(): void
-    {
-        $this->ensureOpen();
-        if ($this->quackVersion->number() !== 3) {
-            return;
-        }
-
-        $timeout = (float) $this->transport->heartbeatTimeout();
-        $now = microtime(true);
-        if ($now - $this->state->lastSuccessfulActivity() >= $timeout) {
-            $this->state->close();
-            throw new ProtocolException('Quack heartbeat lease expired');
-        }
-
-        $interval = max($timeout / 3, 0.1);
-        if ($now - $this->state->lastSuccessfulActivity() < $interval) {
-            return;
-        }
-
-        $heartbeat = new HeartbeatRequestMessage(
-            MessageHeader::new(MessageType::HeartbeatRequest)
-                ->withConnection($this->connectionId),
-        );
-        try {
-            $response = $this->transport->send($heartbeat, QuackVersion::v3());
-            if (!$response instanceof SuccessResponseMessage) {
-                $this->state->close();
-                throw new ProtocolException(
-                    'Quack heartbeat returned an unexpected response; closing connection',
-                );
-            }
-            $this->state->recordSuccess();
-        } catch (QuackError $error) {
-            if ($this->state->closeIfExpired($timeout)) {
-                throw new ProtocolException('Quack heartbeat lease expired');
-            }
-            // Transient failure: the next request retries before the lease ends.
         }
     }
 

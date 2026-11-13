@@ -69,15 +69,6 @@ final class Transport
         return $this->timeout;
     }
 
-    /**
-     * The heartbeat lease matching the request timeout, so a request cannot
-     * outlive it.
-     */
-    public function heartbeatTimeout(): int
-    {
-        return (int) ceil($this->timeout);
-    }
-
     public function withTimeout(float $timeout): self
     {
         $clone = clone $this;
