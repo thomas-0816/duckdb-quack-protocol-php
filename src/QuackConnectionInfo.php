@@ -1,6 +1,6 @@
 <?php
 
-namespace Quack\Protocol;
+namespace DuckDB\Quack;
 
 /**
  * What the server reported when a session was opened.

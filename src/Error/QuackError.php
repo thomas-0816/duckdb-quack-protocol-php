@@ -1,10 +1,10 @@
 <?php
 
-namespace Quack\Protocol\Error;
+namespace DuckDB\Quack\Error;
 
-use Quack\Protocol\Exceptions\ProtocolException;
-use Quack\Protocol\Exceptions\UnsupportedTypeException;
-use Quack\Protocol\Transport\Transport;
+use DuckDB\Quack\Exceptions\ProtocolException;
+use DuckDB\Quack\Exceptions\UnsupportedTypeException;
+use DuckDB\Quack\Transport\Transport;
 
 /**
  * Base class for every error raised by this package.

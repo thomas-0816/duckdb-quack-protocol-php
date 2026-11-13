@@ -1,9 +1,9 @@
 <?php
 
-namespace Quack\Protocol\Types\Info;
+namespace DuckDB\Quack\Types\Info;
 
-use Quack\Protocol\Types\ChildType;
-use Quack\Protocol\Types\ExtraTypeInfoType;
+use DuckDB\Quack\Types\ChildType;
+use DuckDB\Quack\Types\ExtraTypeInfoType;
 
 final class StructTypeInfo extends ExtraTypeInfo
 {

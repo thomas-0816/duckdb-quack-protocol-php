@@ -13,7 +13,7 @@
 
 require __DIR__ . '/../vendor/autoload.php';
 
-use Quack\Protocol\QuackClient;
+use DuckDB\Quack\QuackClient;
 
 $pemFile = $argv[1] ?? '';
 if ($pemFile === '') {

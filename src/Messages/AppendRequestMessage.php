@@ -1,8 +1,8 @@
 <?php
 
-namespace Quack\Protocol\Messages;
+namespace DuckDB\Quack\Messages;
 
-use Quack\Protocol\Chunk\DataChunk;
+use DuckDB\Quack\Chunk\DataChunk;
 
 final class AppendRequestMessage extends QuackMessage
 {

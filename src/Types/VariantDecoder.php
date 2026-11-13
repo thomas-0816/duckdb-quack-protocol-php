@@ -1,8 +1,8 @@
 <?php
 
-namespace Quack\Protocol\Types;
+namespace DuckDB\Quack\Types;
 
-use Quack\Protocol\Exceptions\ProtocolException;
+use DuckDB\Quack\Exceptions\ProtocolException;
 
 /**
  * Decodes DuckDB's shredded VARIANT representation into native PHP values.

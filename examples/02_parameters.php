@@ -15,9 +15,9 @@
 
 require __DIR__ . '/../vendor/autoload.php';
 
-use Quack\Protocol\QuackClient;
-use Quack\Protocol\Sql\SqlFormatter;
-use Quack\Protocol\Sql\SqlParameter;
+use DuckDB\Quack\QuackClient;
+use DuckDB\Quack\Sql\SqlFormatter;
+use DuckDB\Quack\Sql\SqlParameter;
 
 $client = QuackClient::connect(
     'http://127.0.0.1:9494',
@@ -78,8 +78,8 @@ print_r($rows);
 
 // The explicit SqlParameter/SqlParameters API is still available when a caller
 // needs to force a specific representation.
-$explicit = \Quack\Protocol\Sql\SqlParameters::positional([
-    \Quack\Protocol\Sql\SqlParameter::value(\Quack\Protocol\Types\Value::string("O'Reilly")),
+$explicit = \DuckDB\Quack\Sql\SqlParameters::positional([
+    \DuckDB\Quack\Sql\SqlParameter::value(\DuckDB\Quack\Types\Value::string("O'Reilly")),
 ]);
 echo PHP_EOL, 'explicit parameter: ',
 SqlFormatter::formatSql('SELECT ? AS author', $explicit), PHP_EOL;
@@ -89,7 +89,7 @@ SqlFormatter::sqlLiteral(SqlParameter::fromPhp("O'Reilly")), PHP_EOL;
 
 try {
     SqlFormatter::formatSql('SELECT ?', []);
-} catch (\Quack\Protocol\Exceptions\ProtocolException $error) {
+} catch (\DuckDB\Quack\Exceptions\ProtocolException $error) {
     echo 'expected error: ', $error->getMessage(), PHP_EOL;
 }
 

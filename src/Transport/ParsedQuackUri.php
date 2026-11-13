@@ -1,6 +1,6 @@
 <?php
 
-namespace Quack\Protocol\Transport;
+namespace DuckDB\Quack\Transport;
 
 /**
  * The parts of a Quack URI that the HTTP transport needs.

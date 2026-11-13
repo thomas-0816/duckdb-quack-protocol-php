@@ -1,6 +1,6 @@
 <?php
 
-namespace Quack\Protocol\Error;
+namespace DuckDB\Quack\Error;
 
 /** An optional error detail recognized from DuckDB's extra-info map. */
 final class ErrorSubtype

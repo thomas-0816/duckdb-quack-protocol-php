@@ -1,11 +1,11 @@
 <?php
 
-namespace Quack\Protocol\Tests\Unit\Transport;
+namespace DuckDB\Quack\Tests\Unit\Transport;
 
+use DuckDB\Quack\Error\QuackError;
+use DuckDB\Quack\Transport\ParsedQuackUri;
+use DuckDB\Quack\Transport\UriParser;
 use PHPUnit\Framework\TestCase;
-use Quack\Protocol\Error\QuackError;
-use Quack\Protocol\Transport\ParsedQuackUri;
-use Quack\Protocol\Transport\UriParser;
 
 final class UriParserTest extends TestCase
 {

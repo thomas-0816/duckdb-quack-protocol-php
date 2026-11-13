@@ -1,8 +1,8 @@
 <?php
 
-namespace Quack\Protocol\Types;
+namespace DuckDB\Quack\Types;
 
-use Quack\Protocol\Exceptions\ProtocolException;
+use DuckDB\Quack\Exceptions\ProtocolException;
 
 /**
  * The two 64-bit halves of a 128-bit integer, matching DuckDB's hugeint layout.

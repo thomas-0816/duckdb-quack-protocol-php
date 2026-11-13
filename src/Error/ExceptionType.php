@@ -1,6 +1,6 @@
 <?php
 
-namespace Quack\Protocol\Error;
+namespace DuckDB\Quack\Error;
 
 /**
  * A known DuckDB exception category, or an unchanged future wire value.

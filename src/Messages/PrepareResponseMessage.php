@@ -1,10 +1,10 @@
 <?php
 
-namespace Quack\Protocol\Messages;
+namespace DuckDB\Quack\Messages;
 
-use Quack\Protocol\Chunk\DataChunk;
-use Quack\Protocol\Types\HugeIntParts;
-use Quack\Protocol\Types\LogicalType;
+use DuckDB\Quack\Chunk\DataChunk;
+use DuckDB\Quack\Types\HugeIntParts;
+use DuckDB\Quack\Types\LogicalType;
 
 final class PrepareResponseMessage extends QuackMessage
 {

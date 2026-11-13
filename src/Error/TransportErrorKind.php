@@ -1,6 +1,6 @@
 <?php
 
-namespace Quack\Protocol\Error;
+namespace DuckDB\Quack\Error;
 
 /** What part of an HTTP exchange failed. */
 enum TransportErrorKind: string

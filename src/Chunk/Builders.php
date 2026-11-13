@@ -1,17 +1,17 @@
 <?php
 
-namespace Quack\Protocol\Chunk;
+namespace DuckDB\Quack\Chunk;
 
-use Quack\Protocol\Exceptions\ProtocolException;
-use Quack\Protocol\Types\ChildType;
-use Quack\Protocol\Types\LogicalType;
-use Quack\Protocol\Types\LogicalTypeCodec;
-use Quack\Protocol\Types\LogicalTypeId;
-use Quack\Protocol\Types\LogicalTypes;
-use Quack\Protocol\Types\TimestampUnit;
-use Quack\Protocol\Types\TimeUnit;
-use Quack\Protocol\Types\Value;
-use Quack\Protocol\Types\VectorType;
+use DuckDB\Quack\Exceptions\ProtocolException;
+use DuckDB\Quack\Types\ChildType;
+use DuckDB\Quack\Types\LogicalType;
+use DuckDB\Quack\Types\LogicalTypeCodec;
+use DuckDB\Quack\Types\LogicalTypeId;
+use DuckDB\Quack\Types\LogicalTypes;
+use DuckDB\Quack\Types\TimestampUnit;
+use DuckDB\Quack\Types\TimeUnit;
+use DuckDB\Quack\Types\Value;
+use DuckDB\Quack\Types\VectorType;
 
 /**
  * Builds DataChunks from columns, row maps, and inferred types.
@@ -163,7 +163,7 @@ final class Builders
         return LogicalTypes::ubigint();
     }
 
-    private static function inferTimestampType(\Quack\Protocol\Types\TimestampValue $value): LogicalType
+    private static function inferTimestampType(\DuckDB\Quack\Types\TimestampValue $value): LogicalType
     {
         return match ($value->unit) {
             TimestampUnit::Seconds => LogicalTypes::timestampSeconds(),

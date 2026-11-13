@@ -1,22 +1,22 @@
 <?php
 
-namespace Quack\Protocol\Tests\Unit\Json;
+namespace DuckDB\Quack\Tests\Unit\Json;
 
+use DuckDB\Quack\Exceptions\ProtocolException;
+use DuckDB\Quack\Json\BigIntJsonMode;
+use DuckDB\Quack\Json\BytesJsonMode;
+use DuckDB\Quack\Json\JsonConverter;
+use DuckDB\Quack\Json\JsonOptions;
+use DuckDB\Quack\Json\TaggedJsonMode;
+use DuckDB\Quack\Types\DateValue;
+use DuckDB\Quack\Types\DecimalValue;
+use DuckDB\Quack\Types\IntervalValue;
+use DuckDB\Quack\Types\TimestampUnit;
+use DuckDB\Quack\Types\TimestampValue;
+use DuckDB\Quack\Types\TimeUnit;
+use DuckDB\Quack\Types\TimeValue;
+use DuckDB\Quack\Types\Value;
 use PHPUnit\Framework\TestCase;
-use Quack\Protocol\Exceptions\ProtocolException;
-use Quack\Protocol\Json\BigIntJsonMode;
-use Quack\Protocol\Json\BytesJsonMode;
-use Quack\Protocol\Json\JsonConverter;
-use Quack\Protocol\Json\JsonOptions;
-use Quack\Protocol\Json\TaggedJsonMode;
-use Quack\Protocol\Types\DateValue;
-use Quack\Protocol\Types\DecimalValue;
-use Quack\Protocol\Types\IntervalValue;
-use Quack\Protocol\Types\TimestampUnit;
-use Quack\Protocol\Types\TimestampValue;
-use Quack\Protocol\Types\TimeUnit;
-use Quack\Protocol\Types\TimeValue;
-use Quack\Protocol\Types\Value;
 
 final class JsonConverterTest extends TestCase
 {

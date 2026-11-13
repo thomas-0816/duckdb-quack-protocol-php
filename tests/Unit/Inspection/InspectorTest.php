@@ -1,16 +1,16 @@
 <?php
 
-namespace Quack\Protocol\Tests\Unit\Inspection;
+namespace DuckDB\Quack\Tests\Unit\Inspection;
 
+use DuckDB\Quack\Error\InspectionErrorKind;
+use DuckDB\Quack\Error\ServerError;
+use DuckDB\Quack\Exceptions\InspectionException;
+use DuckDB\Quack\Inspection\ControlResponseKind;
+use DuckDB\Quack\Inspection\InspectionMessageHeader;
+use DuckDB\Quack\Inspection\Inspector;
+use DuckDB\Quack\Messages\MessageType;
+use DuckDB\Quack\Transport\BinaryWriter;
 use PHPUnit\Framework\TestCase;
-use Quack\Protocol\Error\InspectionErrorKind;
-use Quack\Protocol\Error\ServerError;
-use Quack\Protocol\Exceptions\InspectionException;
-use Quack\Protocol\Inspection\ControlResponseKind;
-use Quack\Protocol\Inspection\InspectionMessageHeader;
-use Quack\Protocol\Inspection\Inspector;
-use Quack\Protocol\Messages\MessageType;
-use Quack\Protocol\Transport\BinaryWriter;
 
 final class InspectorTest extends TestCase
 {

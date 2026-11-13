@@ -1,17 +1,17 @@
 <?php
 
-namespace Quack\Protocol\Tests\Unit\Sql;
+namespace DuckDB\Quack\Tests\Unit\Sql;
 
+use DuckDB\Quack\Exceptions\ProtocolException;
+use DuckDB\Quack\Sql\SqlFormatter;
+use DuckDB\Quack\Sql\SqlParameter;
+use DuckDB\Quack\Sql\SqlParameters;
+use DuckDB\Quack\Types\DateValue;
+use DuckDB\Quack\Types\DecimalValue;
+use DuckDB\Quack\Types\TimestampUnit;
+use DuckDB\Quack\Types\TimestampValue;
+use DuckDB\Quack\Types\Value;
 use PHPUnit\Framework\TestCase;
-use Quack\Protocol\Exceptions\ProtocolException;
-use Quack\Protocol\Sql\SqlFormatter;
-use Quack\Protocol\Sql\SqlParameter;
-use Quack\Protocol\Sql\SqlParameters;
-use Quack\Protocol\Types\DateValue;
-use Quack\Protocol\Types\DecimalValue;
-use Quack\Protocol\Types\TimestampUnit;
-use Quack\Protocol\Types\TimestampValue;
-use Quack\Protocol\Types\Value;
 
 final class SqlFormatterTest extends TestCase
 {

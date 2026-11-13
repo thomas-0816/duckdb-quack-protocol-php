@@ -1,13 +1,13 @@
 <?php
 
-namespace Quack\Protocol\Json;
+namespace DuckDB\Quack\Json;
 
-use Quack\Protocol\Exceptions\ProtocolException;
-use Quack\Protocol\Types\BigInt;
-use Quack\Protocol\Types\TemporalFormatter;
-use Quack\Protocol\Types\TimestampUnit;
-use Quack\Protocol\Types\TimeUnit;
-use Quack\Protocol\Types\Value;
+use DuckDB\Quack\Exceptions\ProtocolException;
+use DuckDB\Quack\Types\BigInt;
+use DuckDB\Quack\Types\TemporalFormatter;
+use DuckDB\Quack\Types\TimestampUnit;
+use DuckDB\Quack\Types\TimeUnit;
+use DuckDB\Quack\Types\Value;
 
 /**
  * Converts decoded values to structures suitable for json_encode().
@@ -180,7 +180,7 @@ final class JsonConverter
      * @return array<string,string>|string
      */
     private static function timestampJson(
-        \Quack\Protocol\Types\TimestampValue $value,
+        \DuckDB\Quack\Types\TimestampValue $value,
         TaggedJsonMode $mode,
     ): array|string {
         if ($mode === TaggedJsonMode::Tagged) {

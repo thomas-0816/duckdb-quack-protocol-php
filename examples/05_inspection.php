@@ -12,12 +12,12 @@
 
 require __DIR__ . '/../vendor/autoload.php';
 
-use Quack\Protocol\Error\ServerError;
-use Quack\Protocol\Exceptions\InspectionException;
-use Quack\Protocol\Inspection\ControlResponseKind;
-use Quack\Protocol\Inspection\InspectionMessageHeader;
-use Quack\Protocol\Inspection\Inspector;
-use Quack\Protocol\Messages\MessageType;
+use DuckDB\Quack\Error\ServerError;
+use DuckDB\Quack\Exceptions\InspectionException;
+use DuckDB\Quack\Inspection\ControlResponseKind;
+use DuckDB\Quack\Inspection\InspectionMessageHeader;
+use DuckDB\Quack\Inspection\Inspector;
+use DuckDB\Quack\Messages\MessageType;
 
 $connectionId = 'example-connection';
 

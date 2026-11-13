@@ -1,11 +1,11 @@
 <?php
 
-namespace Quack\Protocol\Transport;
+namespace DuckDB\Quack\Transport;
 
-use Quack\Protocol\Exceptions\ProtocolException;
-use Quack\Protocol\Exceptions\Utf8Exception;
-use Quack\Protocol\Types\BigInt;
-use Quack\Protocol\Types\HugeIntParts;
+use DuckDB\Quack\Exceptions\ProtocolException;
+use DuckDB\Quack\Exceptions\Utf8Exception;
+use DuckDB\Quack\Types\BigInt;
+use DuckDB\Quack\Types\HugeIntParts;
 
 /**
  * A little-endian binary writer using DuckDB's BinarySerializer field layout.

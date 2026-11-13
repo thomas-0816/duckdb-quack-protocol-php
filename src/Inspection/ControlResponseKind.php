@@ -1,6 +1,6 @@
 <?php
 
-namespace Quack\Protocol\Inspection;
+namespace DuckDB\Quack\Inspection;
 
 enum ControlResponseKind: string
 {

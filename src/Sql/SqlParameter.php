@@ -1,9 +1,9 @@
 <?php
 
-namespace Quack\Protocol\Sql;
+namespace DuckDB\Quack\Sql;
 
-use Quack\Protocol\Exceptions\ProtocolException;
-use Quack\Protocol\Types\Value;
+use DuckDB\Quack\Exceptions\ProtocolException;
+use DuckDB\Quack\Types\Value;
 
 /**
  * A value or a nested list of values supplied as a SQL parameter.

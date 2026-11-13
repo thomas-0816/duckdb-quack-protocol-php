@@ -1,8 +1,8 @@
 <?php
 
-namespace Quack\Protocol\Inspection;
+namespace DuckDB\Quack\Inspection;
 
-use Quack\Protocol\Messages\MessageType;
+use DuckDB\Quack\Messages\MessageType;
 
 /**
  * A Quack message header inspected without decoding its body.

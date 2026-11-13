@@ -1,8 +1,8 @@
 <?php
 
-namespace Quack\Protocol\Types;
+namespace DuckDB\Quack\Types;
 
-use Quack\Protocol\Types\Info\{
+use DuckDB\Quack\Types\Info\{
     ArrayTypeInfo,
     DecimalTypeInfo,
     EnumTypeInfo,

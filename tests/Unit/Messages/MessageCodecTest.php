@@ -1,21 +1,21 @@
 <?php
 
-namespace Quack\Protocol\Tests\Unit\Messages;
+namespace DuckDB\Quack\Tests\Unit\Messages;
 
+use DuckDB\Quack\Error\ServerError;
+use DuckDB\Quack\Messages\CancelMessage;
+use DuckDB\Quack\Messages\ConnectionRequestMessage;
+use DuckDB\Quack\Messages\DisconnectMessage;
+use DuckDB\Quack\Messages\ErrorMessage;
+use DuckDB\Quack\Messages\FetchRequestMessage;
+use DuckDB\Quack\Messages\HeartbeatRequestMessage;
+use DuckDB\Quack\Messages\MessageCodec;
+use DuckDB\Quack\Messages\MessageHeader;
+use DuckDB\Quack\Messages\MessageType;
+use DuckDB\Quack\Messages\PrepareRequestMessage;
+use DuckDB\Quack\QuackVersion;
+use DuckDB\Quack\Types\HugeIntParts;
 use PHPUnit\Framework\TestCase;
-use Quack\Protocol\Error\ServerError;
-use Quack\Protocol\Messages\CancelMessage;
-use Quack\Protocol\Messages\ConnectionRequestMessage;
-use Quack\Protocol\Messages\DisconnectMessage;
-use Quack\Protocol\Messages\ErrorMessage;
-use Quack\Protocol\Messages\FetchRequestMessage;
-use Quack\Protocol\Messages\HeartbeatRequestMessage;
-use Quack\Protocol\Messages\MessageCodec;
-use Quack\Protocol\Messages\MessageHeader;
-use Quack\Protocol\Messages\MessageType;
-use Quack\Protocol\Messages\PrepareRequestMessage;
-use Quack\Protocol\QuackVersion;
-use Quack\Protocol\Types\HugeIntParts;
 
 final class MessageCodecTest extends TestCase
 {

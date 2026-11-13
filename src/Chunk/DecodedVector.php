@@ -1,10 +1,10 @@
 <?php
 
-namespace Quack\Protocol\Chunk;
+namespace DuckDB\Quack\Chunk;
 
-use Quack\Protocol\Types\LogicalType;
-use Quack\Protocol\Types\Value;
-use Quack\Protocol\Types\VectorType;
+use DuckDB\Quack\Types\LogicalType;
+use DuckDB\Quack\Types\Value;
+use DuckDB\Quack\Types\VectorType;
 
 final class DecodedVector
 {

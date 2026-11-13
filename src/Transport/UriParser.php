@@ -1,9 +1,9 @@
 <?php
 
-namespace Quack\Protocol\Transport;
+namespace DuckDB\Quack\Transport;
 
-use Quack\Protocol\Exceptions\ProtocolException;
-use Quack\Protocol\Exceptions\UrlException;
+use DuckDB\Quack\Exceptions\ProtocolException;
+use DuckDB\Quack\Exceptions\UrlException;
 
 /**
  * Parses the listen URL advertised by `quack_serve`.

@@ -1,8 +1,8 @@
 <?php
 
-namespace Quack\Protocol\Sql;
+namespace DuckDB\Quack\Sql;
 
-use Quack\Protocol\Exceptions\ProtocolException;
+use DuckDB\Quack\Exceptions\ProtocolException;
 
 /**
  * Positional or named SQL parameters.

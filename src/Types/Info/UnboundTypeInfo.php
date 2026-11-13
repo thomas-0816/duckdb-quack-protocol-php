@@ -1,8 +1,8 @@
 <?php
 
-namespace Quack\Protocol\Types\Info;
+namespace DuckDB\Quack\Types\Info;
 
-use Quack\Protocol\Types\ExtraTypeInfoType;
+use DuckDB\Quack\Types\ExtraTypeInfoType;
 
 final class UnboundTypeInfo extends ExtraTypeInfo
 {

@@ -1,8 +1,8 @@
 <?php
 
-namespace Quack\Protocol\Messages;
+namespace DuckDB\Quack\Messages;
 
-use Quack\Protocol\Types\HugeIntParts;
+use DuckDB\Quack\Types\HugeIntParts;
 
 final class PrepareRequestMessage extends QuackMessage
 {

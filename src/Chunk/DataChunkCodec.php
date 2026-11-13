@@ -1,31 +1,31 @@
 <?php
 
-namespace Quack\Protocol\Chunk;
+namespace DuckDB\Quack\Chunk;
 
-use Quack\Protocol\Exceptions\ProtocolException;
-use Quack\Protocol\Exceptions\UnsupportedTypeException;
-use Quack\Protocol\Exceptions\Utf8Exception;
-use Quack\Protocol\Messages\MessageCodec;
-use Quack\Protocol\Transport\BinaryReader;
-use Quack\Protocol\Transport\BinaryWriter;
-use Quack\Protocol\Types\BigInt;
-use Quack\Protocol\Types\Bignum;
-use Quack\Protocol\Types\BitString;
-use Quack\Protocol\Types\DateValue;
-use Quack\Protocol\Types\DecimalValue;
-use Quack\Protocol\Types\HugeIntParts;
-use Quack\Protocol\Types\IntervalValue;
-use Quack\Protocol\Types\LogicalType;
-use Quack\Protocol\Types\LogicalTypeCodec;
-use Quack\Protocol\Types\LogicalTypeId;
-use Quack\Protocol\Types\PhysicalType;
-use Quack\Protocol\Types\TimestampUnit;
-use Quack\Protocol\Types\TimestampValue;
-use Quack\Protocol\Types\TimeTzValue;
-use Quack\Protocol\Types\TimeUnit;
-use Quack\Protocol\Types\TimeValue;
-use Quack\Protocol\Types\Value;
-use Quack\Protocol\Types\VectorType;
+use DuckDB\Quack\Exceptions\ProtocolException;
+use DuckDB\Quack\Exceptions\UnsupportedTypeException;
+use DuckDB\Quack\Exceptions\Utf8Exception;
+use DuckDB\Quack\Messages\MessageCodec;
+use DuckDB\Quack\Transport\BinaryReader;
+use DuckDB\Quack\Transport\BinaryWriter;
+use DuckDB\Quack\Types\BigInt;
+use DuckDB\Quack\Types\Bignum;
+use DuckDB\Quack\Types\BitString;
+use DuckDB\Quack\Types\DateValue;
+use DuckDB\Quack\Types\DecimalValue;
+use DuckDB\Quack\Types\HugeIntParts;
+use DuckDB\Quack\Types\IntervalValue;
+use DuckDB\Quack\Types\LogicalType;
+use DuckDB\Quack\Types\LogicalTypeCodec;
+use DuckDB\Quack\Types\LogicalTypeId;
+use DuckDB\Quack\Types\PhysicalType;
+use DuckDB\Quack\Types\TimestampUnit;
+use DuckDB\Quack\Types\TimestampValue;
+use DuckDB\Quack\Types\TimeTzValue;
+use DuckDB\Quack\Types\TimeUnit;
+use DuckDB\Quack\Types\TimeValue;
+use DuckDB\Quack\Types\Value;
+use DuckDB\Quack\Types\VectorType;
 
 /**
  * Encodes and decodes DuckDB data chunks and their column vectors.

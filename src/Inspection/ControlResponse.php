@@ -1,9 +1,9 @@
 <?php
 
-namespace Quack\Protocol\Inspection;
+namespace DuckDB\Quack\Inspection;
 
-use Quack\Protocol\Error\ServerError;
-use Quack\Protocol\QuackVersion;
+use DuckDB\Quack\Error\ServerError;
+use DuckDB\Quack\QuackVersion;
 
 /**
  * A bounded control response decoded by the inspection helpers.

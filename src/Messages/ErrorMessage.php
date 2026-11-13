@@ -1,8 +1,8 @@
 <?php
 
-namespace Quack\Protocol\Messages;
+namespace DuckDB\Quack\Messages;
 
-use Quack\Protocol\Error\ServerError;
+use DuckDB\Quack\Error\ServerError;
 
 final class ErrorMessage extends QuackMessage
 {

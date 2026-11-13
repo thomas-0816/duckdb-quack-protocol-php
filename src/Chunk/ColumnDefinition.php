@@ -1,8 +1,8 @@
 <?php
 
-namespace Quack\Protocol\Chunk;
+namespace DuckDB\Quack\Chunk;
 
-use Quack\Protocol\Types\LogicalType;
+use DuckDB\Quack\Types\LogicalType;
 
 final class ColumnDefinition
 {

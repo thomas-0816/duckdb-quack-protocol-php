@@ -1,9 +1,9 @@
 <?php
 
-namespace Quack\Protocol\Tests\Integration;
+namespace DuckDB\Quack\Tests\Integration;
 
+use DuckDB\Quack\QuackClient;
 use PHPUnit\Framework\TestCase;
-use Quack\Protocol\QuackClient;
 
 final class QuackClientTest extends TestCase
 {

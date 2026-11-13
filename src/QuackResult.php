@@ -1,12 +1,12 @@
 <?php
 
-namespace Quack\Protocol;
+namespace DuckDB\Quack;
 
-use Quack\Protocol\Chunk\ColumnDefinition;
-use Quack\Protocol\Chunk\DataChunk;
-use Quack\Protocol\Chunk\DataChunkCodec;
-use Quack\Protocol\Exceptions\ProtocolException;
-use Quack\Protocol\Sql\FetchState;
+use DuckDB\Quack\Chunk\ColumnDefinition;
+use DuckDB\Quack\Chunk\DataChunk;
+use DuckDB\Quack\Chunk\DataChunkCodec;
+use DuckDB\Quack\Exceptions\ProtocolException;
+use DuckDB\Quack\Sql\FetchState;
 
 /**
  * A lazily fetched query result.

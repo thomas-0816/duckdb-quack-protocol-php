@@ -1,6 +1,6 @@
 <?php
 
-namespace Quack\Protocol\Sql;
+namespace DuckDB\Quack\Sql;
 
 /**
  * A raw SQL string plus a short collapsed preview that is safe to log.

@@ -1,6 +1,6 @@
 <?php
 
-namespace Quack\Protocol\Json;
+namespace DuckDB\Quack\Json;
 
 enum TaggedJsonMode: string
 {

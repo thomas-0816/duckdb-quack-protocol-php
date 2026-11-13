@@ -1,10 +1,10 @@
 <?php
 
-namespace Quack\Protocol\Tests\Unit\Types;
+namespace DuckDB\Quack\Tests\Unit\Types;
 
+use DuckDB\Quack\Exceptions\ProtocolException;
+use DuckDB\Quack\Types\BigInt;
 use PHPUnit\Framework\TestCase;
-use Quack\Protocol\Exceptions\ProtocolException;
-use Quack\Protocol\Types\BigInt;
 
 final class BigIntTest extends TestCase
 {

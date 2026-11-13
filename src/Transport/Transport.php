@@ -1,16 +1,16 @@
 <?php
 
-namespace Quack\Protocol\Transport;
+namespace DuckDB\Quack\Transport;
 
-use Quack\Protocol\Error\TransportErrorKind;
-use Quack\Protocol\Exceptions\HttpStatusException;
-use Quack\Protocol\Exceptions\ProtocolException;
-use Quack\Protocol\Exceptions\ServerException;
-use Quack\Protocol\Exceptions\TransportException;
-use Quack\Protocol\Messages\ErrorMessage;
-use Quack\Protocol\Messages\MessageCodec;
-use Quack\Protocol\Messages\QuackMessage;
-use Quack\Protocol\QuackVersion;
+use DuckDB\Quack\Error\TransportErrorKind;
+use DuckDB\Quack\Exceptions\HttpStatusException;
+use DuckDB\Quack\Exceptions\ProtocolException;
+use DuckDB\Quack\Exceptions\ServerException;
+use DuckDB\Quack\Exceptions\TransportException;
+use DuckDB\Quack\Messages\ErrorMessage;
+use DuckDB\Quack\Messages\MessageCodec;
+use DuckDB\Quack\Messages\QuackMessage;
+use DuckDB\Quack\QuackVersion;
 
 /**
  * HTTP(S) transport for one Quack endpoint, backed by ext-curl.

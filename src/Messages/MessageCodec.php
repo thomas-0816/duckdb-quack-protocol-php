@@ -1,16 +1,16 @@
 <?php
 
-namespace Quack\Protocol\Messages;
+namespace DuckDB\Quack\Messages;
 
-use Quack\Protocol\Chunk\DataChunk;
-use Quack\Protocol\Chunk\DataChunkCodec;
-use Quack\Protocol\Error\ServerError;
-use Quack\Protocol\Exceptions\ProtocolException;
-use Quack\Protocol\QuackVersion;
-use Quack\Protocol\Transport\BinaryReader;
-use Quack\Protocol\Transport\BinaryWriter;
-use Quack\Protocol\Types\LogicalType;
-use Quack\Protocol\Types\LogicalTypeCodec;
+use DuckDB\Quack\Chunk\DataChunk;
+use DuckDB\Quack\Chunk\DataChunkCodec;
+use DuckDB\Quack\Error\ServerError;
+use DuckDB\Quack\Exceptions\ProtocolException;
+use DuckDB\Quack\QuackVersion;
+use DuckDB\Quack\Transport\BinaryReader;
+use DuckDB\Quack\Transport\BinaryWriter;
+use DuckDB\Quack\Types\LogicalType;
+use DuckDB\Quack\Types\LogicalTypeCodec;
 
 /**
  * Encodes and decodes Quack protocol messages for protocol versions 1 and 3.

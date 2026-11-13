@@ -1,8 +1,8 @@
 <?php
 
-namespace Quack\Protocol\Types;
+namespace DuckDB\Quack\Types;
 
-use Quack\Protocol\Types\Info\ExtraTypeInfo;
+use DuckDB\Quack\Types\Info\ExtraTypeInfo;
 
 final class LogicalType
 {

@@ -1,6 +1,6 @@
 <?php
 
-namespace Quack\Protocol;
+namespace DuckDB\Quack;
 
 /**
  * A Quack protocol version this package speaks: v1 or v3.

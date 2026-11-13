@@ -1,8 +1,8 @@
 <?php
 
-namespace Quack\Protocol\Exceptions;
+namespace DuckDB\Quack\Exceptions;
 
-use Quack\Protocol\Error\QuackError;
+use DuckDB\Quack\Error\QuackError;
 
 /**
  * The HTTP request got a non-success reply.

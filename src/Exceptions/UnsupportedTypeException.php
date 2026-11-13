@@ -1,8 +1,8 @@
 <?php
 
-namespace Quack\Protocol\Exceptions;
+namespace DuckDB\Quack\Exceptions;
 
-use Quack\Protocol\Error\QuackError;
+use DuckDB\Quack\Error\QuackError;
 
 /** A value or logical type this implementation cannot encode or decode. */
 final class UnsupportedTypeException extends QuackError

@@ -1,6 +1,6 @@
 <?php
 
-namespace Quack\Protocol\Messages;
+namespace DuckDB\Quack\Messages;
 
 /**
  * Base type for every protocol message.

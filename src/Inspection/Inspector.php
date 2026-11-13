@@ -1,22 +1,22 @@
 <?php
 
-namespace Quack\Protocol\Inspection;
+namespace DuckDB\Quack\Inspection;
 
-use Quack\Protocol\Error\QuackError;
-use Quack\Protocol\Error\ServerError;
-use Quack\Protocol\Exceptions\InspectionException;
-use Quack\Protocol\Messages\CancelMessage;
-use Quack\Protocol\Messages\ConnectionResponseMessage;
-use Quack\Protocol\Messages\DisconnectMessage;
-use Quack\Protocol\Messages\ErrorMessage;
-use Quack\Protocol\Messages\MessageCodec;
-use Quack\Protocol\Messages\MessageHeader;
-use Quack\Protocol\Messages\MessageType;
-use Quack\Protocol\Messages\QuackMessage;
-use Quack\Protocol\Messages\SuccessResponseMessage;
-use Quack\Protocol\QuackVersion;
-use Quack\Protocol\Transport\BinaryReader;
-use Quack\Protocol\Types\HugeIntParts;
+use DuckDB\Quack\Error\QuackError;
+use DuckDB\Quack\Error\ServerError;
+use DuckDB\Quack\Exceptions\InspectionException;
+use DuckDB\Quack\Messages\CancelMessage;
+use DuckDB\Quack\Messages\ConnectionResponseMessage;
+use DuckDB\Quack\Messages\DisconnectMessage;
+use DuckDB\Quack\Messages\ErrorMessage;
+use DuckDB\Quack\Messages\MessageCodec;
+use DuckDB\Quack\Messages\MessageHeader;
+use DuckDB\Quack\Messages\MessageType;
+use DuckDB\Quack\Messages\QuackMessage;
+use DuckDB\Quack\Messages\SuccessResponseMessage;
+use DuckDB\Quack\QuackVersion;
+use DuckDB\Quack\Transport\BinaryReader;
+use DuckDB\Quack\Types\HugeIntParts;
 
 /**
  * Bounded metadata inspection of raw Quack messages; payloads remain opaque.

@@ -1,6 +1,6 @@
 <?php
 
-namespace Quack\Protocol\Error;
+namespace DuckDB\Quack\Error;
 
 enum InspectionErrorKind: string
 {

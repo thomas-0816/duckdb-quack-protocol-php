@@ -1,14 +1,14 @@
 <?php
 
-namespace Quack\Protocol\Tests\Unit\Chunk;
+namespace DuckDB\Quack\Tests\Unit\Chunk;
 
+use DuckDB\Quack\Chunk\Builders;
+use DuckDB\Quack\Chunk\DataChunkCodec;
+use DuckDB\Quack\Transport\BinaryReader;
+use DuckDB\Quack\Transport\BinaryWriter;
+use DuckDB\Quack\Types\LogicalTypes;
+use DuckDB\Quack\Types\Value;
 use PHPUnit\Framework\TestCase;
-use Quack\Protocol\Chunk\Builders;
-use Quack\Protocol\Chunk\DataChunkCodec;
-use Quack\Protocol\Transport\BinaryReader;
-use Quack\Protocol\Transport\BinaryWriter;
-use Quack\Protocol\Types\LogicalTypes;
-use Quack\Protocol\Types\Value;
 
 final class DataChunkCodecTest extends TestCase
 {

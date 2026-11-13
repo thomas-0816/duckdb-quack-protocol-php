@@ -1,8 +1,8 @@
 <?php
 
-namespace Quack\Protocol\Messages;
+namespace DuckDB\Quack\Messages;
 
-use Quack\Protocol\Exceptions\ProtocolException;
+use DuckDB\Quack\Exceptions\ProtocolException;
 
 enum MessageType: int
 {

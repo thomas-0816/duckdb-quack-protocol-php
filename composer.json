@@ -15,12 +15,12 @@
     },
     "autoload": {
         "psr-4": {
-            "Quack\\Protocol\\": "src/"
+            "DuckDB\\Quack\\": "src/"
         }
     },
     "autoload-dev": {
         "psr-4": {
-            "Quack\\Protocol\\Tests\\": "tests/"
+            "DuckDB\\Quack\\Tests\\": "tests/"
         }
     },
     "scripts": {

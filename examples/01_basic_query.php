@@ -8,7 +8,7 @@
 
 require __DIR__ . '/../vendor/autoload.php';
 
-use Quack\Protocol\QuackClient;
+use DuckDB\Quack\QuackClient;
 
 echo 'connecting to http://127.0.0.1:9494', PHP_EOL;
 $client = QuackClient::connect(

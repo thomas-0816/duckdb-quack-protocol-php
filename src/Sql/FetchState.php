@@ -1,14 +1,14 @@
 <?php
 
-namespace Quack\Protocol\Sql;
+namespace DuckDB\Quack\Sql;
 
-use Quack\Protocol\Chunk\DataChunk;
-use Quack\Protocol\Connection\ClientConnection;
-use Quack\Protocol\Exceptions\ProtocolException;
-use Quack\Protocol\Messages\FetchResponseMessage;
-use Quack\Protocol\QuackVersion;
-use Quack\Protocol\Types\BigInt;
-use Quack\Protocol\Types\HugeIntParts;
+use DuckDB\Quack\Chunk\DataChunk;
+use DuckDB\Quack\Connection\ClientConnection;
+use DuckDB\Quack\Exceptions\ProtocolException;
+use DuckDB\Quack\Messages\FetchResponseMessage;
+use DuckDB\Quack\QuackVersion;
+use DuckDB\Quack\Types\BigInt;
+use DuckDB\Quack\Types\HugeIntParts;
 
 /**
  * Cursor state for the FETCH requests that continue a prepared result.

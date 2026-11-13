@@ -1,8 +1,8 @@
 <?php
 
-namespace Quack\Protocol\Types;
+namespace DuckDB\Quack\Types;
 
-use Quack\Protocol\Exceptions\ProtocolException;
+use DuckDB\Quack\Exceptions\ProtocolException;
 
 /**
  * Converts DuckDB's BIGNUM storage to its exact decimal string.

@@ -1,23 +1,23 @@
 <?php
 
-namespace Quack\Protocol\Connection;
+namespace DuckDB\Quack\Connection;
 
-use Quack\Protocol\Error\QuackError;
-use Quack\Protocol\Exceptions\HttpStatusException;
-use Quack\Protocol\Exceptions\ProtocolException;
-use Quack\Protocol\Exceptions\ServerException;
-use Quack\Protocol\Messages\ConnectionRequestMessage;
-use Quack\Protocol\Messages\ConnectionResponseMessage;
-use Quack\Protocol\Messages\DisconnectMessage;
-use Quack\Protocol\Messages\FetchRequestMessage;
-use Quack\Protocol\Messages\MessageHeader;
-use Quack\Protocol\Messages\MessageType;
-use Quack\Protocol\Messages\PrepareRequestMessage;
-use Quack\Protocol\Messages\QuackMessage;
-use Quack\Protocol\QuackConnectionInfo;
-use Quack\Protocol\QuackVersion;
-use Quack\Protocol\Transport\Transport;
-use Quack\Protocol\Types\HugeIntParts;
+use DuckDB\Quack\Error\QuackError;
+use DuckDB\Quack\Exceptions\HttpStatusException;
+use DuckDB\Quack\Exceptions\ProtocolException;
+use DuckDB\Quack\Exceptions\ServerException;
+use DuckDB\Quack\Messages\ConnectionRequestMessage;
+use DuckDB\Quack\Messages\ConnectionResponseMessage;
+use DuckDB\Quack\Messages\DisconnectMessage;
+use DuckDB\Quack\Messages\FetchRequestMessage;
+use DuckDB\Quack\Messages\MessageHeader;
+use DuckDB\Quack\Messages\MessageType;
+use DuckDB\Quack\Messages\PrepareRequestMessage;
+use DuckDB\Quack\Messages\QuackMessage;
+use DuckDB\Quack\QuackConnectionInfo;
+use DuckDB\Quack\QuackVersion;
+use DuckDB\Quack\Transport\Transport;
+use DuckDB\Quack\Types\HugeIntParts;
 
 /**
  * One negotiated Quack session, minus the public client facade.

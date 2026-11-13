@@ -1,6 +1,6 @@
 <?php
 
-namespace Quack\Protocol\Types;
+namespace DuckDB\Quack\Types;
 
 /**
  * Formats DuckDB temporal values without relying on PHP's DateTime classes.

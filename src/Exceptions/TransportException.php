@@ -1,9 +1,9 @@
 <?php
 
-namespace Quack\Protocol\Exceptions;
+namespace DuckDB\Quack\Exceptions;
 
-use Quack\Protocol\Error\QuackError;
-use Quack\Protocol\Error\TransportErrorKind;
+use DuckDB\Quack\Error\QuackError;
+use DuckDB\Quack\Error\TransportErrorKind;
 
 /** The HTTP exchange itself failed: no complete reply was received. */
 final class TransportException extends QuackError

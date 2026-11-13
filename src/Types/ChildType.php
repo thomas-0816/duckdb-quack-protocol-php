@@ -1,6 +1,6 @@
 <?php
 
-namespace Quack\Protocol\Types;
+namespace DuckDB\Quack\Types;
 
 final class ChildType
 {

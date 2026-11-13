@@ -1,12 +1,12 @@
 <?php
 
-namespace Quack\Protocol\Types;
+namespace DuckDB\Quack\Types;
 
-use Quack\Protocol\Exceptions\ProtocolException;
-use Quack\Protocol\Exceptions\UnsupportedTypeException;
-use Quack\Protocol\Transport\BinaryReader;
-use Quack\Protocol\Transport\BinaryWriter;
-use Quack\Protocol\Types\Info\{
+use DuckDB\Quack\Exceptions\ProtocolException;
+use DuckDB\Quack\Exceptions\UnsupportedTypeException;
+use DuckDB\Quack\Transport\BinaryReader;
+use DuckDB\Quack\Transport\BinaryWriter;
+use DuckDB\Quack\Types\Info\{
     AggregateStateTypeInfo,
     AnyTypeInfo,
     ArrayTypeInfo,

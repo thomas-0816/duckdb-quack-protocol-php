@@ -1,9 +1,9 @@
 <?php
 
-namespace Quack\Protocol\Exceptions;
+namespace DuckDB\Quack\Exceptions;
 
-use Quack\Protocol\Error\QuackError;
-use Quack\Protocol\Error\ServerError;
+use DuckDB\Quack\Error\QuackError;
+use DuckDB\Quack\Error\ServerError;
 
 /** A structured error returned by the server. */
 final class ServerException extends QuackError

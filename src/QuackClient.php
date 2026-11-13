@@ -1,19 +1,19 @@
 <?php
 
-namespace Quack\Protocol;
+namespace DuckDB\Quack;
 
-use Quack\Protocol\Chunk\ColumnDefinition;
-use Quack\Protocol\Chunk\DataChunk;
-use Quack\Protocol\Connection\ClientConnection;
-use Quack\Protocol\Connection\ConnectionState;
-use Quack\Protocol\Error\QuackError;
-use Quack\Protocol\Exceptions\ProtocolException;
-use Quack\Protocol\Messages\PrepareResponseMessage;
-use Quack\Protocol\Sql\FetchState;
-use Quack\Protocol\Sql\QuerySql;
-use Quack\Protocol\Sql\SqlFormatter;
-use Quack\Protocol\Sql\SqlParameters;
-use Quack\Protocol\Transport\Transport;
+use DuckDB\Quack\Chunk\ColumnDefinition;
+use DuckDB\Quack\Chunk\DataChunk;
+use DuckDB\Quack\Connection\ClientConnection;
+use DuckDB\Quack\Connection\ConnectionState;
+use DuckDB\Quack\Error\QuackError;
+use DuckDB\Quack\Exceptions\ProtocolException;
+use DuckDB\Quack\Messages\PrepareResponseMessage;
+use DuckDB\Quack\Sql\FetchState;
+use DuckDB\Quack\Sql\QuerySql;
+use DuckDB\Quack\Sql\SqlFormatter;
+use DuckDB\Quack\Sql\SqlParameters;
+use DuckDB\Quack\Transport\Transport;
 
 /**
  * One session on a Quack server.

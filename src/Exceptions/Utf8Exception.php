@@ -1,8 +1,8 @@
 <?php
 
-namespace Quack\Protocol\Exceptions;
+namespace DuckDB\Quack\Exceptions;
 
-use Quack\Protocol\Error\QuackError;
+use DuckDB\Quack\Error\QuackError;
 
 /** A wire string was not valid UTF-8. */
 final class Utf8Exception extends QuackError

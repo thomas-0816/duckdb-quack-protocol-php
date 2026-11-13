@@ -1,9 +1,9 @@
 <?php
 
-namespace Quack\Protocol\Exceptions;
+namespace DuckDB\Quack\Exceptions;
 
-use Quack\Protocol\Error\InspectionErrorKind;
-use Quack\Protocol\Error\QuackError;
+use DuckDB\Quack\Error\InspectionErrorKind;
+use DuckDB\Quack\Error\QuackError;
 
 /** A bounded inspection helper rejected its input. */
 final class InspectionException extends QuackError

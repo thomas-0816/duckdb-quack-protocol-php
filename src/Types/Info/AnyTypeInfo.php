@@ -1,9 +1,9 @@
 <?php
 
-namespace Quack\Protocol\Types\Info;
+namespace DuckDB\Quack\Types\Info;
 
-use Quack\Protocol\Types\ExtraTypeInfoType;
-use Quack\Protocol\Types\LogicalType;
+use DuckDB\Quack\Types\ExtraTypeInfoType;
+use DuckDB\Quack\Types\LogicalType;
 
 final class AnyTypeInfo extends ExtraTypeInfo
 {

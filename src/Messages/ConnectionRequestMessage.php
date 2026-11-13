@@ -1,6 +1,6 @@
 <?php
 
-namespace Quack\Protocol\Messages;
+namespace DuckDB\Quack\Messages;
 
 final class ConnectionRequestMessage extends QuackMessage
 {

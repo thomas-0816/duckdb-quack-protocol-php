@@ -1,23 +1,23 @@
 <?php
 
-namespace Quack\Protocol\Tests\Unit\Types;
+namespace DuckDB\Quack\Tests\Unit\Types;
 
+use DuckDB\Quack\Types\ChildType;
+use DuckDB\Quack\Types\DateValue;
+use DuckDB\Quack\Types\DecimalValue;
+use DuckDB\Quack\Types\Info\StringTypeInfo;
+use DuckDB\Quack\Types\Info\StructTypeInfo;
+use DuckDB\Quack\Types\IntervalValue;
+use DuckDB\Quack\Types\LogicalType;
+use DuckDB\Quack\Types\LogicalTypeId;
+use DuckDB\Quack\Types\LogicalTypes;
+use DuckDB\Quack\Types\TimestampUnit;
+use DuckDB\Quack\Types\TimestampValue;
+use DuckDB\Quack\Types\TimeTzValue;
+use DuckDB\Quack\Types\TimeUnit;
+use DuckDB\Quack\Types\TimeValue;
+use DuckDB\Quack\Types\Value;
 use PHPUnit\Framework\TestCase;
-use Quack\Protocol\Types\ChildType;
-use Quack\Protocol\Types\DateValue;
-use Quack\Protocol\Types\DecimalValue;
-use Quack\Protocol\Types\Info\StringTypeInfo;
-use Quack\Protocol\Types\Info\StructTypeInfo;
-use Quack\Protocol\Types\IntervalValue;
-use Quack\Protocol\Types\LogicalType;
-use Quack\Protocol\Types\LogicalTypeId;
-use Quack\Protocol\Types\LogicalTypes;
-use Quack\Protocol\Types\TimestampUnit;
-use Quack\Protocol\Types\TimestampValue;
-use Quack\Protocol\Types\TimeTzValue;
-use Quack\Protocol\Types\TimeUnit;
-use Quack\Protocol\Types\TimeValue;
-use Quack\Protocol\Types\Value;
 
 final class ValueToPhpTest extends TestCase
 {

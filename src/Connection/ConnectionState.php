@@ -1,6 +1,6 @@
 <?php
 
-namespace Quack\Protocol\Connection;
+namespace DuckDB\Quack\Connection;
 
 /**
  * Connection status shared by a client and its connection.
