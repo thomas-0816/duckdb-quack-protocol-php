@@ -1,7 +1,5 @@
 <?php
 
-declare(strict_types=1);
-
 namespace Quack\Protocol\Error;
 
 /** An optional error detail recognized from DuckDB's extra-info map. */

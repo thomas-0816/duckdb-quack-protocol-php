@@ -1,7 +1,5 @@
 <?php
 
-declare(strict_types=1);
-
 /**
  * Basic querying: metadata, lazy rows, and the one-shot helpers.
  *

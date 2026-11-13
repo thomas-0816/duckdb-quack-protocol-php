@@ -1,7 +1,5 @@
 <?php
 
-declare(strict_types=1);
-
 namespace Quack\Protocol\Tests\Unit\Messages;
 
 use PHPUnit\Framework\TestCase;

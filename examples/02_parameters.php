@@ -1,7 +1,5 @@
 <?php
 
-declare(strict_types=1);
-
 /**
  * SQL parameters and automatic type detection.
  *

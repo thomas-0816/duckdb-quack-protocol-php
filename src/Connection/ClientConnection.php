@@ -1,7 +1,5 @@
 <?php
 
-declare(strict_types=1);
-
 namespace Quack\Protocol\Connection;
 
 use Quack\Protocol\Error\QuackError;
@@ -199,12 +197,8 @@ final class ClientConnection
         $message = new DisconnectMessage(
             $this->scopedHeader(MessageType::DisconnectMessage),
         );
-        $timeout = min(
-            $this->transport->timeout(),
-            10.0,
-        );
         try {
-            $this->transport->withTimeout($timeout)->send($message, $this->quackVersion);
+            $this->transport->withTimeout(10.0)->send($message, $this->quackVersion);
         } catch (QuackError) {
             // The caller is gone; nothing useful can be reported.
         } finally {

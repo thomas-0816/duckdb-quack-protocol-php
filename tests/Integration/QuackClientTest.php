@@ -1,7 +1,5 @@
 <?php
 
-declare(strict_types=1);
-
 namespace Quack\Protocol\Tests\Integration;
 
 use PHPUnit\Framework\TestCase;
@@ -16,7 +14,7 @@ final class QuackClientTest extends TestCase
             'secret',
             10,
             300,
-            sslCertificate: self::sslCertificate(),
+            self::sslCertificate(),
         );
         self::assertSame(3, $client->info?->quackVersion?->number());
     }
@@ -592,7 +590,6 @@ final class QuackClientTest extends TestCase
             self::fail('HOME is not set; cannot locate the DuckDB SSL certificate.');
         }
         $certFile = $home . '/.duckdb/extension_data/quack/server.pem';
-        $deadline = microtime(true) + 10.0;
         $pem = file_get_contents($certFile);
         if ($pem === false) {
             self::fail("Could not read the SSL certificate at {$certFile}.");

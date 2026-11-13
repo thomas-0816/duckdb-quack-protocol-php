@@ -1,7 +1,5 @@
 <?php
 
-declare(strict_types=1);
-
 namespace Quack\Protocol;
 
 use Quack\Protocol\Chunk\ColumnDefinition;

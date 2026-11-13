@@ -1,7 +1,5 @@
 <?php
 
-declare(strict_types=1);
-
 namespace Quack\Protocol\Transport;
 
 use Quack\Protocol\Error\TransportErrorKind;

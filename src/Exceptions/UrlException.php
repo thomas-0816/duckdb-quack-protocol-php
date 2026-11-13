@@ -1,7 +1,5 @@
 <?php
 
-declare(strict_types=1);
-
 namespace Quack\Protocol\Exceptions;
 
 use Quack\Protocol\Error\QuackError;

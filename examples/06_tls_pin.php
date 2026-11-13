@@ -1,7 +1,5 @@
 <?php
 
-declare(strict_types=1);
-
 /**
  * TLS with a self-signed certificate.
  *
