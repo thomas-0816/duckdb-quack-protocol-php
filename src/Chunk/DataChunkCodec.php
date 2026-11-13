@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace Quack\Protocol\Chunk;
 
-use Quack\Protocol\Connection\Constants;
 use Quack\Protocol\Exceptions\ProtocolException;
 use Quack\Protocol\Exceptions\UnsupportedTypeException;
 use Quack\Protocol\Exceptions\Utf8Exception;
+use Quack\Protocol\Messages\MessageCodec;
 use Quack\Protocol\Transport\BinaryReader;
 use Quack\Protocol\Transport\BinaryWriter;
 use Quack\Protocol\Types\BigInt;
@@ -709,7 +709,7 @@ final class DataChunkCodec
             static fn (BinaryReader $r) => $r->readUlebU64(),
             null,
         );
-        if ($byteDataLength !== null && (string) $byteDataLength === Constants::OPTIONAL_INDEX_INVALID) {
+        if ($byteDataLength !== null && (string) $byteDataLength === MessageCodec::OPTIONAL_INDEX_INVALID) {
             $byteDataLength = null;
         }
         if ($byteDataLength === null) {

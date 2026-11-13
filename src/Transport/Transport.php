@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Quack\Protocol\Transport;
 
-use Quack\Protocol\Connection\Constants;
 use Quack\Protocol\Error\TransportErrorKind;
 use Quack\Protocol\Exceptions\HttpStatusException;
 use Quack\Protocol\Exceptions\ProtocolException;
@@ -79,7 +78,7 @@ final class Transport
     public function send(QuackMessage $message, QuackVersion $version): QuackMessage
     {
         $bytes = MessageCodec::encodeMessageForVersion($message, $version);
-        $curl = curl_init($this->baseUrl . Constants::QUACK_ENDPOINT);
+        $curl = curl_init($this->baseUrl . '/quack');
         if ($curl === false) {
             throw new TransportException(
                 TransportErrorKind::Other,
@@ -88,8 +87,8 @@ final class Transport
         }
 
         $headers = [
-            'Accept: ' . Constants::DUCKDB_MIME_TYPE,
-            'Content-Type: ' . Constants::DUCKDB_MIME_TYPE,
+            'Accept: application/duckdb',
+            'Content-Type: application/duckdb',
         ];
 
         $timeoutMs = (int) max(1, round($this->timeout * 1000));
@@ -130,8 +129,8 @@ final class Transport
 
         if ($status < 200 || $status >= 300) {
             $raw = (string) $body;
-            if (strlen($raw) > Constants::MAX_HTTP_STATUS_BODY_BYTES) {
-                $raw = '';
+            if (strlen($raw) > 16 * 1024) {
+                $raw = substr($raw, 0, 16 * 1024);
             }
             throw new HttpStatusException($status, $raw);
         }

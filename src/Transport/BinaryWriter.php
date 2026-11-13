@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Quack\Protocol\Transport;
 
-use Quack\Protocol\Connection\Constants;
 use Quack\Protocol\Exceptions\ProtocolException;
 use Quack\Protocol\Exceptions\Utf8Exception;
 use Quack\Protocol\Types\BigInt;
@@ -35,7 +34,7 @@ final class BinaryWriter
     public function writeObject(callable $write): void
     {
         $write($this);
-        $this->writeFieldId(Constants::FIELD_END);
+        $this->writeFieldId(0xffff);
     }
 
     public function writeField(int $fieldId, callable $write): void

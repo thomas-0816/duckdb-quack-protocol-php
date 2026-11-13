@@ -6,7 +6,6 @@ namespace Quack\Protocol\Messages;
 
 use Quack\Protocol\Chunk\DataChunk;
 use Quack\Protocol\Chunk\DataChunkCodec;
-use Quack\Protocol\Connection\Constants;
 use Quack\Protocol\Error\ServerError;
 use Quack\Protocol\Exceptions\ProtocolException;
 use Quack\Protocol\QuackVersion;
@@ -20,6 +19,9 @@ use Quack\Protocol\Types\LogicalTypeCodec;
  */
 final class MessageCodec
 {
+    /** u64::MAX, used as the sentinel for an absent optional index. */
+    public const OPTIONAL_INDEX_INVALID = '18446744073709551615';
+
     public static function encodeMessage(QuackMessage $message): string
     {
         return self::encodeMessageForVersion($message, QuackVersion::v3());
@@ -79,7 +81,7 @@ final class MessageCodec
             $object->writeField(
                 3,
                 static fn (BinaryWriter $w) => $w->writeUleb(
-                    $header->clientQueryId ?? Constants::OPTIONAL_INDEX_INVALID,
+                    $header->clientQueryId ?? self::OPTIONAL_INDEX_INVALID,
                 ),
             );
         });
@@ -106,7 +108,7 @@ final class MessageCodec
                 3,
                 static fn (BinaryReader $r) => $r->readUlebU64(),
             );
-            $clientQueryId = (string) $rawClientQueryId === Constants::OPTIONAL_INDEX_INVALID
+            $clientQueryId = (string) $rawClientQueryId === self::OPTIONAL_INDEX_INVALID
                 ? null
                 : $rawClientQueryId;
             return new MessageHeader($messageType, $connectionId, $clientQueryId);
@@ -188,7 +190,7 @@ final class MessageCodec
                 $object->writeField(
                     2,
                     static fn (BinaryWriter $w) => $w->writeUleb(
-                        $message->batchIndex ?? Constants::OPTIONAL_INDEX_INVALID,
+                        $message->batchIndex ?? self::OPTIONAL_INDEX_INVALID,
                     ),
                 );
             });
@@ -520,7 +522,7 @@ final class MessageCodec
                         header: $header,
                         results: $results,
                         totalBatches: null,
-                        batchIndex: (string) $batchIndex === Constants::OPTIONAL_INDEX_INVALID
+                        batchIndex: (string) $batchIndex === self::OPTIONAL_INDEX_INVALID
                             ? null
                             : $batchIndex,
                     );
@@ -847,7 +849,7 @@ final class MessageCodec
             static fn (BinaryReader $r) => $r->readUlebU64(),
             null,
         );
-        if ($value === null || (string) $value === Constants::OPTIONAL_INDEX_INVALID) {
+        if ($value === null || (string) $value === self::OPTIONAL_INDEX_INVALID) {
             return null;
         }
         return $value;

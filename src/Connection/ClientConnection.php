@@ -48,8 +48,8 @@ final class ClientConnection
         Transport $transport,
         string $authToken,
     ): array {
-        $minVersion = QuackVersion::fromNumber(Constants::MIN_QUACK_VERSION);
-        $maxVersion = QuackVersion::fromNumber(Constants::MAX_QUACK_VERSION);
+        $minVersion = QuackVersion::fromNumber(1);
+        $maxVersion = QuackVersion::fromNumber(3);
         if ($minVersion === null || $maxVersion === null) {
             throw new ProtocolException('invalid supported Quack protocol version range');
         }
@@ -201,7 +201,7 @@ final class ClientConnection
         );
         $timeout = min(
             $this->transport->timeout(),
-            (float) Constants::DISCONNECT_ON_DROP_TIMEOUT_SECS,
+            10.0,
         );
         try {
             $this->transport->withTimeout($timeout)->send($message, $this->quackVersion);

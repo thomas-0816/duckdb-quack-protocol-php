@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Quack\Protocol\Transport;
 
-use Quack\Protocol\Connection\Constants;
 use Quack\Protocol\Exceptions\ProtocolException;
 use Quack\Protocol\Exceptions\Utf8Exception;
 use Quack\Protocol\Types\BigInt;
@@ -60,7 +59,7 @@ final class BinaryReader
     public function readEndObject(): void
     {
         $fieldId = $this->readFieldId();
-        if ($fieldId !== Constants::FIELD_END) {
+        if ($fieldId !== 0xffff) {
             throw new ProtocolException(
                 'expected end of object at offset ' . ($this->offset - 2)
                 . ", got field {$fieldId}",
