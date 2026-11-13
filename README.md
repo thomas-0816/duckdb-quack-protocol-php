@@ -1,8 +1,8 @@
-# PHP client for DuckDB Quack remote protocol
+# PHP client for DuckDB Quack Remote Protocol
 
 <img width="500" height="273" alt="logo" src="logo.jpg" />
 
-The Quack protocol unlocks multi-client access for DuckDB, turning it into a general-purpose database system with client and server.
+The Quack Remote Protocol unlocks multi-client access for DuckDB, turning it into a general-purpose database system with client and server.
 
 This library provides a PHP client for the DuckDB Quack Remote Protocol.
 
