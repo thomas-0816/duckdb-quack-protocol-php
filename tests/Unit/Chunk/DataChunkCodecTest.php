@@ -118,7 +118,6 @@ final class DataChunkCodecTest extends TestCase
         self::assertSame(['a', 'bc'], $decoded->columns[1]->values);
         self::assertSame([[1, 2], []], $decoded->columns[2]->values);
         self::assertSame($types, $decoded->types);
-        self::assertSame($types, $decoded->resultTypes);
         self::assertSame(['id', 'label', 'items'], $decoded->resultNames);
     }
 }

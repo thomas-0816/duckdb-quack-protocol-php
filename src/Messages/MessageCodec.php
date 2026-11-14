@@ -249,7 +249,7 @@ final class MessageCodec
         PrepareResponseMessage $message,
     ): void {
         $firstChunk = $message->results[0] ?? null;
-        $resultTypes = $firstChunk->resultTypes ?? [];
+        $resultTypes = $firstChunk->types ?? [];
         $resultNames = $firstChunk->resultNames ?? [];
         $writer->writeObject(static function (BinaryWriter $object) use ($message, $resultTypes, $resultNames): void {
             if ($resultTypes !== []) {

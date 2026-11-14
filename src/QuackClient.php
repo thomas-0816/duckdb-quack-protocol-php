@@ -324,7 +324,7 @@ final class QuackClient
         $nextBatchIndex = 1;
         $ackIndex = 0;
         $firstChunk = $response->results[0] ?? null;
-        $resultTypes = $firstChunk->resultTypes ?? [];
+        $resultTypes = $firstChunk->types ?? [];
         $resultNames = $firstChunk->resultNames ?? [];
 
         foreach ($response->results as $chunk) {

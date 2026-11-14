@@ -141,7 +141,7 @@ final class DataChunkCodec
                 . count($columns) . ' columns',
             );
         }
-        return new DataChunk($rowCount, $types, $columns, $types, $resultNames);
+        return new DataChunk($rowCount, $types, $columns, $resultNames);
     }
 
     /**

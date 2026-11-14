@@ -71,7 +71,6 @@ final class MessageCodecTest extends TestCase
             rowCount: 1,
             types: [$type],
             columns: [new DecodedVector(VectorType::Flat, [Value::int(42)])],
-            resultTypes: [$type],
             resultNames: ['answer'],
         );
         $message = new PrepareResponseMessage(
@@ -89,7 +88,7 @@ final class MessageCodecTest extends TestCase
         self::assertInstanceOf(PrepareResponseMessage::class, $decoded);
         self::assertCount(1, $decoded->results);
         self::assertSame([42], $decoded->results[0]->columns[0]->values);
-        self::assertEquals([$type], $decoded->results[0]->resultTypes);
+        self::assertEquals([$type], $decoded->results[0]->types);
         self::assertSame(['answer'], $decoded->results[0]->resultNames);
     }
 
