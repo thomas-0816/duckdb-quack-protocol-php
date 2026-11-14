@@ -30,22 +30,22 @@ final class DataChunkCodecTest extends TestCase
         $writer = BinaryWriter::new();
         DataChunkCodec::encodeDataChunkWrapper($writer, $chunk);
         $reader = new BinaryReader($writer->intoBytes());
-        $decoded = DataChunkCodec::decodeDataChunkWrapper($reader);
+        $decoded = DataChunkCodec::decodeDataChunkWrapperToPhp($reader, []);
         $reader->assertEof();
 
         self::assertSame(2, $decoded->rowCount);
-        self::assertEquals(
-            [Value::int(1), Value::null()],
+        self::assertSame(
+            [1, null],
             $decoded->columns[0]->values,
         );
-        self::assertEquals(
-            [Value::string('a'), Value::string('bc')],
+        self::assertSame(
+            ['a', 'bc'],
             $decoded->columns[1]->values,
         );
-        self::assertEquals(
+        self::assertSame(
             [
-                Value::list([Value::int(1), Value::int(2)]),
-                Value::list([]),
+                [1, 2],
+                [],
             ],
             $decoded->columns[2]->values,
         );
@@ -71,7 +71,7 @@ final class DataChunkCodecTest extends TestCase
         $writer = BinaryWriter::new();
         DataChunkCodec::encodeDataChunk($writer, $chunk);
         $reader = new BinaryReader($writer->intoBytes());
-        $decoded = DataChunkCodec::decodeDataChunk($reader);
+        $decoded = DataChunkCodec::decodeDataChunkToPhp($reader, []);
         $reader->assertEof();
 
         self::assertSame(1, $decoded->rowCount);
@@ -79,16 +79,46 @@ final class DataChunkCodecTest extends TestCase
             LogicalTypes::map(LogicalTypes::varchar(), LogicalTypes::integer()),
             $decoded->types[0],
         );
-        self::assertEquals(
+        self::assertSame(
             [
-                Value::list([
-                    Value::struct([
-                        'key' => Value::string('a'),
-                        'value' => Value::int(1),
-                    ]),
-                ]),
+                ['a' => 1],
             ],
             $decoded->columns[0]->values,
         );
+    }
+
+    public function testDataChunkDecodesDirectlyToPhpWithProvidedTypes(): void
+    {
+        $types = [
+            LogicalTypes::integer(),
+            LogicalTypes::varchar(),
+            LogicalTypes::list(LogicalTypes::integer()),
+        ];
+        $chunk = Builders::dataChunk([
+            Builders::column($types[0], [Value::int(1), Value::null()], 'id'),
+            Builders::column($types[1], [Value::string('a'), Value::string('bc')], 'label'),
+            Builders::column(
+                $types[2],
+                [
+                    Value::list([Value::int(1), Value::int(2)]),
+                    Value::list([]),
+                ],
+                'items',
+            ),
+        ]);
+
+        $writer = BinaryWriter::new();
+        DataChunkCodec::encodeDataChunkWrapper($writer, $chunk);
+        $reader = new BinaryReader($writer->intoBytes());
+        $decoded = DataChunkCodec::decodeDataChunkWrapperToPhp($reader, $types, ['id', 'label', 'items']);
+        $reader->assertEof();
+
+        self::assertSame(2, $decoded->rowCount);
+        self::assertSame([1, null], $decoded->columns[0]->values);
+        self::assertSame(['a', 'bc'], $decoded->columns[1]->values);
+        self::assertSame([[1, 2], []], $decoded->columns[2]->values);
+        self::assertSame($types, $decoded->types);
+        self::assertSame($types, $decoded->resultTypes);
+        self::assertSame(['id', 'label', 'items'], $decoded->resultNames);
     }
 }

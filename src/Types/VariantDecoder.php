@@ -106,6 +106,67 @@ final class VariantDecoder
         return new self($keys, $children, $values, $data);
     }
 
+    /**
+     * Builds a decoder from the PHP struct produced by direct chunk decoding.
+     *
+     * @param array<string,mixed> $fields
+     */
+    public static function fromPhp(array $fields): self
+    {
+        $keys = [];
+        foreach (self::requiredPhpList($fields, 'keys') as $key) {
+            if (!is_string($key)) {
+                throw new ProtocolException('VARIANT key is not a string');
+            }
+            $keys[] = $key;
+        }
+
+        $children = [];
+        foreach (self::requiredPhpList($fields, 'children') as $child) {
+            if (!is_array($child)) {
+                throw new ProtocolException('VARIANT child is not a struct');
+            }
+            $children[] = [
+                'keys_index' => self::optionalPhpIndex($child['keys_index'] ?? null),
+                'values_index' => self::requiredPhpIndex(
+                    $child['values_index'] ?? null,
+                    'values_index',
+                ),
+            ];
+        }
+
+        $values = [];
+        foreach (self::requiredPhpList($fields, 'values') as $entry) {
+            if (!is_array($entry)) {
+                throw new ProtocolException('VARIANT value entry is not a struct');
+            }
+            $values[] = [
+                'type_id' => self::requiredPhpIndex(
+                    $entry['type_id'] ?? null,
+                    'type_id',
+                ),
+                'byte_offset' => self::requiredPhpIndex(
+                    $entry['byte_offset'] ?? null,
+                    'byte_offset',
+                ),
+            ];
+        }
+
+        if (!array_key_exists('data', $fields)) {
+            throw new ProtocolException('VARIANT is missing the data field');
+        }
+        $dataValue = $fields['data'];
+        if ($dataValue === null) {
+            $data = '';
+        } elseif (is_string($dataValue)) {
+            $data = $dataValue;
+        } else {
+            throw new ProtocolException('VARIANT data is not a byte string');
+        }
+
+        return new self($keys, $children, $values, $data);
+    }
+
     public function decode(): mixed
     {
         if ($this->values === []) {
@@ -414,5 +475,48 @@ final class VariantDecoder
         }
 
         return $int;
+    }
+
+    /**
+     * @param array<string,mixed> $fields
+     * @return list<mixed>
+     */
+    private static function requiredPhpList(array $fields, string $name): array
+    {
+        $field = $fields[$name] ?? throw new ProtocolException(
+            "VARIANT is missing the {$name} field",
+        );
+        if (!is_array($field) || !array_is_list($field)) {
+            throw new ProtocolException("VARIANT {$name} field is not a list");
+        }
+
+        return $field;
+    }
+
+    private static function optionalPhpIndex(mixed $value): ?int
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        return self::requiredPhpIndex($value, 'index');
+    }
+
+    private static function requiredPhpIndex(mixed $value, string $name): int
+    {
+        if ($value === null) {
+            throw new ProtocolException("VARIANT {$name} is missing");
+        }
+        if (is_int($value)) {
+            return $value;
+        }
+        if (is_string($value) && preg_match('/^[0-9]+$/', $value) === 1) {
+            $int = (int) $value;
+            if ((string) $int === $value) {
+                return $int;
+            }
+        }
+
+        throw new ProtocolException("VARIANT {$name} is not a valid index");
     }
 }

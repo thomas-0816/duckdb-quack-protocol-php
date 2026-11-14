@@ -11,7 +11,6 @@ use DuckDB\Quack\Transport\BinaryWriter;
 use DuckDB\Quack\Types\BigInt;
 use DuckDB\Quack\Types\Bignum;
 use DuckDB\Quack\Types\BitString;
-use DuckDB\Quack\Types\DateValue;
 use DuckDB\Quack\Types\DecimalValue;
 use DuckDB\Quack\Types\HugeIntParts;
 use DuckDB\Quack\Types\IntervalValue;
@@ -19,12 +18,11 @@ use DuckDB\Quack\Types\LogicalType;
 use DuckDB\Quack\Types\LogicalTypeCodec;
 use DuckDB\Quack\Types\LogicalTypeId;
 use DuckDB\Quack\Types\PhysicalType;
+use DuckDB\Quack\Types\TemporalFormatter;
 use DuckDB\Quack\Types\TimestampUnit;
-use DuckDB\Quack\Types\TimestampValue;
-use DuckDB\Quack\Types\TimeTzValue;
 use DuckDB\Quack\Types\TimeUnit;
-use DuckDB\Quack\Types\TimeValue;
 use DuckDB\Quack\Types\Value;
+use DuckDB\Quack\Types\VariantDecoder;
 use DuckDB\Quack\Types\VectorType;
 
 /**
@@ -35,16 +33,6 @@ use DuckDB\Quack\Types\VectorType;
  */
 final class DataChunkCodec
 {
-    public static function decodeDataChunkWrapper(BinaryReader $reader): DataChunk
-    {
-        return $reader->readObject(
-            static fn (BinaryReader $object) => $object->readRequiredField(
-                300,
-                self::decodeDataChunk(...),
-            ),
-        );
-    }
-
     public static function encodeDataChunkWrapper(BinaryWriter $writer, DataChunk $chunk): void
     {
         $writer->writeObject(function (BinaryWriter $object) use ($chunk): void {
@@ -52,42 +40,130 @@ final class DataChunkCodec
         });
     }
 
-    public static function decodeDataChunk(BinaryReader $reader): DataChunk
-    {
-        return $reader->readObject(function (BinaryReader $object): DataChunk {
+    /**
+     * @param list<LogicalType> $types
+     * @param list<string>      $resultNames
+     */
+    public static function decodeDataChunkWrapperToPhp(
+        BinaryReader $reader,
+        array $types,
+        array $resultNames = [],
+    ): DataChunk {
+        return $reader->readObject(
+            static fn (BinaryReader $object) => $object->readRequiredField(
+                300,
+                static fn (BinaryReader $r) => self::decodeDataChunkToPhp($r, $types, $resultNames),
+            ),
+        );
+    }
+
+    /**
+     * Decodes a chunk straight to PHP values using the prepare-time schema.
+     *
+     * The chunk's own type list is consumed without allocating LogicalType
+     * objects. It is validated against the supplied types, which are reused as
+     * the decoded chunk's type metadata.
+     *
+     * @param list<LogicalType> $types
+     * @param list<string>      $resultNames
+     */
+    public static function decodeDataChunkToPhp(
+        BinaryReader $reader,
+        array $types,
+        array $resultNames = [],
+    ): DataChunk {
+        return $reader->readObject(function (BinaryReader $object) use ($types, $resultNames): DataChunk {
             $rowCount = $object->readRequiredField(
                 100,
                 static fn (BinaryReader $r) => $r->readUlebUsize(),
             );
-            $types = $object->readRequiredField(
+
+            if ($types === []) {
+                $decodedTypes = $object->readRequiredField(
+                    101,
+                    static fn (BinaryReader $r) => $r->readList(
+                        static fn (BinaryReader $rr) => LogicalTypeCodec::decodeLogicalType($rr),
+                    ),
+                );
+                /** @var list<LogicalType> $decodedTypes */
+                return self::decodeColumns($object, $rowCount, $decodedTypes, $resultNames);
+            }
+
+            $chunkTypeIds = $object->readRequiredField(
                 101,
-                static fn (BinaryReader $r) => $r->readList(
-                    static fn (BinaryReader $rr) => LogicalTypeCodec::decodeLogicalType($rr),
-                ),
+                static fn (BinaryReader $r) => LogicalTypeCodec::skipLogicalTypeList($r),
             );
-            /** @var list<LogicalType> $types */
-            $columns = $object->readRequiredField(
-                102,
-                static fn (BinaryReader $r) => $r->readList(
-                    static function (BinaryReader $rr, int $index) use ($types, $rowCount): DecodedVector {
-                        $logicalType = $types[$index] ?? null;
-                        if ($logicalType === null) {
-                            throw new ProtocolException(
-                                "column vector {$index} has no matching logical type",
-                            );
-                        }
-                        return self::decodeVector($rr, $logicalType, $rowCount);
-                    },
-                ),
-            );
-            if (count($columns) !== count($types)) {
+            if (count($chunkTypeIds) !== count($types)) {
                 throw new ProtocolException(
-                    'DataChunk declared ' . count($types) . ' types but serialized '
-                    . count($columns) . ' columns',
+                    'DataChunk declared ' . count($chunkTypeIds)
+                    . ' types but the prepared result has ' . count($types),
                 );
             }
-            return new DataChunk($rowCount, $types, $columns);
+            foreach ($types as $index => $type) {
+                if (($chunkTypeIds[$index] ?? null) !== $type->id->value) {
+                    throw new ProtocolException(
+                        "DataChunk type {$index} does not match the prepared result type",
+                    );
+                }
+            }
+
+            return self::decodeColumns($object, $rowCount, $types, $resultNames);
         });
+    }
+
+    /**
+     * @param list<LogicalType> $types
+     * @param list<string>      $resultNames
+     */
+    private static function decodeColumns(
+        BinaryReader $object,
+        int $rowCount,
+        array $types,
+        array $resultNames = [],
+    ): DataChunk {
+        $columns = $object->readRequiredField(
+            102,
+            static fn (BinaryReader $r) => $r->readList(
+                static function (BinaryReader $rr, int $index) use ($types, $rowCount): DecodedVector {
+                    $logicalType = $types[$index] ?? null;
+                    if ($logicalType === null) {
+                        throw new ProtocolException(
+                            "column vector {$index} has no matching logical type",
+                        );
+                    }
+                    return self::decodeVector($rr, $logicalType, $rowCount);
+                },
+            ),
+        );
+        if (count($columns) !== count($types)) {
+            throw new ProtocolException(
+                'DataChunk declared ' . count($types) . ' types but serialized '
+                . count($columns) . ' columns',
+            );
+        }
+        return new DataChunk($rowCount, $types, $columns, $types, $resultNames);
+    }
+
+    /**
+     * Encoding still operates on Value objects; decoded chunks contain PHP
+     * values, so reject them rather than failing deep inside the encoder.
+     *
+     * @param list<mixed> $values
+     * @return list<Value>
+     */
+    private static function valueList(array $values, int $columnIndex): array
+    {
+        $result = [];
+        foreach ($values as $value) {
+            if (!$value instanceof Value) {
+                throw new ProtocolException(
+                    "column {$columnIndex} contains a decoded PHP value and cannot be re-encoded",
+                );
+            }
+            $result[] = $value;
+        }
+
+        return $result;
     }
 
     public static function encodeDataChunk(BinaryWriter $writer, DataChunk $chunk): void
@@ -117,7 +193,12 @@ final class DataChunkCodec
                                 . " values, expected {$chunk->rowCount}",
                             );
                         }
-                        self::encodeVector($ww, $logicalType, $column->values, $chunk->rowCount);
+                        self::encodeVector(
+                            $ww,
+                            $logicalType,
+                            self::valueList($column->values, $index),
+                            $chunk->rowCount,
+                        );
                     },
                 );
             });
@@ -187,9 +268,8 @@ final class DataChunkCodec
         int $count,
     ): DecodedVector {
         $decoded = self::decodeVectorBody($reader, $logicalType, $count > 0 ? 1 : 0);
-        $value = $decoded->values[0] ?? Value::null();
+        $value = $decoded->values[0] ?? null;
         return new DecodedVector(
-            $logicalType,
             VectorType::Constant,
             array_fill(0, $count, $value),
         );
@@ -215,7 +295,7 @@ final class DataChunkCodec
             $values[] = $dictionary->values[$index]
                 ?? throw new ProtocolException("dictionary selection {$index} is out of range");
         }
-        return new DecodedVector($logicalType, VectorType::Dictionary, $values);
+        return new DecodedVector(VectorType::Dictionary, $values);
     }
 
     private static function decodeSequenceVector(
@@ -234,9 +314,9 @@ final class DataChunkCodec
         $values = [];
         for ($index = 0; $index < $count; $index++) {
             $current = $start->add($increment->mul(BigInt::fromInt($index)));
-            $values[] = self::decodeSequenceValue($logicalType, $current);
+            $values[] = self::decodeSequenceValueToPhp($logicalType, $current);
         }
-        return new DecodedVector($logicalType, VectorType::Sequence, $values);
+        return new DecodedVector(VectorType::Sequence, $values);
     }
 
     private static function decodeFlatVectorBody(
@@ -273,14 +353,14 @@ final class DataChunkCodec
                     . " bytes, expected {$byteLength}",
                 );
             }
-            $values = self::decodeFixedValues(
+            $values = self::decodeFixedValuesToPhp(
                 $logicalType,
                 $physicalType,
                 $bytes,
                 $count,
                 $validity,
             );
-            return new DecodedVector($logicalType, $vectorType, $values);
+            return new DecodedVector($vectorType, $values);
         }
 
         return match ($physicalType) {
@@ -332,10 +412,10 @@ final class DataChunkCodec
         $values = [];
         foreach ($rawValues as $index => $raw) {
             $values[] = self::isValid($validity, $index)
-                ? self::decodeStringLikeValue($logicalType, $raw)
-                : Value::null();
+                ? self::decodeStringLikeValueToPhp($logicalType, $raw)
+                : null;
         }
-        return new DecodedVector($logicalType, $vectorType, $values);
+        return new DecodedVector($vectorType, $values);
     }
 
     /**
@@ -369,7 +449,7 @@ final class DataChunkCodec
         $values = [];
         for ($rowIndex = 0; $rowIndex < $count; $rowIndex++) {
             if (!self::isValid($validity, $rowIndex)) {
-                $values[] = Value::null();
+                $values[] = null;
                 continue;
             }
             $row = [];
@@ -378,11 +458,23 @@ final class DataChunkCodec
                 if ($childVector === null) {
                     throw new ProtocolException("STRUCT child {$childIndex} is incomplete");
                 }
-                $row[$child->name] = $childVector->values[$rowIndex] ?? Value::null();
+                $row[$child->name] = $childVector->values[$rowIndex] ?? null;
             }
-            $values[] = Value::struct($row);
+            $values[] = self::logicalStructToPhp($logicalType, $row);
         }
-        return new DecodedVector($logicalType, $vectorType, $values);
+        return new DecodedVector($vectorType, $values);
+    }
+
+    /**
+     * @param array<string,mixed> $row
+     */
+    private static function logicalStructToPhp(LogicalType $logicalType, array $row): mixed
+    {
+        return match ($logicalType->id) {
+            LogicalTypeId::Union => self::unionToPhp($row, $logicalType),
+            LogicalTypeId::Variant => VariantDecoder::fromPhp($row)->decode(),
+            default => $row,
+        };
     }
 
     /**
@@ -409,10 +501,11 @@ final class DataChunkCodec
             static fn (BinaryReader $r) => self::decodeVector($r, $childType, $listSize),
         );
 
+        $isMap = $logicalType->id === LogicalTypeId::Map;
         $values = [];
         foreach ($entries as $rowIndex => [$offset, $length]) {
             if (!self::isValid($validity, $rowIndex)) {
-                $values[] = Value::null();
+                $values[] = null;
                 continue;
             }
             if ($offset > count($childVector->values) || $offset + $length > count($childVector->values)) {
@@ -420,9 +513,59 @@ final class DataChunkCodec
                     "LIST entry {$rowIndex} overruns the child vector",
                 );
             }
-            $values[] = Value::list(array_slice($childVector->values, $offset, $length));
+            $items = array_slice($childVector->values, $offset, $length);
+            $values[] = $isMap ? self::mapPairsToPhp($items, $logicalType) : $items;
         }
-        return new DecodedVector($logicalType, $vectorType, $values);
+        return new DecodedVector($vectorType, $values);
+    }
+
+    /**
+     * @param array<string,mixed> $row
+     * @return array<string,mixed>
+     */
+    private static function unionToPhp(array $row, LogicalType $logicalType): array
+    {
+        $tag = $row[''] ?? null;
+        if (is_string($tag)) {
+            if (preg_match('/^[0-9]+$/', $tag) !== 1) {
+                throw new ProtocolException("invalid UNION tag {$tag}");
+            }
+            $tag = (int) $tag;
+        }
+        if (!is_int($tag)) {
+            throw new ProtocolException('UNION value is missing its tag');
+        }
+
+        $children = LogicalTypeCodec::getStructChildren($logicalType);
+        $member = $children[$tag + 1] ?? null;
+        if ($member === null) {
+            throw new ProtocolException("UNION tag {$tag} is out of range");
+        }
+
+        return [$member->name => $row[$member->name] ?? null];
+    }
+
+    /**
+     * @param list<mixed> $pairs
+     * @return array<int|string,mixed>
+     */
+    private static function mapPairsToPhp(array $pairs, LogicalType $logicalType): array
+    {
+        $result = [];
+        foreach ($pairs as $pair) {
+            if (!is_array($pair)) {
+                throw new ProtocolException('MAP entry is not a struct');
+            }
+            $key = $pair['key'] ?? null;
+            if (!is_int($key) && !is_string($key)) {
+                throw new ProtocolException(
+                    'MAP key cannot be represented as a PHP array key',
+                );
+            }
+            $result[$key] = $pair['value'] ?? null;
+        }
+
+        return $result;
     }
 
     /**
@@ -454,13 +597,13 @@ final class DataChunkCodec
         $values = [];
         for ($rowIndex = 0; $rowIndex < $count; $rowIndex++) {
             if (!self::isValid($validity, $rowIndex)) {
-                $values[] = Value::null();
+                $values[] = null;
                 continue;
             }
             $offset = $rowIndex * $arraySize;
-            $values[] = Value::list(array_slice($childVector->values, $offset, $arraySize));
+            $values[] = array_slice($childVector->values, $offset, $arraySize);
         }
-        return new DecodedVector($logicalType, $vectorType, $values);
+        return new DecodedVector($vectorType, $values);
     }
 
     /**
@@ -732,9 +875,9 @@ final class DataChunkCodec
 
     /**
      * @param list<bool>|null $validity
-     * @return list<Value>
+     * @return list<mixed>
      */
-    private static function decodeFixedValues(
+    private static function decodeFixedValuesToPhp(
         LogicalType $logicalType,
         PhysicalType $physicalType,
         string $bytes,
@@ -744,45 +887,45 @@ final class DataChunkCodec
         $reader = new BinaryReader($bytes);
         $values = [];
         for ($index = 0; $index < $count; $index++) {
-            $value = self::decodeFixedValue($reader, $logicalType, $physicalType);
-            $values[] = self::isValid($validity, $index) ? $value : Value::null();
+            $value = self::decodeFixedValueToPhp($reader, $logicalType, $physicalType);
+            $values[] = self::isValid($validity, $index) ? $value : null;
         }
         $reader->assertEof();
         return $values;
     }
 
-    private static function decodeFixedValue(
+    private static function decodeFixedValueToPhp(
         BinaryReader $reader,
         LogicalType $logicalType,
         PhysicalType $physicalType,
-    ): Value {
+    ): mixed {
         return match ($physicalType) {
-            PhysicalType::Bool => Value::bool($reader->readFixedU8() !== 0),
-            PhysicalType::Int8 => Value::int($reader->readFixedI8()),
-            PhysicalType::UInt8 => self::decodeEnumOrNumber(
+            PhysicalType::Bool => $reader->readFixedU8() !== 0,
+            PhysicalType::Int8 => $reader->readFixedI8(),
+            PhysicalType::UInt8 => self::decodeEnumOrNumberToPhp(
                 $logicalType,
                 $reader->readFixedU8(),
             ),
-            PhysicalType::Int16 => self::decodeInt16OrDecimal($reader, $logicalType),
-            PhysicalType::UInt16 => self::decodeEnumOrNumber(
+            PhysicalType::Int16 => self::decodeInt16OrDecimalToPhp($reader, $logicalType),
+            PhysicalType::UInt16 => self::decodeEnumOrNumberToPhp(
                 $logicalType,
                 $reader->readFixedU16(),
             ),
-            PhysicalType::Int32 => self::decodeInt32LogicalValue($reader, $logicalType),
-            PhysicalType::UInt32 => self::decodeEnumOrNumber(
+            PhysicalType::Int32 => self::decodeInt32LogicalValueToPhp($reader, $logicalType),
+            PhysicalType::UInt32 => self::decodeEnumOrNumberToPhp(
                 $logicalType,
                 $reader->readFixedU32(),
             ),
-            PhysicalType::Int64 => self::decodeInt64LogicalValue(
+            PhysicalType::Int64 => self::decodeInt64LogicalValueToPhp(
                 $logicalType,
                 $reader->readFixedI64(),
             ),
-            PhysicalType::UInt64 => Value::uint($reader->readFixedU64()),
-            PhysicalType::Float => Value::float($reader->readFixedF32()),
-            PhysicalType::Double => Value::double($reader->readFixedF64()),
-            PhysicalType::Int128 => self::decodeInt128Value($reader, $logicalType),
-            PhysicalType::UInt128 => self::decodeUInt128Value($reader),
-            PhysicalType::Interval => Value::interval(
+            PhysicalType::UInt64 => $reader->readFixedU64(),
+            PhysicalType::Float => $reader->readFixedF32(),
+            PhysicalType::Double => $reader->readFixedF64(),
+            PhysicalType::Int128 => self::decodeInt128ValueToPhp($reader, $logicalType),
+            PhysicalType::UInt128 => self::decodeUInt128ValueToPhp($reader),
+            PhysicalType::Interval => TemporalFormatter::formatInterval(
                 new IntervalValue(
                     $reader->readFixedI32(),
                     $reader->readFixedI32(),
@@ -795,67 +938,69 @@ final class DataChunkCodec
         };
     }
 
-    private static function decodeInt16OrDecimal(
+    private static function decodeInt16OrDecimalToPhp(
         BinaryReader $reader,
         LogicalType $logicalType,
-    ): Value {
+    ): int|float|string {
         $value = $reader->readFixedI16();
         if ($logicalType->id === LogicalTypeId::Decimal) {
-            return Value::decimal(self::decimalFromUnscaled($logicalType, $value));
+            return self::decimalFromUnscaled($logicalType, $value)->toPhp();
         }
-        return Value::int($value);
+        return $value;
     }
 
-    private static function decodeInt32LogicalValue(
+    private static function decodeInt32LogicalValueToPhp(
         BinaryReader $reader,
         LogicalType $logicalType,
-    ): Value {
+    ): int|float|string {
         $value = $reader->readFixedI32();
         if ($logicalType->id === LogicalTypeId::Date) {
-            return Value::date(new DateValue($value));
+            return TemporalFormatter::formatDate($value);
         }
         if ($logicalType->id === LogicalTypeId::Decimal) {
-            return Value::decimal(self::decimalFromUnscaled($logicalType, $value));
+            return self::decimalFromUnscaled($logicalType, $value)->toPhp();
         }
-        return Value::int($value);
+        return $value;
     }
 
-    private static function decodeInt128Value(
+    private static function decodeInt128ValueToPhp(
         BinaryReader $reader,
         LogicalType $logicalType,
-    ): Value {
+    ): int|float|string {
         $lower = $reader->readFixedU64();
         $upper = $reader->readFixedI64();
         $parts = new HugeIntParts($upper, $lower);
         if ($logicalType->id === LogicalTypeId::Uuid) {
-            return Value::string($parts->uuid());
+            return $parts->uuid();
         }
         $value = $parts->toSignedBigInt();
         if ($logicalType->id === LogicalTypeId::Decimal) {
-            return Value::decimal(self::decimalFromUnscaled($logicalType, $value->toIntOrString()));
+            return self::decimalFromUnscaled($logicalType, $value->toIntOrString())->toPhp();
         }
-        return Value::hugeInt($value->toIntOrString());
+        return $value->toIntOrString();
     }
 
-    private static function decodeUInt128Value(BinaryReader $reader): Value
+    private static function decodeUInt128ValueToPhp(BinaryReader $reader): int|string
     {
         $lower = $reader->readFixedU64();
         $upper = $reader->readFixedI64();
         $parts = new HugeIntParts($upper, $lower);
-        return Value::uHugeInt($parts->toUnsignedBigInt()->toIntOrString());
+        return $parts->toUnsignedBigInt()->toIntOrString();
     }
 
-    private static function decodeEnumOrNumber(LogicalType $logicalType, int|string $index): Value
-    {
+    private static function decodeEnumOrNumberToPhp(
+        LogicalType $logicalType,
+        int|string $index,
+    ): int|string {
         if ($logicalType->id !== LogicalTypeId::Enum) {
-            return Value::uint($index);
+            return $index;
         }
         $values = LogicalTypeCodec::getEnumValues($logicalType);
         $position = (int) $index;
         if ((string) $position !== (string) $index || !isset($values[$position])) {
             throw new ProtocolException("ENUM index {$index} is out of range");
         }
-        return Value::string($values[$position]);
+        return $values[$position];
     }
 
     private static function encodeFixedValue(
@@ -962,27 +1107,52 @@ final class DataChunkCodec
         }
     }
 
-    private static function decodeStringLikeValue(LogicalType $logicalType, string $raw): Value
+    private static function decodeStringLikeValueToPhp(LogicalType $logicalType, string $raw): mixed
     {
         if ($logicalType->id === LogicalTypeId::Blob) {
-            return Value::bytes($raw);
+            return $raw;
         }
         if ($logicalType->id === LogicalTypeId::Bit) {
-            return Value::string(BitString::fromStorage($raw));
+            return BitString::fromStorage($raw);
         }
         if ($logicalType->id === LogicalTypeId::Type) {
-            return Value::string(self::typeStringFromStorage($raw));
+            return self::typeStringFromStorage($raw);
         }
         if ($logicalType->id === LogicalTypeId::BigNum) {
-            return Value::string(Bignum::fromStorage($raw));
+            return Bignum::fromStorage($raw);
         }
         if ($logicalType->id === LogicalTypeId::Geometry) {
-            return Value::string($raw);
+            return $raw;
         }
         if ($raw !== '' && preg_match('//u', $raw) !== 1) {
             throw new Utf8Exception('invalid UTF-8 string');
         }
-        return Value::string($raw);
+        if (self::isJsonType($logicalType)) {
+            return self::jsonToPhp($raw);
+        }
+        return $raw;
+    }
+
+    private static function isJsonType(LogicalType $logicalType): bool
+    {
+        return $logicalType->id === LogicalTypeId::Varchar
+            && strcasecmp($logicalType->alias() ?? '', 'JSON') === 0;
+    }
+
+    private static function jsonToPhp(string $json): mixed
+    {
+        try {
+            return json_decode(
+                $json,
+                true,
+                512,
+                JSON_THROW_ON_ERROR | JSON_BIGINT_AS_STRING,
+            );
+        } catch (\JsonException $error) {
+            throw new ProtocolException(
+                'invalid JSON value: ' . $error->getMessage(),
+            );
+        }
     }
 
     private static function encodeStringLikeValue(LogicalType $logicalType, Value $value): string
@@ -1087,31 +1257,35 @@ final class DataChunkCodec
         };
     }
 
-    private static function decodeInt64LogicalValue(LogicalType $logicalType, int $value): Value
+    private static function decodeInt64LogicalValueToPhp(LogicalType $logicalType, int $value): int|float|string
     {
         return match ($logicalType->id) {
-            LogicalTypeId::Time => Value::time(new TimeValue(TimeUnit::Micros, $value)),
-            LogicalTypeId::TimeNs => Value::time(new TimeValue(TimeUnit::Nanos, $value)),
-            LogicalTypeId::TimeTz => Value::timeTz(new TimeTzValue($value)),
-            LogicalTypeId::TimestampSec => Value::timestamp(
-                new TimestampValue(TimestampUnit::Seconds, $value),
+            LogicalTypeId::Time => TemporalFormatter::formatTime($value, TimeUnit::Micros),
+            LogicalTypeId::TimeNs => TemporalFormatter::formatTime($value, TimeUnit::Nanos),
+            LogicalTypeId::TimeTz => TemporalFormatter::formatTimeTz($value),
+            LogicalTypeId::TimestampSec => TemporalFormatter::formatTimestamp(
+                $value,
+                TimestampUnit::Seconds,
             ),
-            LogicalTypeId::TimestampMs => Value::timestamp(
-                new TimestampValue(TimestampUnit::Millis, $value),
+            LogicalTypeId::TimestampMs => TemporalFormatter::formatTimestamp(
+                $value,
+                TimestampUnit::Millis,
             ),
-            LogicalTypeId::Timestamp => Value::timestamp(
-                new TimestampValue(TimestampUnit::Micros, $value),
+            LogicalTypeId::Timestamp => TemporalFormatter::formatTimestamp(
+                $value,
+                TimestampUnit::Micros,
             ),
-            LogicalTypeId::TimestampNs => Value::timestamp(
-                new TimestampValue(TimestampUnit::Nanos, $value),
+            LogicalTypeId::TimestampNs => TemporalFormatter::formatTimestamp(
+                $value,
+                TimestampUnit::Nanos,
             ),
-            LogicalTypeId::TimestampTz => Value::timestamp(
-                new TimestampValue(TimestampUnit::Micros, $value, true),
+            LogicalTypeId::TimestampTz => TemporalFormatter::formatTimestamp(
+                $value,
+                TimestampUnit::Micros,
+                true,
             ),
-            LogicalTypeId::Decimal => Value::decimal(
-                self::decimalFromUnscaled($logicalType, $value),
-            ),
-            default => Value::int($value),
+            LogicalTypeId::Decimal => self::decimalFromUnscaled($logicalType, $value)->toPhp(),
+            default => $value,
         };
     }
 
@@ -1269,13 +1443,13 @@ final class DataChunkCodec
         throw new ProtocolException("unknown ENUM value {$value}");
     }
 
-    private static function decodeSequenceValue(LogicalType $logicalType, BigInt $value): Value
+    private static function decodeSequenceValueToPhp(LogicalType $logicalType, BigInt $value): int|float|string
     {
         return match ($logicalType->id) {
-            LogicalTypeId::Integer => Value::int(self::asI64($value)),
-            LogicalTypeId::Date => Value::date(new DateValue(self::asI32($value))),
-            LogicalTypeId::BigInt => Value::int(self::asI64($value)),
-            default => self::decodeInt64LogicalValue($logicalType, self::asI64($value)),
+            LogicalTypeId::Integer => self::asI64($value),
+            LogicalTypeId::Date => TemporalFormatter::formatDate(self::asI32($value)),
+            LogicalTypeId::BigInt => self::asI64($value),
+            default => self::decodeInt64LogicalValueToPhp($logicalType, self::asI64($value)),
         };
     }
 

@@ -2,6 +2,8 @@
 
 namespace DuckDB\Quack\Tests\Unit\Messages;
 
+use DuckDB\Quack\Chunk\DataChunk;
+use DuckDB\Quack\Chunk\DecodedVector;
 use DuckDB\Quack\Error\ServerError;
 use DuckDB\Quack\Messages\CancelMessage;
 use DuckDB\Quack\Messages\ConnectionRequestMessage;
@@ -13,7 +15,11 @@ use DuckDB\Quack\Messages\MessageCodec;
 use DuckDB\Quack\Messages\MessageHeader;
 use DuckDB\Quack\Messages\MessageType;
 use DuckDB\Quack\Messages\PrepareRequestMessage;
+use DuckDB\Quack\Messages\PrepareResponseMessage;
 use DuckDB\Quack\Types\HugeIntParts;
+use DuckDB\Quack\Types\LogicalTypes;
+use DuckDB\Quack\Types\Value;
+use DuckDB\Quack\Types\VectorType;
 use PHPUnit\Framework\TestCase;
 
 final class MessageCodecTest extends TestCase
@@ -56,6 +62,35 @@ final class MessageCodecTest extends TestCase
 
         self::assertInstanceOf(PrepareRequestMessage::class, $decoded);
         self::assertEquals($message, $decoded);
+    }
+
+    public function testPrepareResponseRoundTripsResultMetadataThroughChunks(): void
+    {
+        $type = LogicalTypes::integer();
+        $chunk = new DataChunk(
+            rowCount: 1,
+            types: [$type],
+            columns: [new DecodedVector(VectorType::Flat, [Value::int(42)])],
+            resultTypes: [$type],
+            resultNames: ['answer'],
+        );
+        $message = new PrepareResponseMessage(
+            new MessageHeader(MessageType::PrepareResponse, 'conn-1', 11),
+            false,
+            [$chunk],
+            new HugeIntParts(0, 5),
+        );
+
+        $decoded = MessageCodec::decodeMessageForVersion(
+            MessageCodec::encodeMessageForVersion($message, 3),
+            3,
+        );
+
+        self::assertInstanceOf(PrepareResponseMessage::class, $decoded);
+        self::assertCount(1, $decoded->results);
+        self::assertSame([42], $decoded->results[0]->columns[0]->values);
+        self::assertEquals([$type], $decoded->results[0]->resultTypes);
+        self::assertSame(['answer'], $decoded->results[0]->resultNames);
     }
 
     public function testHeartbeatCancelAndDisconnectRoundTrip(): void

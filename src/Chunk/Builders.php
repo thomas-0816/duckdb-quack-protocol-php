@@ -50,7 +50,6 @@ final class Builders
             }
             $types[] = $input->logicalType;
             $decodedColumns[] = new DecodedVector(
-                $input->logicalType,
                 VectorType::Flat,
                 $input->values,
             );

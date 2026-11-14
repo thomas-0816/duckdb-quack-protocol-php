@@ -11,6 +11,7 @@ use DuckDB\Quack\Exceptions\TransportException;
 use DuckDB\Quack\Messages\ErrorMessage;
 use DuckDB\Quack\Messages\MessageCodec;
 use DuckDB\Quack\Messages\QuackMessage;
+use DuckDB\Quack\Types\LogicalType;
 
 /**
  * HTTP(S) transport for one Quack endpoint, backed by ext-curl.
@@ -79,8 +80,16 @@ final class Transport
         return $clone;
     }
 
-    public function send(QuackMessage $message, int $version): QuackMessage
-    {
+    /**
+     * @param list<LogicalType> $resultTypes schema for decoding result chunks
+     * @param list<string>      $resultNames column names for decoding result chunks
+     */
+    public function send(
+        QuackMessage $message,
+        int $version,
+        array $resultTypes = [],
+        array $resultNames = [],
+    ): QuackMessage {
         $bytes = MessageCodec::encodeMessageForVersion($message, $version);
         $curl = curl_init($this->baseUrl . '/quack');
         if ($curl === false) {
@@ -136,7 +145,7 @@ final class Transport
             throw new HttpStatusException($status, $raw);
         }
 
-        $decoded = MessageCodec::decodeMessageForVersion((string) $body, $version);
+        $decoded = MessageCodec::decodeMessageForVersion((string) $body, $version, $resultTypes, $resultNames);
         if ($decoded instanceof ErrorMessage) {
             throw new ServerException($decoded->error);
         }

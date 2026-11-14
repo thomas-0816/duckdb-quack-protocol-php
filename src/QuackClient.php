@@ -12,7 +12,6 @@ use DuckDB\Quack\Sql\QuerySql;
 use DuckDB\Quack\Sql\SqlFormatter;
 use DuckDB\Quack\Sql\SqlParameters;
 use DuckDB\Quack\Transport\Transport;
-use DuckDB\Quack\Types\Value;
 
 /**
  * One session on a Quack server.
@@ -80,21 +79,15 @@ final class QuackClient
             if (!$response instanceof PrepareResponseMessage) {
                 throw $this->connection->protocolFailure('expected PREPARE_RESPONSE, got ' . $response->messageType()->name);
             }
-            $types = [];
-            foreach ($response->resultNames as $key => $name) {
-                $type = $response->resultTypes[$key] ?? null;
-                if ($type !== null) {
-                    $types[$name] = $type;
-                }
-            }
-            $names = array_keys($types);
-            foreach ($this->chunks($response) as $chunk) { // TODO check again
+            // Only the first row matters, and returning early is safe because
+            // the next PREPARE resets the server's result cursor.
+            foreach ($this->chunks($response) as $chunk) {
+                $names = $chunk->resultNames;
                 for ($rowIndex = 0; $rowIndex < $chunk->rowCount; $rowIndex++) {
                     $result = [];
                     foreach ($chunk->columns as $columnIndex => $column) {
                         $name = $names[$columnIndex] ?? "column{$columnIndex}";
-                        $value = $column->values[$rowIndex] ?? Value::null();
-                        $result[$name] = $value->toPhp($types[$name] ?? null);
+                        $result[$name] = $column->values[$rowIndex] ?? null;
                     }
                     $count = $result['Count'] ?? 0;
                     return is_int($count) ? $count : 0;
@@ -127,22 +120,14 @@ final class QuackClient
             if (!$response instanceof PrepareResponseMessage) {
                 throw $this->connection->protocolFailure('expected PREPARE_RESPONSE, got ' . $response->messageType()->name);
             }
-            $types = [];
-            foreach ($response->resultNames as $key => $name) {
-                $type = $response->resultTypes[$key] ?? null;
-                if ($type !== null) {
-                    $types[$name] = $type;
-                }
-            }
-            $names = array_keys($types);
             $rows = [];
             foreach ($this->chunks($response) as $chunk) {
+                $names = $chunk->resultNames;
                 for ($rowIndex = 0; $rowIndex < $chunk->rowCount; $rowIndex++) {
                     $result = [];
                     foreach ($chunk->columns as $columnIndex => $column) {
                         $name = $names[$columnIndex] ?? "column{$columnIndex}";
-                        $value = $column->values[$rowIndex] ?? Value::null();
-                        $result[$name] = $value->toPhp($types[$name] ?? null);
+                        $result[$name] = $column->values[$rowIndex] ?? null;
                     }
                     $rows[] = $result;
                 }
@@ -174,21 +159,13 @@ final class QuackClient
             if (!$response instanceof PrepareResponseMessage) {
                 throw $this->connection->protocolFailure('expected PREPARE_RESPONSE, got ' . $response->messageType()->name);
             }
-            $types = [];
-            foreach ($response->resultNames as $key => $name) {
-                $type = $response->resultTypes[$key] ?? null;
-                if ($type !== null) {
-                    $types[$name] = $type;
-                }
-            }
-            $names = array_keys($types);
             foreach ($this->chunks($response) as $chunk) {
+                $names = $chunk->resultNames;
                 for ($rowIndex = 0; $rowIndex < $chunk->rowCount; $rowIndex++) {
                     $result = [];
                     foreach ($chunk->columns as $columnIndex => $column) {
                         $name = $names[$columnIndex] ?? "column{$columnIndex}";
-                        $value = $column->values[$rowIndex] ?? Value::null();
-                        $result[$name] = $value->toPhp($types[$name] ?? null);
+                        $result[$name] = $column->values[$rowIndex] ?? null;
                     }
                     return $result;
                 }
@@ -220,21 +197,13 @@ final class QuackClient
             if (!$response instanceof PrepareResponseMessage) {
                 throw $this->connection->protocolFailure('expected PREPARE_RESPONSE, got ' . $response->messageType()->name);
             }
-            $types = [];
-            foreach ($response->resultNames as $key => $name) {
-                $type = $response->resultTypes[$key] ?? null;
-                if ($type !== null) {
-                    $types[$name] = $type;
-                }
-            }
-            $names = array_keys($types);
             foreach ($this->chunks($response) as $chunk) {
+                $names = $chunk->resultNames;
                 for ($rowIndex = 0; $rowIndex < $chunk->rowCount; $rowIndex++) {
                     $result = [];
                     foreach ($chunk->columns as $columnIndex => $column) {
                         $name = $names[$columnIndex] ?? "column{$columnIndex}";
-                        $value = $column->values[$rowIndex] ?? Value::null();
-                        $result[$name] = $value->toPhp($types[$name] ?? null);
+                        $result[$name] = $column->values[$rowIndex] ?? null;
                     }
                     yield $result;
                 }
@@ -265,11 +234,10 @@ final class QuackClient
             if (!$response instanceof PrepareResponseMessage) {
                 throw $this->connection->protocolFailure('expected PREPARE_RESPONSE, got ' . $response->messageType()->name);
             }
-            $type = $response->resultTypes[0] ?? null;
             $values = [];
             foreach ($this->chunks($response) as $chunk) {
                 foreach ($chunk->columns[0]->values ?? [] as $value) {
-                    $values[] = $value->toPhp($type);
+                    $values[] = $value;
                 }
             }
             return $values;
@@ -298,10 +266,9 @@ final class QuackClient
             if (!$response instanceof PrepareResponseMessage) {
                 throw $this->connection->protocolFailure('expected PREPARE_RESPONSE, got ' . $response->messageType()->name);
             }
-            $type = $response->resultTypes[0] ?? null;
             foreach ($this->chunks($response) as $chunk) {
                 foreach ($chunk->columns[0]->values ?? [] as $value) {
-                    return $value->toPhp($type);
+                    return $value;
                 }
             }
             return null;
@@ -331,19 +298,15 @@ final class QuackClient
             if (!$response instanceof PrepareResponseMessage) {
                 throw $this->connection->protocolFailure('expected PREPARE_RESPONSE, got ' . $response->messageType()->name);
             }
-            $keyType = $response->resultTypes[0] ?? null;
-            $valueType = $response->resultTypes[1] ?? null;
             $result = [];
             foreach ($this->chunks($response) as $chunk) {
                 $keys = $chunk->columns[0]->values ?? [];
                 $values = $chunk->columns[1]->values ?? [];
-                foreach ($keys as $rowIndex => $keyValue) {
-                    $phpKey = $keyValue->toPhp($keyType);
+                foreach ($keys as $rowIndex => $phpKey) {
                     if (!is_int($phpKey) && !is_string($phpKey)) {
                         throw new ProtocolException('key column must contain integers or strings');
                     }
-                    $phpValue = $values[$rowIndex] ?? Value::null();
-                    $result[$phpKey] = $phpValue->toPhp($valueType);
+                    $result[$phpKey] = $values[$rowIndex] ?? null;
                 }
             }
             return $result;
@@ -360,6 +323,9 @@ final class QuackClient
         $needsMoreFetch = $response->needsMoreFetch;
         $nextBatchIndex = 1;
         $ackIndex = 0;
+        $firstChunk = $response->results[0] ?? null;
+        $resultTypes = $firstChunk->resultTypes ?? [];
+        $resultNames = $firstChunk->resultNames ?? [];
 
         foreach ($response->results as $chunk) {
             yield $chunk;
@@ -370,6 +336,8 @@ final class QuackClient
                 $response->resultUuid,
                 $nextBatchIndex,
                 $ackIndex,
+                $resultTypes,
+                $resultNames,
             );
             if (!$fetchResponse instanceof FetchResponseMessage) {
                 throw $this->connection->protocolFailure('expected FETCH_RESPONSE, got ' . $fetchResponse->messageType()->name);

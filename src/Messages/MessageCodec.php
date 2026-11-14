@@ -34,14 +34,20 @@ final class MessageCodec
         return $writer->intoBytes();
     }
 
+    /**
+     * @param list<LogicalType> $resultTypes schema for decoding FETCH_RESPONSE chunks
+     * @param list<string>      $resultNames column names for FETCH_RESPONSE chunks
+     */
     public static function decodeMessageForVersion(
         string $bytes,
         int $version,
+        array $resultTypes = [],
+        array $resultNames = [],
     ): QuackMessage {
         $reader = new BinaryReader($bytes);
         $header = self::decodeHeader($reader);
         $message = match ($version) {
-            3 => self::decodeBodyV3($reader, $header),
+            3 => self::decodeBodyV3($reader, $header, $resultTypes, $resultNames),
             default => throw new ProtocolException("unsupported Quack protocol version {$version}"),
         };
         $reader->assertEof();
@@ -242,19 +248,22 @@ final class MessageCodec
         BinaryWriter $writer,
         PrepareResponseMessage $message,
     ): void {
-        $writer->writeObject(static function (BinaryWriter $object) use ($message): void {
-            if ($message->resultTypes !== []) {
-                $object->writeField(1, static function (BinaryWriter $w) use ($message): void {
+        $firstChunk = $message->results[0] ?? null;
+        $resultTypes = $firstChunk->resultTypes ?? [];
+        $resultNames = $firstChunk->resultNames ?? [];
+        $writer->writeObject(static function (BinaryWriter $object) use ($message, $resultTypes, $resultNames): void {
+            if ($resultTypes !== []) {
+                $object->writeField(1, static function (BinaryWriter $w) use ($resultTypes): void {
                     $w->writeList(
-                        $message->resultTypes,
+                        $resultTypes,
                         static fn (BinaryWriter $ww, LogicalType $type) => LogicalTypeCodec::encodeLogicalType($ww, $type),
                     );
                 });
             }
-            if ($message->resultNames !== []) {
-                $object->writeField(2, static function (BinaryWriter $w) use ($message): void {
+            if ($resultNames !== []) {
+                $object->writeField(2, static function (BinaryWriter $w) use ($resultNames): void {
                     $w->writeList(
-                        $message->resultNames,
+                        $resultNames,
                         static fn (BinaryWriter $ww, string $name) => $ww->writeString($name),
                     );
                 });
@@ -281,9 +290,15 @@ final class MessageCodec
         });
     }
 
+    /**
+     * @param list<LogicalType> $resultTypes
+     * @param list<string>      $resultNames
+     */
     private static function decodeBodyV3(
         BinaryReader $reader,
         MessageHeader $header,
+        array $resultTypes = [],
+        array $resultNames = [],
     ): QuackMessage {
         return match ($header->messageType) {
             MessageType::ConnectionRequest => $reader->readObject(
@@ -368,7 +383,12 @@ final class MessageCodec
                     );
                 },
             ),
-            MessageType::FetchResponse => self::decodeFetchResponseV3($reader, $header),
+            MessageType::FetchResponse => self::decodeFetchResponseV3(
+                $reader,
+                $header,
+                $resultTypes,
+                $resultNames,
+            ),
             MessageType::SuccessResponse => $reader->readObject(
                 static fn (): SuccessResponseMessage => new SuccessResponseMessage($header),
             ),
@@ -424,7 +444,7 @@ final class MessageCodec
         );
         $results = $object->readOptionalField(
             4,
-            static fn (BinaryReader $r) => self::readChunkPointerList($r),
+            static fn (BinaryReader $r) => self::readChunkPointerList($r, $resultTypes, $resultNames),
             [],
         );
         $resultUuid = $object->readRequiredField(
@@ -433,17 +453,21 @@ final class MessageCodec
         );
         return new PrepareResponseMessage(
             $header,
-            $resultTypes,
-            $resultNames,
             $needsMoreFetch,
             $results,
             $resultUuid,
         );
     }
 
+    /**
+     * @param list<LogicalType> $resultTypes
+     * @param list<string>      $resultNames
+     */
     private static function decodeFetchResponseV3(
         BinaryReader $reader,
         MessageHeader $header,
+        array $resultTypes = [],
+        array $resultNames = [],
     ): FetchResponseMessage {
         [$chunkCount, $totalBatches, $batchIndex] = $reader->readObject(
             static function (BinaryReader $object): array {
@@ -464,20 +488,33 @@ final class MessageCodec
         }
         $results = [];
         for ($index = 0; $index < $count; $index++) {
-            $results[] = DataChunkCodec::decodeDataChunk($reader);
+            $results[] = DataChunkCodec::decodeDataChunkToPhp(
+                $reader,
+                $resultTypes,
+                $resultNames,
+            );
         }
         return new FetchResponseMessage($header, $results, $totalBatches, $batchIndex);
     }
 
     /**
+     * @param list<LogicalType> $resultTypes
+     * @param list<string>      $resultNames
      * @return list<DataChunk>
      */
-    private static function readChunkPointerList(BinaryReader $reader): array
-    {
+    private static function readChunkPointerList(
+        BinaryReader $reader,
+        array $resultTypes = [],
+        array $resultNames = [],
+    ): array {
         return $reader->readList(
-            static function (BinaryReader $r): DataChunk {
+            static function (BinaryReader $r) use ($resultTypes, $resultNames): DataChunk {
                 $chunk = $r->readNullable(
-                    static fn (BinaryReader $rr) => DataChunkCodec::decodeDataChunkWrapper($rr),
+                    static fn (BinaryReader $rr) => DataChunkCodec::decodeDataChunkWrapperToPhp(
+                        $rr,
+                        $resultTypes,
+                        $resultNames,
+                    ),
                 );
                 if ($chunk === null) {
                     throw new ProtocolException(

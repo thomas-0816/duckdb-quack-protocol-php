@@ -19,7 +19,7 @@ ini_set('display_errors', 1);
 $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 10, 300);
 echo 'connected with Quack protocol version ', $client->getConnection()->quackVersion(), PHP_EOL;
 
-$sql = "SELECT 1, 'foo', [1, 2, 3], null, true, {bar: 'baz'}";
+$sql = "SELECT 1 as a, 'foo' as b, [1, 2, 3] as c, null as d, true as e, {bar: 'baz'} as f";
 
 echo PHP_EOL, 'rows:', PHP_EOL;
 foreach ($client->fetchIterator($sql) as $row) {
