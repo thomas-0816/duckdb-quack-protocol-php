@@ -72,22 +72,17 @@ final class QuackClient
             throw new ProtocolException('Quack client is already running a query');
         }
         $query = SqlFormatter::formatSql($sql, SqlParameters::coerce($params));
-        $this->connection->setBusy(true);
-        try {
-            // Changed-row results have a single Count column, so only the first
-            // value matters. Returning early is safe because the next PREPARE
-            // resets the server's result cursor.
-            foreach ($this->fetchChunks($this->connection, $query) as $chunk) {
-                if (($chunk->resultNames[0] ?? null) !== 'Count') {
-                    return 0;
-                }
-                $count = $chunk->columns[0]->values[0] ?? 0;
-                return is_int($count) ? $count : 0;
+        // Changed-row results have a single Count column, so only the first
+        // value matters. Returning early is safe because the next PREPARE
+        // resets the server's result cursor.
+        foreach ($this->fetchChunks($this->connection, $query) as $chunk) {
+            if (($chunk->resultNames[0] ?? null) !== 'Count') {
+                return 0;
             }
-            return 0;
-        } finally {
-            $this->connection->setBusy(false);
+            $count = $chunk->columns[0]->values[0] ?? 0;
+            return is_int($count) ? $count : 0;
         }
+        return 0;
     }
 
     /**
@@ -152,24 +147,19 @@ final class QuackClient
             throw new ProtocolException('Quack client is already running a query');
         }
         $query = SqlFormatter::formatSql($sql, SqlParameters::coerce($params));
-        $this->connection->setBusy(true);
-        try {
-            $rows = [];
-            foreach ($this->fetchChunks($this->connection, $query) as $chunk) {
-                $names = $chunk->resultNames;
-                for ($rowIndex = 0; $rowIndex < $chunk->rowCount; $rowIndex++) {
-                    $result = [];
-                    foreach ($chunk->columns as $columnIndex => $column) {
-                        $name = $names[$columnIndex] ?? "column{$columnIndex}";
-                        $result[$name] = $column->values[$rowIndex] ?? null;
-                    }
-                    $rows[] = $result;
+        $rows = [];
+        foreach ($this->fetchChunks($this->connection, $query) as $chunk) {
+            $names = $chunk->resultNames;
+            for ($rowIndex = 0; $rowIndex < $chunk->rowCount; $rowIndex++) {
+                $result = [];
+                foreach ($chunk->columns as $columnIndex => $column) {
+                    $name = $names[$columnIndex] ?? "column{$columnIndex}";
+                    $result[$name] = $column->values[$rowIndex] ?? null;
                 }
+                $rows[] = $result;
             }
-            return $rows;
-        } finally {
-            $this->connection->setBusy(false);
         }
+        return $rows;
     }
 
     /**
@@ -187,23 +177,18 @@ final class QuackClient
             throw new ProtocolException('Quack client is already running a query');
         }
         $query = SqlFormatter::formatSql($sql, SqlParameters::coerce($params));
-        $this->connection->setBusy(true);
-        try {
-            foreach ($this->fetchChunks($this->connection, $query) as $chunk) {
-                $names = $chunk->resultNames;
-                for ($rowIndex = 0; $rowIndex < $chunk->rowCount; $rowIndex++) {
-                    $result = [];
-                    foreach ($chunk->columns as $columnIndex => $column) {
-                        $name = $names[$columnIndex] ?? "column{$columnIndex}";
-                        $result[$name] = $column->values[$rowIndex] ?? null;
-                    }
-                    return $result;
+        foreach ($this->fetchChunks($this->connection, $query) as $chunk) {
+            $names = $chunk->resultNames;
+            for ($rowIndex = 0; $rowIndex < $chunk->rowCount; $rowIndex++) {
+                $result = [];
+                foreach ($chunk->columns as $columnIndex => $column) {
+                    $name = $names[$columnIndex] ?? "column{$columnIndex}";
+                    $result[$name] = $column->values[$rowIndex] ?? null;
                 }
+                return $result;
             }
-            return null;
-        } finally {
-            $this->connection->setBusy(false);
         }
+        return null;
     }
 
     /**
@@ -254,18 +239,13 @@ final class QuackClient
             throw new ProtocolException('Quack client is already running a query');
         }
         $query = SqlFormatter::formatSql($sql, SqlParameters::coerce($params));
-        $this->connection->setBusy(true);
-        try {
-            $values = [];
-            foreach ($this->fetchChunks($this->connection, $query) as $chunk) {
-                foreach ($chunk->columns[0]->values ?? [] as $value) {
-                    $values[] = $value;
-                }
+        $values = [];
+        foreach ($this->fetchChunks($this->connection, $query) as $chunk) {
+            foreach ($chunk->columns[0]->values ?? [] as $value) {
+                $values[] = $value;
             }
-            return $values;
-        } finally {
-            $this->connection->setBusy(false);
         }
+        return $values;
     }
 
     /**
@@ -282,17 +262,12 @@ final class QuackClient
             throw new ProtocolException('Quack client is already running a query');
         }
         $query = SqlFormatter::formatSql($sql, SqlParameters::coerce($params));
-        $this->connection->setBusy(true);
-        try {
-            foreach ($this->fetchChunks($this->connection, $query) as $chunk) {
-                foreach ($chunk->columns[0]->values ?? [] as $value) {
-                    return $value;
-                }
+        foreach ($this->fetchChunks($this->connection, $query) as $chunk) {
+            foreach ($chunk->columns[0]->values ?? [] as $value) {
+                return $value;
             }
-            return null;
-        } finally {
-            $this->connection->setBusy(false);
         }
+        return null;
     }
 
     /**
