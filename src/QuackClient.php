@@ -8,7 +8,6 @@ use DuckDB\Quack\Error\QuackError;
 use DuckDB\Quack\Exceptions\ProtocolException;
 use DuckDB\Quack\Messages\FetchResponseMessage;
 use DuckDB\Quack\Messages\PrepareResponseMessage;
-use DuckDB\Quack\Sql\QuerySql;
 use DuckDB\Quack\Sql\SqlFormatter;
 use DuckDB\Quack\Sql\SqlParameters;
 use DuckDB\Quack\Transport\Transport;
@@ -72,12 +71,12 @@ final class QuackClient
         if ($this->connection->isBusy()) {
             throw new ProtocolException('Quack client is already running a query');
         }
-        $querySql = new QuerySql(SqlFormatter::formatSql($sql, SqlParameters::coerce($params)));
+        $query = SqlFormatter::formatSql($sql, SqlParameters::coerce($params));
         $this->connection->setBusy(true);
         try {
             // Only the first row matters, and returning early is safe because
             // the next PREPARE resets the server's result cursor.
-            foreach ($this->fetchChunks($this->connection, $querySql->asString()) as $chunk) {
+            foreach ($this->fetchChunks($this->connection, $query) as $chunk) {
                 $names = $chunk->resultNames;
                 for ($rowIndex = 0; $rowIndex < $chunk->rowCount; $rowIndex++) {
                     $result = [];
@@ -109,11 +108,11 @@ final class QuackClient
         if ($this->connection->isBusy()) {
             throw new ProtocolException('Quack client is already running a query');
         }
-        $querySql = new QuerySql(SqlFormatter::formatSql($sql, SqlParameters::coerce($params)));
+        $query = SqlFormatter::formatSql($sql, SqlParameters::coerce($params));
         $this->connection->setBusy(true);
         try {
             $rows = [];
-            foreach ($this->fetchChunks($this->connection, $querySql->asString()) as $chunk) {
+            foreach ($this->fetchChunks($this->connection, $query) as $chunk) {
                 $names = $chunk->resultNames;
                 for ($rowIndex = 0; $rowIndex < $chunk->rowCount; $rowIndex++) {
                     $result = [];
@@ -144,10 +143,10 @@ final class QuackClient
         if ($this->connection->isBusy()) {
             throw new ProtocolException('Quack client is already running a query');
         }
-        $querySql = new QuerySql(SqlFormatter::formatSql($sql, SqlParameters::coerce($params)));
+        $query = SqlFormatter::formatSql($sql, SqlParameters::coerce($params));
         $this->connection->setBusy(true);
         try {
-            foreach ($this->fetchChunks($this->connection, $querySql->asString()) as $chunk) {
+            foreach ($this->fetchChunks($this->connection, $query) as $chunk) {
                 $names = $chunk->resultNames;
                 for ($rowIndex = 0; $rowIndex < $chunk->rowCount; $rowIndex++) {
                     $result = [];
@@ -178,10 +177,10 @@ final class QuackClient
         if ($this->connection->isBusy()) {
             throw new ProtocolException('Quack client is already running a query');
         }
-        $querySql = new QuerySql(SqlFormatter::formatSql($sql, SqlParameters::coerce($params)));
+        $query = SqlFormatter::formatSql($sql, SqlParameters::coerce($params));
         $this->connection->setBusy(true);
         try {
-            foreach ($this->fetchChunks($this->connection, $querySql->asString()) as $chunk) {
+            foreach ($this->fetchChunks($this->connection, $query) as $chunk) {
                 $names = $chunk->resultNames;
                 for ($rowIndex = 0; $rowIndex < $chunk->rowCount; $rowIndex++) {
                     $result = [];
@@ -211,11 +210,11 @@ final class QuackClient
         if ($this->connection->isBusy()) {
             throw new ProtocolException('Quack client is already running a query');
         }
-        $querySql = new QuerySql(SqlFormatter::formatSql($sql, SqlParameters::coerce($params)));
+        $query = SqlFormatter::formatSql($sql, SqlParameters::coerce($params));
         $this->connection->setBusy(true);
         try {
             $values = [];
-            foreach ($this->fetchChunks($this->connection, $querySql->asString()) as $chunk) {
+            foreach ($this->fetchChunks($this->connection, $query) as $chunk) {
                 foreach ($chunk->columns[0]->values ?? [] as $value) {
                     $values[] = $value;
                 }
@@ -239,10 +238,10 @@ final class QuackClient
         if ($this->connection->isBusy()) {
             throw new ProtocolException('Quack client is already running a query');
         }
-        $querySql = new QuerySql(SqlFormatter::formatSql($sql, SqlParameters::coerce($params)));
+        $query = SqlFormatter::formatSql($sql, SqlParameters::coerce($params));
         $this->connection->setBusy(true);
         try {
-            foreach ($this->fetchChunks($this->connection, $querySql->asString()) as $chunk) {
+            foreach ($this->fetchChunks($this->connection, $query) as $chunk) {
                 foreach ($chunk->columns[0]->values ?? [] as $value) {
                     return $value;
                 }
@@ -267,11 +266,11 @@ final class QuackClient
         if ($this->connection->isBusy()) {
             throw new ProtocolException('Quack client is already running a query');
         }
-        $querySql = new QuerySql(SqlFormatter::formatSql($sql, SqlParameters::coerce($params)));
+        $query = SqlFormatter::formatSql($sql, SqlParameters::coerce($params));
         $this->connection->setBusy(true);
         try {
             $result = [];
-            foreach ($this->fetchChunks($this->connection, $querySql->asString()) as $chunk) {
+            foreach ($this->fetchChunks($this->connection, $query) as $chunk) {
                 $keys = $chunk->columns[0]->values ?? [];
                 $values = $chunk->columns[1]->values ?? [];
                 foreach ($keys as $rowIndex => $phpKey) {
@@ -296,9 +295,7 @@ final class QuackClient
     {
         $response = $connection->prepare($query);
         if (!$response instanceof PrepareResponseMessage) {
-            throw $connection->protocolFailure(
-                'expected PREPARE_RESPONSE, got ' . $response->messageType()->name,
-            );
+            throw $connection->protocolFailure('expected PREPARE_RESPONSE, got ' . $response->messageType()->name);
         }
 
         $needsMoreFetch = $response->needsMoreFetch;

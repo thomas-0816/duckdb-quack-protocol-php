@@ -19,15 +19,15 @@ ini_set('display_errors', 1);
 $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 10, 300);
 echo 'connected with Quack protocol version ', $client->getConnection()->quackVersion(), PHP_EOL;
 
-$sql = "SELECT 1 as a, 'foo' as b, [1, 2, 3] as c, null as d, true as e, {bar: 'baz'} as f";
+$sql = "SELECT 1 as a, 'foo' as b, [1, 2, 3] as c, null as d, true as e, {bar: 'baz'} as f, ? as g";
 
 echo PHP_EOL, 'rows:', PHP_EOL;
-foreach ($client->fetchIterator($sql) as $row) {
+foreach ($client->fetchIterator($sql, ['foo']) as $row) {
     print_r($row);
 }
 
 echo PHP_EOL, 'fetchAll():', PHP_EOL;
-print_r($client->fetchAll($sql));
+print_r($client->fetchAll($sql, [['foo' => 'bar']]));
 
 // The fetch helpers consume the stream for you.
 $first = $client->fetchOne('SELECT 42 AS answer') ?? [];
