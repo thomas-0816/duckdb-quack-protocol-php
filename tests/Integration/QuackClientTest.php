@@ -2,7 +2,6 @@
 
 namespace DuckDB\Quack\Tests\Integration;
 
-use DuckDB\Quack\Exceptions\ProtocolException;
 use DuckDB\Quack\QuackClient;
 use PHPUnit\Framework\TestCase;
 
@@ -154,23 +153,15 @@ final class QuackClientTest extends TestCase
         }
         self::assertSame(['n' => 1], $client->fetchOne('SELECT 1 AS n'));
 
-        // Creating an iterator without starting it does not acquire the client.
+        // Creating an iterator without starting it does not execute anything.
         $notStarted = $client->fetchIterator('SELECT 1 AS n');
-        self::assertFalse($client->getConnection()->isBusy());
         unset($notStarted);
 
-        // A partially consumed iterator still owns the client.
+        // A generator can be consumed incrementally.
         $generator = $client->fetchIterator('SELECT * FROM (VALUES (1), (2), (3)) t(n)');
         self::assertSame(['n' => 1], $generator->current());
         $generator->next();
         self::assertSame(['n' => 2], $generator->current());
-
-        try {
-            $client->fetchOne('SELECT 1 AS n');
-            self::fail('expected the partially consumed iterator to keep the client busy');
-        } catch (ProtocolException $error) {
-            self::assertStringContainsString('Quack client is already running a query', $error->getMessage());
-        }
 
         unset($generator);
         self::assertSame(['n' => 1], $client->fetchOne('SELECT 1 AS n'));

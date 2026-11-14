@@ -32,8 +32,6 @@ final class ClientConnection
 
     private bool $closed = false;
 
-    private bool $busy = false;
-
     private function __construct(
         private readonly Transport $transport,
         private readonly string $connectionId,
@@ -82,16 +80,6 @@ final class ClientConnection
     public function isClosed(): bool
     {
         return $this->closed;
-    }
-
-    public function setBusy(bool $busy): void
-    {
-        $this->busy = $busy;
-    }
-
-    public function isBusy(): bool
-    {
-        return $this->busy;
     }
 
     public function quackVersion(): int

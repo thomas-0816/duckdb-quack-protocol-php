@@ -15,9 +15,9 @@ use DuckDB\Quack\Transport\Transport;
 /**
  * One session on a Quack server.
  *
- * A client maps to exactly one server-side connection id. Queries are
- * serialized by a busy flag: a result stream keeps the client busy until it is
- * drained or destroyed, because a PREPARE resets the server's result cursor.
+ * A client maps to exactly one server-side connection id. The server runs one
+ * statement per connection and a new PREPARE supersedes the current result
+ * stream, so finish or discard a stream before sending another query.
  * Concurrent work needs separate clients or separate processes.
  */
 final class QuackClient
@@ -29,10 +29,6 @@ final class QuackClient
 
     public function __destruct()
     {
-        if ($this->connection->isBusy()) {
-            // An active result stream still owns this client and will release it.
-            return;
-        }
         $this->connection->disconnectOnDrop();
     }
 
@@ -45,10 +41,10 @@ final class QuackClient
         string $uri,
         string $authToken,
         float $connectTimeout = 10,
-        float $timeout = 120,
+        float $queryTimeout = 30,
         ?string $sslCertificate = null,
     ): self {
-        $transport = Transport::new($uri, $authToken, $connectTimeout, $timeout, $sslCertificate);
+        $transport = Transport::new($uri, $authToken, $connectTimeout, $queryTimeout, $sslCertificate);
         $connection = ClientConnection::connect($transport);
         return new self($connection);
     }
@@ -67,9 +63,6 @@ final class QuackClient
     {
         if ($this->connection->isClosed()) {
             throw new ProtocolException('Quack client is not connected');
-        }
-        if ($this->connection->isBusy()) {
-            throw new ProtocolException('Quack client is already running a query');
         }
         $query = SqlFormatter::formatSql($sql, SqlParameters::coerce($params));
         // Changed-row results have a single Count column, so only the first
@@ -143,9 +136,6 @@ final class QuackClient
         if ($this->connection->isClosed()) {
             throw new ProtocolException('Quack client is not connected');
         }
-        if ($this->connection->isBusy()) {
-            throw new ProtocolException('Quack client is already running a query');
-        }
         $query = SqlFormatter::formatSql($sql, SqlParameters::coerce($params));
         $rows = [];
         foreach ($this->fetchChunks($this->connection, $query) as $chunk) {
@@ -173,9 +163,6 @@ final class QuackClient
         if ($this->connection->isClosed()) {
             throw new ProtocolException('Quack client is not connected');
         }
-        if ($this->connection->isBusy()) {
-            throw new ProtocolException('Quack client is already running a query');
-        }
         $query = SqlFormatter::formatSql($sql, SqlParameters::coerce($params));
         foreach ($this->fetchChunks($this->connection, $query) as $chunk) {
             $names = $chunk->resultNames;
@@ -202,25 +189,17 @@ final class QuackClient
         if ($this->connection->isClosed()) {
             throw new ProtocolException('Quack client is not connected');
         }
-        if ($this->connection->isBusy()) {
-            throw new ProtocolException('Quack client is already running a query');
-        }
         $query = SqlFormatter::formatSql($sql, SqlParameters::coerce($params));
-        $this->connection->setBusy(true);
-        try {
-            foreach ($this->fetchChunks($this->connection, $query) as $chunk) {
-                $names = $chunk->resultNames;
-                for ($rowIndex = 0; $rowIndex < $chunk->rowCount; $rowIndex++) {
-                    $result = [];
-                    foreach ($chunk->columns as $columnIndex => $column) {
-                        $name = $names[$columnIndex] ?? "column{$columnIndex}";
-                        $result[$name] = $column->values[$rowIndex] ?? null;
-                    }
-                    yield $result;
+        foreach ($this->fetchChunks($this->connection, $query) as $chunk) {
+            $names = $chunk->resultNames;
+            for ($rowIndex = 0; $rowIndex < $chunk->rowCount; $rowIndex++) {
+                $result = [];
+                foreach ($chunk->columns as $columnIndex => $column) {
+                    $name = $names[$columnIndex] ?? "column{$columnIndex}";
+                    $result[$name] = $column->values[$rowIndex] ?? null;
                 }
+                yield $result;
             }
-        } finally {
-            $this->connection->setBusy(false);
         }
     }
 
@@ -234,9 +213,6 @@ final class QuackClient
     {
         if ($this->connection->isClosed()) {
             throw new ProtocolException('Quack client is not connected');
-        }
-        if ($this->connection->isBusy()) {
-            throw new ProtocolException('Quack client is already running a query');
         }
         $query = SqlFormatter::formatSql($sql, SqlParameters::coerce($params));
         $values = [];
@@ -258,9 +234,6 @@ final class QuackClient
         if ($this->connection->isClosed()) {
             throw new ProtocolException('Quack client is not connected');
         }
-        if ($this->connection->isBusy()) {
-            throw new ProtocolException('Quack client is already running a query');
-        }
         $query = SqlFormatter::formatSql($sql, SqlParameters::coerce($params));
         foreach ($this->fetchChunks($this->connection, $query) as $chunk) {
             foreach ($chunk->columns[0]->values ?? [] as $value) {
@@ -280,9 +253,6 @@ final class QuackClient
     {
         if ($this->connection->isClosed()) {
             throw new ProtocolException('Quack client is not connected');
-        }
-        if ($this->connection->isBusy()) {
-            throw new ProtocolException('Quack client is already running a query');
         }
         $query = SqlFormatter::formatSql($sql, SqlParameters::coerce($params));
         $result = [];
