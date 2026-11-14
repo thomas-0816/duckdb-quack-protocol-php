@@ -310,23 +310,18 @@ final class QuackClient
             throw new ProtocolException('Quack client is already running a query');
         }
         $query = SqlFormatter::formatSql($sql, SqlParameters::coerce($params));
-        $this->connection->setBusy(true);
-        try {
-            $result = [];
-            foreach ($this->fetchChunks($this->connection, $query) as $chunk) {
-                $keys = $chunk->columns[0]->values ?? [];
-                $values = $chunk->columns[1]->values ?? [];
-                foreach ($keys as $rowIndex => $phpKey) {
-                    if (!is_int($phpKey) && !is_string($phpKey)) {
-                        throw new ProtocolException('key column must contain integers or strings');
-                    }
-                    $result[$phpKey] = $values[$rowIndex] ?? null;
+        $result = [];
+        foreach ($this->fetchChunks($this->connection, $query) as $chunk) {
+            $keys = $chunk->columns[0]->values ?? [];
+            $values = $chunk->columns[1]->values ?? [];
+            foreach ($keys as $rowIndex => $phpKey) {
+                if (!is_int($phpKey) && !is_string($phpKey)) {
+                    throw new ProtocolException('key column must contain integers or strings');
                 }
+                $result[$phpKey] = $values[$rowIndex] ?? null;
             }
-            return $result;
-        } finally {
-            $this->connection->setBusy(false);
         }
+        return $result;
     }
 
     /**
