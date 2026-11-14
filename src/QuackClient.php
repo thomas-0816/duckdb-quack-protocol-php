@@ -75,13 +75,9 @@ final class QuackClient
         $querySql = new QuerySql(SqlFormatter::formatSql($sql, SqlParameters::coerce($params)));
         $this->connection->setBusy(true);
         try {
-            $response = $this->connection->prepare($querySql->asString());
-            if (!$response instanceof PrepareResponseMessage) {
-                throw $this->connection->protocolFailure('expected PREPARE_RESPONSE, got ' . $response->messageType()->name);
-            }
             // Only the first row matters, and returning early is safe because
             // the next PREPARE resets the server's result cursor.
-            foreach ($this->chunks($response) as $chunk) {
+            foreach ($this->fetchChunks($this->connection, $querySql->asString()) as $chunk) {
                 $names = $chunk->resultNames;
                 for ($rowIndex = 0; $rowIndex < $chunk->rowCount; $rowIndex++) {
                     $result = [];
@@ -116,12 +112,8 @@ final class QuackClient
         $querySql = new QuerySql(SqlFormatter::formatSql($sql, SqlParameters::coerce($params)));
         $this->connection->setBusy(true);
         try {
-            $response = $this->connection->prepare($querySql->asString());
-            if (!$response instanceof PrepareResponseMessage) {
-                throw $this->connection->protocolFailure('expected PREPARE_RESPONSE, got ' . $response->messageType()->name);
-            }
             $rows = [];
-            foreach ($this->chunks($response) as $chunk) {
+            foreach ($this->fetchChunks($this->connection, $querySql->asString()) as $chunk) {
                 $names = $chunk->resultNames;
                 for ($rowIndex = 0; $rowIndex < $chunk->rowCount; $rowIndex++) {
                     $result = [];
@@ -155,11 +147,7 @@ final class QuackClient
         $querySql = new QuerySql(SqlFormatter::formatSql($sql, SqlParameters::coerce($params)));
         $this->connection->setBusy(true);
         try {
-            $response = $this->connection->prepare($querySql->asString());
-            if (!$response instanceof PrepareResponseMessage) {
-                throw $this->connection->protocolFailure('expected PREPARE_RESPONSE, got ' . $response->messageType()->name);
-            }
-            foreach ($this->chunks($response) as $chunk) {
+            foreach ($this->fetchChunks($this->connection, $querySql->asString()) as $chunk) {
                 $names = $chunk->resultNames;
                 for ($rowIndex = 0; $rowIndex < $chunk->rowCount; $rowIndex++) {
                     $result = [];
@@ -193,11 +181,7 @@ final class QuackClient
         $querySql = new QuerySql(SqlFormatter::formatSql($sql, SqlParameters::coerce($params)));
         $this->connection->setBusy(true);
         try {
-            $response = $this->connection->prepare($querySql->asString());
-            if (!$response instanceof PrepareResponseMessage) {
-                throw $this->connection->protocolFailure('expected PREPARE_RESPONSE, got ' . $response->messageType()->name);
-            }
-            foreach ($this->chunks($response) as $chunk) {
+            foreach ($this->fetchChunks($this->connection, $querySql->asString()) as $chunk) {
                 $names = $chunk->resultNames;
                 for ($rowIndex = 0; $rowIndex < $chunk->rowCount; $rowIndex++) {
                     $result = [];
@@ -230,12 +214,8 @@ final class QuackClient
         $querySql = new QuerySql(SqlFormatter::formatSql($sql, SqlParameters::coerce($params)));
         $this->connection->setBusy(true);
         try {
-            $response = $this->connection->prepare($querySql->asString());
-            if (!$response instanceof PrepareResponseMessage) {
-                throw $this->connection->protocolFailure('expected PREPARE_RESPONSE, got ' . $response->messageType()->name);
-            }
             $values = [];
-            foreach ($this->chunks($response) as $chunk) {
+            foreach ($this->fetchChunks($this->connection, $querySql->asString()) as $chunk) {
                 foreach ($chunk->columns[0]->values ?? [] as $value) {
                     $values[] = $value;
                 }
@@ -262,11 +242,7 @@ final class QuackClient
         $querySql = new QuerySql(SqlFormatter::formatSql($sql, SqlParameters::coerce($params)));
         $this->connection->setBusy(true);
         try {
-            $response = $this->connection->prepare($querySql->asString());
-            if (!$response instanceof PrepareResponseMessage) {
-                throw $this->connection->protocolFailure('expected PREPARE_RESPONSE, got ' . $response->messageType()->name);
-            }
-            foreach ($this->chunks($response) as $chunk) {
+            foreach ($this->fetchChunks($this->connection, $querySql->asString()) as $chunk) {
                 foreach ($chunk->columns[0]->values ?? [] as $value) {
                     return $value;
                 }
@@ -294,12 +270,8 @@ final class QuackClient
         $querySql = new QuerySql(SqlFormatter::formatSql($sql, SqlParameters::coerce($params)));
         $this->connection->setBusy(true);
         try {
-            $response = $this->connection->prepare($querySql->asString());
-            if (!$response instanceof PrepareResponseMessage) {
-                throw $this->connection->protocolFailure('expected PREPARE_RESPONSE, got ' . $response->messageType()->name);
-            }
             $result = [];
-            foreach ($this->chunks($response) as $chunk) {
+            foreach ($this->fetchChunks($this->connection, $querySql->asString()) as $chunk) {
                 $keys = $chunk->columns[0]->values ?? [];
                 $values = $chunk->columns[1]->values ?? [];
                 foreach ($keys as $rowIndex => $phpKey) {
@@ -316,10 +288,19 @@ final class QuackClient
     }
 
     /**
+     * Prepares a query and streams its result chunks.
+     *
      * @return \Generator<int,DataChunk>
      */
-    private function chunks(PrepareResponseMessage $response): \Generator
+    private function fetchChunks(ClientConnection $connection, string $query): \Generator
     {
+        $response = $connection->prepare($query);
+        if (!$response instanceof PrepareResponseMessage) {
+            throw $connection->protocolFailure(
+                'expected PREPARE_RESPONSE, got ' . $response->messageType()->name,
+            );
+        }
+
         $needsMoreFetch = $response->needsMoreFetch;
         $nextBatchIndex = 1;
         $ackIndex = 0;
@@ -332,7 +313,7 @@ final class QuackClient
         }
 
         while ($needsMoreFetch) {
-            $fetchResponse = $this->connection->fetch(
+            $fetchResponse = $connection->fetch(
                 $response->resultUuid,
                 $nextBatchIndex,
                 $ackIndex,
@@ -340,27 +321,27 @@ final class QuackClient
                 $resultNames,
             );
             if (!$fetchResponse instanceof FetchResponseMessage) {
-                throw $this->connection->protocolFailure('expected FETCH_RESPONSE, got ' . $fetchResponse->messageType()->name);
+                throw $connection->protocolFailure('expected FETCH_RESPONSE, got ' . $fetchResponse->messageType()->name);
             }
 
             $results = $fetchResponse->results;
             $batchIndex = $fetchResponse->batchIndex;
             if ($batchIndex !== null) {
                 if ($batchIndex !== $nextBatchIndex) {
-                    throw $this->connection->protocolFailure("expected FETCH_RESPONSE batch {$nextBatchIndex}, got {$batchIndex}");
+                    throw $connection->protocolFailure("expected FETCH_RESPONSE batch {$nextBatchIndex}, got {$batchIndex}");
                 }
                 if ($results === []) {
-                    throw $this->connection->protocolFailure('FETCH_RESPONSE batch did not include any chunks');
+                    throw $connection->protocolFailure('FETCH_RESPONSE batch did not include any chunks');
                 }
                 $ackIndex = $batchIndex;
                 $nextBatchIndex++;
             } elseif ($results === []) {
                 $totalBatches = $fetchResponse->totalBatches;
                 if ($totalBatches !== null && $totalBatches !== $ackIndex) {
-                    throw $this->connection->protocolFailure("FETCH_RESPONSE ended after {$ackIndex} batches but announced {$totalBatches}");
+                    throw $connection->protocolFailure("FETCH_RESPONSE ended after {$ackIndex} batches but announced {$totalBatches}");
                 }
             } else {
-                throw $this->connection->protocolFailure('FETCH_RESPONSE with chunks did not include a batch index');
+                throw $connection->protocolFailure('FETCH_RESPONSE with chunks did not include a batch index');
             }
             $needsMoreFetch = $batchIndex !== null;
 
