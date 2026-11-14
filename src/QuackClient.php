@@ -101,9 +101,40 @@ final class QuackClient
     /**
      * Commits the active transaction.
      */
-    public function commitTransaction(): void
+    public function commit(): void
     {
         $this->execute('COMMIT');
+    }
+
+    /**
+     * Rolls back the active transaction.
+     */
+    public function rollback(): void
+    {
+        $this->execute('ROLLBACK');
+    }
+
+    /**
+     * Runs the callback in a transaction, committing on success and rolling
+     * back when it throws. The callback receives this client.
+     *
+     * @param \Closure(self):mixed $callback
+     */
+    public function transaction(\Closure $callback): mixed
+    {
+        $this->beginTransaction();
+        try {
+            $result = $callback($this);
+        } catch (\Throwable $e) {
+            try {
+                $this->rollback();
+            } catch (\Throwable) {
+                // Keep the callback failure; the connection may already be unusable.
+            }
+            throw $e;
+        }
+        $this->commit();
+        return $result;
     }
 
     /**

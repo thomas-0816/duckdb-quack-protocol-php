@@ -222,11 +222,80 @@ final class QuackClientTest extends TestCase
             2,
             $client->execute('INSERT INTO transaction_rows VALUES (1), (2)'),
         );
-        $client->commitTransaction();
+        $client->commit();
 
         self::assertSame(
             [1, 2],
             $client->fetchColumn('SELECT id FROM transaction_rows ORDER BY id'),
+        );
+    }
+
+    public function testRollbackDiscardsChanges(): void
+    {
+        $client = QuackClient::connect(
+            'http://127.0.0.1:9494',
+            'secret',
+            10,
+            300,
+        );
+
+        $client->execute('CREATE TEMP TABLE transaction_discard(id INTEGER)');
+        $client->beginTransaction();
+        $client->execute('INSERT INTO transaction_discard VALUES (1), (2)');
+        $client->rollback();
+
+        self::assertSame(
+            [],
+            $client->fetchColumn('SELECT id FROM transaction_discard'),
+        );
+    }
+
+    public function testTransactionCallbackCommitsOnSuccess(): void
+    {
+        $client = QuackClient::connect(
+            'http://127.0.0.1:9494',
+            'secret',
+            10,
+            300,
+        );
+
+        $client->execute('CREATE TEMP TABLE transaction_callback(id INTEGER)');
+        $result = $client->transaction(function (QuackClient $client): string {
+            $client->execute('INSERT INTO transaction_callback VALUES (1), (2)');
+
+            return 'committed';
+        });
+
+        self::assertSame('committed', $result);
+        self::assertSame(
+            [1, 2],
+            $client->fetchColumn('SELECT id FROM transaction_callback ORDER BY id'),
+        );
+    }
+
+    public function testTransactionCallbackRollsBackOnFailure(): void
+    {
+        $client = QuackClient::connect(
+            'http://127.0.0.1:9494',
+            'secret',
+            10,
+            300,
+        );
+
+        $client->execute('CREATE TEMP TABLE transaction_rollback(id INTEGER)');
+        try {
+            $client->transaction(function (QuackClient $client): void {
+                $client->execute('INSERT INTO transaction_rollback VALUES (1)');
+                throw new \RuntimeException('callback failed');
+            });
+            self::fail('expected the callback failure to propagate');
+        } catch (\RuntimeException $e) {
+            self::assertSame('callback failed', $e->getMessage());
+        }
+
+        self::assertSame(
+            [],
+            $client->fetchColumn('SELECT id FROM transaction_rollback'),
         );
     }
 
