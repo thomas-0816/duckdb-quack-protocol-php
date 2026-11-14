@@ -122,18 +122,18 @@ final class QuackClient
      */
     public function transaction(\Closure $callback): mixed
     {
-        $this->beginTransaction();
+        $this->execute('BEGIN TRANSACTION');
         try {
             $result = $callback($this);
         } catch (\Throwable $e) {
             try {
-                $this->rollback();
+                $this->execute('ROLLBACK');
             } catch (\Throwable) {
                 // Keep the callback failure; the connection may already be unusable.
             }
             throw $e;
         }
-        $this->commit();
+        $this->execute('COMMIT');
         return $result;
     }
 
