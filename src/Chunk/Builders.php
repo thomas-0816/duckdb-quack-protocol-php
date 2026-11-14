@@ -40,7 +40,6 @@ final class Builders
         $rowCount = count($columns[0]->values);
         $types = [];
         $decodedColumns = [];
-        $names = [];
 
         foreach ($columns as $index => $input) {
             if (count($input->values) !== $rowCount) {
@@ -49,7 +48,6 @@ final class Builders
                     . " values, expected {$rowCount}",
                 );
             }
-            $names[] = $input->name ?? "column{$index}";
             $types[] = $input->logicalType;
             $decodedColumns[] = new DecodedVector(
                 $input->logicalType,
@@ -58,7 +56,7 @@ final class Builders
             );
         }
 
-        return new DataChunk($rowCount, $types, $decodedColumns, $names);
+        return new DataChunk($rowCount, $types, $decodedColumns);
     }
 
     /**

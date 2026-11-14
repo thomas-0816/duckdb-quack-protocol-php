@@ -35,10 +35,10 @@ $sql = SqlFormatter::formatSql(
 );
 echo 'formatted positional SQL:', PHP_EOL, $sql, PHP_EOL, PHP_EOL;
 
-$row = $client->query(
+$row = $client->fetchOne(
     'SELECT ? + 1 AS answer, ? AS label, ? AS items',
     [41, "can't", [1, 2, 3]],
-)->fetchRow();
+) ?? [];
 echo 'answer: ';
 var_dump($row['answer']);
 echo 'label:  ';
@@ -52,10 +52,10 @@ $named = ['id' => 7, 'label' => 'seven'];
 echo PHP_EOL, 'formatted named SQL:', PHP_EOL,
 SqlFormatter::formatSql('SELECT :id AS id, :label AS label', $named), PHP_EOL;
 
-$row = $client->query(
+$row = $client->fetchOne(
     'SELECT :id AS id, :label AS label',
     $named,
-)->fetchRow();
+) ?? [];
 echo 'id:    ';
 var_dump($row['id']);
 echo 'label: ';
@@ -69,10 +69,10 @@ SqlFormatter::formatSql(
 ),
 PHP_EOL;
 
-$rows = $client->query(
+$rows = $client->fetchColumn(
     'SELECT * FROM (VALUES (1), (2), (3), (4)) t(x) WHERE list_contains(?, x) ORDER BY x',
     [[1, 2, 3]],
-)->fetchColumn('x');
+);
 echo 'matching values: ';
 print_r($rows);
 

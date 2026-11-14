@@ -17,7 +17,7 @@ final class QuackClientTest extends TestCase
             300,
             self::sslCertificate(),
         );
-        self::assertSame(3, $client->info?->quackVersion?->number());
+        self::assertSame(3, $client->getConnection()->quackVersion()->number());
     }
 
     public function testConnect(): void
@@ -28,33 +28,31 @@ final class QuackClientTest extends TestCase
             10,
             300,
         );
-        self::assertSame(3, $client->info?->quackVersion?->number());
+        self::assertSame(3, $client->getConnection()->quackVersion()->number());
 
-        $stream = $client->query(
-            "SELECT * FROM (VALUES (1::INTEGER, 'one'::VARCHAR), (2, 'two')) AS t(id, label) ORDER BY id",
-        );
-        self::assertSame(['id', 'label'], array_keys($stream->columns()));
         self::assertSame(
             [
                 ['id' => 1, 'label' => 'one'],
                 ['id' => 2, 'label' => 'two'],
             ],
-            iterator_to_array($stream),
+            $client->fetchAll(
+                "SELECT * FROM (VALUES (1::INTEGER, 'one'::VARCHAR), (2, 'two')) AS t(id, label) ORDER BY id",
+            ),
         );
 
-        $row = $client->query(
+        $row = $client->fetchOne(
             'SELECT ? + 1 AS answer, ? AS label, ? AS list_value',
             [41, "can't", [1, 2, 3]],
-        )->fetchRow() ?? self::fail('expected a row');
+        ) ?? self::fail('expected a row');
         self::assertSame(42, $row['answer']);
         self::assertSame("can't", $row['label']);
         self::assertSame([1, 2, 3], $row['list_value']);
 
-        $row = $client->query(
+        $row = $client->fetchOne(
             "SELECT MAP {'a': 1} AS m, "
             . "CAST('happy' AS ENUM ('sad', 'happy')) AS e, "
             . 'CAST(42 AS UNION(answer INTEGER)) AS u',
-        )->fetchRow() ?? self::fail('expected a row');
+        ) ?? self::fail('expected a row');
         self::assertSame(
             ['a' => 1],
             $row['m'],
@@ -67,21 +65,21 @@ final class QuackClientTest extends TestCase
 
         self::assertSame(
             9_223_372_036_854_775_807,
-            $client->query('SELECT 9223372036854775807::BIGINT AS n')->fetchValue('n'),
+            $client->fetchValue('SELECT 9223372036854775807::BIGINT AS n'),
         );
         self::assertSame(
             '170141183460469231731687303715884105727',
-            $client->query(
+            $client->fetchValue(
                 'SELECT 170141183460469231731687303715884105727::HUGEINT AS n',
-            )->fetchValue('n'),
+            ),
         );
 
-        $temporal = $client->query(
+        $temporal = $client->fetchOne(
             "SELECT DATE '1970-01-02' AS d, "
             . "TIME '12:34:56.5' AS t, "
             . "TIMESTAMP '1970-01-01 00:00:01.000001' AS ts, "
             . "INTERVAL '1 year 2 months 3 days' AS i",
-        )->fetchRow() ?? self::fail('expected a row');
+        ) ?? self::fail('expected a row');
         self::assertSame('1970-01-02', $temporal['d']);
         self::assertSame('12:34:56.5', $temporal['t']);
         self::assertSame('1970-01-01 00:00:01.000001', $temporal['ts']);
@@ -100,42 +98,38 @@ final class QuackClientTest extends TestCase
 
         self::assertSame(
             [['n' => 1], ['n' => 2], ['n' => 3]],
-            $client->query('SELECT * FROM (VALUES (1), (2), (3)) t(n)')->fetchAll(),
+            $client->fetchAll('SELECT * FROM (VALUES (1), (2), (3)) t(n)'),
         );
 
-        $result = $client->query('SELECT * FROM (VALUES (1), (2)) t(n)');
-        self::assertSame(['n' => 1], $result->fetchRow());
-        self::assertSame(['n' => 2], $result->fetchRow());
-        self::assertNull($result->fetchRow());
+        self::assertSame(
+            ['n' => 1],
+            $client->fetchOne('SELECT * FROM (VALUES (1), (2)) t(n)'),
+        );
 
         self::assertSame(
             [10, 20],
-            $client->query('SELECT * FROM (VALUES (10), (20)) t(n)')->fetchColumn('n'),
+            $client->fetchColumn('SELECT * FROM (VALUES (10), (20)) t(n)'),
         );
         self::assertSame(
             ['a', 'b'],
-            $client->query(
-                "SELECT * FROM (VALUES (1, 'a'), (2, 'b')) t(n, label)",
-            )->fetchColumn('label'),
+            $client->fetchColumn(
+                "SELECT label FROM (VALUES (1, 'a'), (2, 'b')) t(n, label)",
+            ),
         );
-        self::assertSame(42, $client->query('SELECT 42 AS n')->fetchValue());
-        self::assertSame(
-            'a',
-            $client->query(
-                "SELECT * FROM (VALUES (1, 'a'), (2, 'b')) t(n, label)",
-            )->fetchValue('label'),
-        );
-        self::assertNull($client->query('SELECT 1 AS n WHERE false')->fetchValue());
+        self::assertSame(42, $client->fetchValue('SELECT 42 AS n'));
+        $row = $client->fetchOne(
+            "SELECT * FROM (VALUES (1, 'a'), (2, 'b')) t(n, label)",
+        ) ?? self::fail('expected a row');
+        self::assertSame('a', $row['label']);
+        self::assertNull($client->fetchValue('SELECT 1 AS n WHERE false'));
 
         self::assertSame(
             [['n' => 1], ['n' => 2]],
-            iterator_to_array(
-                $client->query('SELECT * FROM (VALUES (1), (2)) t(n)'),
-            ),
+            $client->fetchAll('SELECT * FROM (VALUES (1), (2)) t(n)'),
         );
     }
 
-    public function testFetchColumnRejectsUnknownColumn(): void
+    public function testFetchIterator(): void
     {
         $client = QuackClient::connect(
             'http://127.0.0.1:9494',
@@ -144,10 +138,42 @@ final class QuackClientTest extends TestCase
             300,
         );
 
-        $this->expectException(ProtocolException::class);
-        $this->expectExceptionMessage('result has no column named missing');
+        self::assertSame(
+            [['n' => 1], ['n' => 2], ['n' => 3]],
+            iterator_to_array(
+                $client->fetchIterator('SELECT * FROM (VALUES (1), (2), (3)) t(n)'),
+            ),
+        );
 
-        $client->query('SELECT 1 AS n')->fetchColumn('missing');
+        // Breaking out of a temporary iterator releases it immediately.
+        foreach (
+            $client->fetchIterator('SELECT * FROM (VALUES (1), (2), (3)) t(n)') as $row
+        ) {
+            self::assertSame(['n' => 1], $row);
+            break;
+        }
+        self::assertSame(['n' => 1], $client->fetchOne('SELECT 1 AS n'));
+
+        // Creating an iterator without starting it does not acquire the client.
+        $notStarted = $client->fetchIterator('SELECT 1 AS n');
+        self::assertFalse($client->getConnection()->state()->isBusy());
+        unset($notStarted);
+
+        // A partially consumed iterator still owns the client.
+        $generator = $client->fetchIterator('SELECT * FROM (VALUES (1), (2), (3)) t(n)');
+        self::assertSame(['n' => 1], $generator->current());
+        $generator->next();
+        self::assertSame(['n' => 2], $generator->current());
+
+        try {
+            $client->fetchOne('SELECT 1 AS n');
+            self::fail('expected the partially consumed iterator to keep the client busy');
+        } catch (ProtocolException $error) {
+            self::assertStringContainsString('Quack client is already running a query', $error->getMessage());
+        }
+
+        unset($generator);
+        self::assertSame(['n' => 1], $client->fetchOne('SELECT 1 AS n'));
     }
 
     public function testExecuteReturnsChangedRows(): void
@@ -164,16 +190,20 @@ final class QuackClientTest extends TestCase
             $client->execute('CREATE TEMP TABLE execute_counts(id INTEGER)'),
         );
         self::assertSame(
-            2,
-            $client->execute('INSERT INTO execute_counts VALUES (1), (2)'),
+            4,
+            $client->execute('INSERT INTO execute_counts VALUES (1), (2), (3), (4)'),
         );
         self::assertSame(
             2,
-            $client->execute('UPDATE execute_counts SET id = id + 1'),
+            $client->execute('UPDATE execute_counts SET id = id + 10 WHERE id <= 2'),
         );
         self::assertSame(
             1,
-            $client->execute('DELETE FROM execute_counts WHERE id > 2'),
+            $client->execute('DELETE FROM execute_counts WHERE id = 12'),
+        );
+        self::assertSame(
+            [3, 4, 11],
+            $client->fetchColumn('SELECT id FROM execute_counts ORDER BY id'),
         );
     }
 
@@ -693,6 +723,6 @@ final class QuackClientTest extends TestCase
             300,
         );
 
-        return $client->query($sql)->fetchValue('v');
+        return $client->fetchValue($sql);
     }
 }

@@ -17,32 +17,28 @@ ini_set('display_errors', 1);
 // duckdb --cmd "CALL quack_serve('quack:127.0.0.1:9494', token='secret');"
 
 $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 10, 300);
-print_r($client->info);
+echo 'connected with Quack protocol version ', $client->getConnection()->quackVersion()->number(), PHP_EOL;
 
-$stream = $client->query("SELECT 1, 'foo', [1, 2, 3], null, true, {bar: 'baz'}");
-print_r($stream->fetchAll());
-exit;
-
-echo PHP_EOL, 'columns:', PHP_EOL;
-foreach ($stream->columns() as $name => $type) {
-    echo '  ', $name, ' [', $type->id->name, ']', PHP_EOL;
-}
+$sql = "SELECT 1, 'foo', [1, 2, 3], null, true, {bar: 'baz'}";
 
 echo PHP_EOL, 'rows:', PHP_EOL;
-foreach ($stream as $row) {
+foreach ($client->fetchIterator($sql) as $row) {
     print_r($row);
 }
 
+echo PHP_EOL, 'fetchAll():', PHP_EOL;
+print_r($client->fetchAll($sql));
+
 // The fetch helpers consume the stream for you.
-$first = $client->query('SELECT 42 AS answer')->fetchRow();
+$first = $client->fetchOne('SELECT 42 AS answer') ?? [];
 echo PHP_EOL, 'fetchRow(): ';
 var_dump($first['answer'] ?? null);
 
-$value = $client->query('SELECT 7 AS answer')->fetchValue('answer');
+$value = $client->fetchValue('SELECT 7 AS answer');
 echo 'fetchValue(): ';
 var_dump($value);
 
-$values = $client->query('SELECT * FROM (VALUES (10), (20), (30)) t(x)')->fetchColumn('x');
+$values = $client->fetchColumn('SELECT * FROM (VALUES (10), (20), (30)) t(x)');
 echo 'fetchColumn(): ';
 print_r($values);
 
@@ -50,7 +46,7 @@ print_r($values);
 $created = $client->execute('CREATE TEMP TABLE example_basic(id INTEGER, label VARCHAR)');
 $inserted = $client->execute("INSERT INTO example_basic VALUES (1, 'one'), (2, 'two')");
 echo PHP_EOL, 'changed rows: create=', $created, ', insert=', $inserted, PHP_EOL;
-$rows = iterator_to_array($client->query('SELECT * FROM example_basic'));
+$rows = $client->fetchAll('SELECT * FROM example_basic');
 echo PHP_EOL, 'temp table rows: ', count($rows), PHP_EOL;
 
 echo PHP_EOL, 'done', PHP_EOL;

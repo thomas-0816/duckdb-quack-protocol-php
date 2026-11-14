@@ -14,7 +14,6 @@ use DuckDB\Quack\Messages\MessageHeader;
 use DuckDB\Quack\Messages\MessageType;
 use DuckDB\Quack\Messages\PrepareRequestMessage;
 use DuckDB\Quack\Messages\QuackMessage;
-use DuckDB\Quack\QuackConnectionInfo;
 use DuckDB\Quack\QuackVersion;
 use DuckDB\Quack\Transport\Transport;
 use DuckDB\Quack\Types\HugeIntParts;
@@ -35,17 +34,16 @@ final class ClientConnection
         private readonly Transport $transport,
         private readonly string $connectionId,
         private readonly QuackVersion $quackVersion,
+        private readonly ?string $serverDuckdbVersion,
+        private readonly ?string $serverPlatform,
         private readonly ConnectionState $state,
     ) {
     }
 
-    /**
-     * @return array{0:self,1:QuackConnectionInfo}
-     */
     public static function connect(
         Transport $transport,
-        string $authToken,
-    ): array {
+        string $authToken, // TODO move authToken into Transport class
+    ): self {
         $minVersion = QuackVersion::fromNumber(3);
         $maxVersion = QuackVersion::fromNumber(3);
         if ($minVersion === null || $maxVersion === null) {
@@ -117,21 +115,14 @@ final class ClientConnection
                 );
             }
 
-            $state = new ConnectionState();
-            $connection = new self(
+            return new self(
                 $transport,
                 $connectionId,
                 $version,
-                $state,
+                $response->serverDuckdbVersion,
+                $response->serverPlatform,
+                new ConnectionState(),
             );
-            return [
-                $connection,
-                new QuackConnectionInfo(
-                    serverDuckdbVersion: $response->serverDuckdbVersion,
-                    serverPlatform: $response->serverPlatform,
-                    quackVersion: $version,
-                ),
-            ];
         }
 
         throw new ProtocolException(
@@ -147,6 +138,16 @@ final class ClientConnection
     public function quackVersion(): QuackVersion
     {
         return $this->quackVersion;
+    }
+
+    public function serverDuckdbVersion(): ?string
+    {
+        return $this->serverDuckdbVersion;
+    }
+
+    public function serverPlatform(): ?string
+    {
+        return $this->serverPlatform;
     }
 
     public function connectionId(): string

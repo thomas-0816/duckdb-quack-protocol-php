@@ -40,8 +40,8 @@ $client = QuackClient::connect(
 );
 
 echo 'connected over TLS to https://localhost:9494', PHP_EOL;
-echo 'server DuckDB: ', $client->info?->serverDuckdbVersion ?? 'unknown', PHP_EOL;
-$row = $client->query('SELECT 1 AS pinned')->fetchRow();
+echo 'server DuckDB: ', $client->getConnection()->serverDuckdbVersion() ?? 'unknown', PHP_EOL;
+$row = $client->fetchOne('SELECT 1 AS pinned') ?? [];
 echo 'query result: ';
 var_dump($row['pinned'] ?? null);
 

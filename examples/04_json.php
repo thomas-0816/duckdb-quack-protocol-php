@@ -24,7 +24,7 @@ $client = QuackClient::connect(
     300.0,
 );
 
-$row = $client->query(
+$row = $client->fetchOne(
     <<<'SQL'
         SELECT
             9223372036854775807::BIGINT  AS big,
@@ -34,13 +34,13 @@ $row = $client->query(
             TIMESTAMP '1970-01-01 00:00:01' AS timestamp_value,
             [1, NULL]                    AS list_value
         SQL,
-)->fetchRow();
+) ?? [];
 
 echo 'native row as JSON:', PHP_EOL;
 echo json_encode($row, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES), PHP_EOL;
 
-$huge = $client->query(
+$huge = $client->fetchValue(
     'SELECT 170141183460469231731687303715884105727::HUGEINT AS n',
-)->fetchValue('n');
+);
 echo PHP_EOL, 'huge integer: ';
 var_dump($huge);
