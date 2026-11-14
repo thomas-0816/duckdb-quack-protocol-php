@@ -22,32 +22,6 @@ final class SqlParameters
     }
 
     /**
-     * @param array<int|string,mixed> $values
-     */
-    public static function positional(array $values): self
-    {
-        $normalized = [];
-        foreach ($values as $value) {
-            $normalized[] = SqlParameter::fromPhp($value);
-        }
-
-        return new self(self::POSITIONAL, $normalized);
-    }
-
-    /**
-     * @param array<string,mixed> $values
-     */
-    public static function named(array $values): self
-    {
-        $normalized = [];
-        foreach ($values as $name => $value) {
-            $normalized[$name] = SqlParameter::fromPhp($value);
-        }
-
-        return new self(self::NAMED, $normalized);
-    }
-
-    /**
      * Detects positional versus named form from the array keys.
      *
      * @param array<int|string,mixed> $values
@@ -55,7 +29,12 @@ final class SqlParameters
     public static function fromArray(array $values): self
     {
         if (array_is_list($values)) {
-            return self::positional($values);
+            $positional = [];
+            foreach ($values as $value) {
+                $positional[] = SqlParameter::fromPhp($value);
+            }
+
+            return new self(self::POSITIONAL, $positional);
         }
 
         $named = [];
@@ -63,10 +42,10 @@ final class SqlParameters
             if (!is_string($name)) {
                 throw new ProtocolException('named SQL parameter keys must be strings');
             }
-            $named[$name] = $value;
+            $named[$name] = SqlParameter::fromPhp($value);
         }
 
-        return self::named($named);
+        return new self(self::NAMED, $named);
     }
 
     /**

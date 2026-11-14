@@ -3,7 +3,6 @@
 namespace DuckDB\Quack\Chunk;
 
 use DuckDB\Quack\Types\LogicalType;
-use DuckDB\Quack\Types\Value;
 
 final class DataChunk
 {
@@ -18,13 +17,5 @@ final class DataChunk
         public array $columns,
         public ?array $columnNames = null,
     ) {
-    }
-
-    /**
-     * @return list<Value>|null
-     */
-    public function columnValues(int $column): ?array
-    {
-        return isset($this->columns[$column]) ? $this->columns[$column]->values : null;
     }
 }

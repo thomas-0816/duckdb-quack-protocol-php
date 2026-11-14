@@ -2,6 +2,7 @@
 
 namespace DuckDB\Quack\Tests\Integration;
 
+use DuckDB\Quack\Exceptions\ProtocolException;
 use DuckDB\Quack\QuackClient;
 use PHPUnit\Framework\TestCase;
 
@@ -32,22 +33,19 @@ final class QuackClientTest extends TestCase
         $stream = $client->query(
             "SELECT * FROM (VALUES (1::INTEGER, 'one'::VARCHAR), (2, 'two')) AS t(id, label) ORDER BY id",
         );
-        self::assertSame(['id', 'label'], array_map(
-            static fn ($column): string => $column->name,
-            $stream->columns,
-        ));
+        self::assertSame(['id', 'label'], array_keys($stream->columns()));
         self::assertSame(
             [
                 ['id' => 1, 'label' => 'one'],
                 ['id' => 2, 'label' => 'two'],
             ],
-            iterator_to_array($stream->rows()),
+            iterator_to_array($stream),
         );
 
         $row = $client->query(
             'SELECT ? + 1 AS answer, ? AS label, ? AS list_value',
             [41, "can't", [1, 2, 3]],
-        )->one();
+        )->fetchRow() ?? self::fail('expected a row');
         self::assertSame(42, $row['answer']);
         self::assertSame("can't", $row['label']);
         self::assertSame([1, 2, 3], $row['list_value']);
@@ -56,7 +54,7 @@ final class QuackClientTest extends TestCase
             "SELECT MAP {'a': 1} AS m, "
             . "CAST('happy' AS ENUM ('sad', 'happy')) AS e, "
             . 'CAST(42 AS UNION(answer INTEGER)) AS u',
-        )->one();
+        )->fetchRow() ?? self::fail('expected a row');
         self::assertSame(
             ['a' => 1],
             $row['m'],
@@ -69,13 +67,13 @@ final class QuackClientTest extends TestCase
 
         self::assertSame(
             9_223_372_036_854_775_807,
-            $client->query('SELECT 9223372036854775807::BIGINT AS n')->one()['n'],
+            $client->query('SELECT 9223372036854775807::BIGINT AS n')->fetchValue('n'),
         );
         self::assertSame(
             '170141183460469231731687303715884105727',
             $client->query(
                 'SELECT 170141183460469231731687303715884105727::HUGEINT AS n',
-            )->one()['n'],
+            )->fetchValue('n'),
         );
 
         $temporal = $client->query(
@@ -83,12 +81,100 @@ final class QuackClientTest extends TestCase
             . "TIME '12:34:56.5' AS t, "
             . "TIMESTAMP '1970-01-01 00:00:01.000001' AS ts, "
             . "INTERVAL '1 year 2 months 3 days' AS i",
-        )->one();
+        )->fetchRow() ?? self::fail('expected a row');
         self::assertSame('1970-01-02', $temporal['d']);
         self::assertSame('12:34:56.5', $temporal['t']);
         self::assertSame('1970-01-01 00:00:01.000001', $temporal['ts']);
         self::assertSame('1 year 2 months 3 days', $temporal['i']);
 
+    }
+
+    public function testResultFetchHelpers(): void
+    {
+        $client = QuackClient::connect(
+            'http://127.0.0.1:9494',
+            'secret',
+            10,
+            300,
+        );
+
+        self::assertSame(
+            [['n' => 1], ['n' => 2], ['n' => 3]],
+            $client->query('SELECT * FROM (VALUES (1), (2), (3)) t(n)')->fetchAll(),
+        );
+
+        $result = $client->query('SELECT * FROM (VALUES (1), (2)) t(n)');
+        self::assertSame(['n' => 1], $result->fetchRow());
+        self::assertSame(['n' => 2], $result->fetchRow());
+        self::assertNull($result->fetchRow());
+
+        self::assertSame(
+            [10, 20],
+            $client->query('SELECT * FROM (VALUES (10), (20)) t(n)')->fetchColumn('n'),
+        );
+        self::assertSame(
+            ['a', 'b'],
+            $client->query(
+                "SELECT * FROM (VALUES (1, 'a'), (2, 'b')) t(n, label)",
+            )->fetchColumn('label'),
+        );
+        self::assertSame(42, $client->query('SELECT 42 AS n')->fetchValue());
+        self::assertSame(
+            'a',
+            $client->query(
+                "SELECT * FROM (VALUES (1, 'a'), (2, 'b')) t(n, label)",
+            )->fetchValue('label'),
+        );
+        self::assertNull($client->query('SELECT 1 AS n WHERE false')->fetchValue());
+
+        self::assertSame(
+            [['n' => 1], ['n' => 2]],
+            iterator_to_array(
+                $client->query('SELECT * FROM (VALUES (1), (2)) t(n)'),
+            ),
+        );
+    }
+
+    public function testFetchColumnRejectsUnknownColumn(): void
+    {
+        $client = QuackClient::connect(
+            'http://127.0.0.1:9494',
+            'secret',
+            10,
+            300,
+        );
+
+        $this->expectException(ProtocolException::class);
+        $this->expectExceptionMessage('result has no column named missing');
+
+        $client->query('SELECT 1 AS n')->fetchColumn('missing');
+    }
+
+    public function testExecuteReturnsChangedRows(): void
+    {
+        $client = QuackClient::connect(
+            'http://127.0.0.1:9494',
+            'secret',
+            10,
+            300,
+        );
+
+        self::assertSame(
+            0,
+            $client->execute('CREATE TEMP TABLE execute_counts(id INTEGER)'),
+        );
+        self::assertSame(
+            2,
+            $client->execute('INSERT INTO execute_counts VALUES (1), (2)'),
+        );
+        self::assertSame(
+            2,
+            $client->execute('UPDATE execute_counts SET id = id + 1'),
+        );
+        self::assertSame(
+            1,
+            $client->execute('DELETE FROM execute_counts WHERE id > 2'),
+        );
     }
 
     public function testBooleanType(): void
@@ -607,6 +693,6 @@ final class QuackClientTest extends TestCase
             300,
         );
 
-        return $client->query($sql)->one()['v'];
+        return $client->query($sql)->fetchValue('v');
     }
 }

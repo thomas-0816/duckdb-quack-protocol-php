@@ -46,7 +46,7 @@ final class ClientConnection
         Transport $transport,
         string $authToken,
     ): array {
-        $minVersion = QuackVersion::fromNumber(1);
+        $minVersion = QuackVersion::fromNumber(3);
         $maxVersion = QuackVersion::fromNumber(3);
         if ($minVersion === null || $maxVersion === null) {
             throw new ProtocolException('invalid supported Quack protocol version range');
@@ -64,7 +64,7 @@ final class ClientConnection
         ));
         if ($versions === []) {
             throw new ProtocolException(
-                'supported Quack protocol versions are 1 and 3, requested range was '
+                'supported Quack protocol version is 3, requested range was '
                 . "{$minVersion}..{$maxVersion}",
             );
         }
@@ -174,8 +174,8 @@ final class ClientConnection
 
     public function fetch(
         HugeIntParts $resultUuid,
-        int|string $batchIndex,
-        int|string $ackIndex,
+        int $batchIndex,
+        int $ackIndex,
     ): QuackMessage {
         $this->ensureOpen();
         return $this->send(new FetchRequestMessage(

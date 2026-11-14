@@ -17,7 +17,7 @@ final class SqlFormatterTest extends TestCase
 {
     public function testFormatsPositionalParameters(): void
     {
-        $params = SqlParameters::positional([
+        $params = SqlParameters::fromArray([
             SqlParameter::value(Value::int(41)),
             SqlParameter::value(Value::string("can't")),
         ]);
@@ -34,7 +34,7 @@ final class SqlFormatterTest extends TestCase
             SELECT '?' AS "?", ? AS real_value -- ? in a line comment
             /* ? in a block comment */
             SQL;
-        $params = SqlParameters::positional([SqlParameter::value(Value::int(7))]);
+        $params = SqlParameters::fromArray([SqlParameter::value(Value::int(7))]);
 
         self::assertSame(
             <<<'SQL'
@@ -47,7 +47,7 @@ final class SqlFormatterTest extends TestCase
 
     public function testFormatsNamedParameters(): void
     {
-        $params = SqlParameters::named([
+        $params = SqlParameters::fromArray([
             'id' => SqlParameter::value(Value::int(7)),
             'label' => SqlParameter::value(Value::string('seven')),
         ]);
@@ -60,7 +60,7 @@ final class SqlFormatterTest extends TestCase
 
     public function testFormatsNestedLists(): void
     {
-        $params = SqlParameters::positional([
+        $params = SqlParameters::fromArray([
             SqlParameter::list([
                 SqlParameter::value(Value::int(1)),
                 SqlParameter::list([
@@ -181,7 +181,7 @@ final class SqlFormatterTest extends TestCase
 
         SqlFormatter::formatSql(
             'SELECT ?',
-            SqlParameters::positional([]),
+            SqlParameters::fromArray([]),
         );
     }
 
@@ -191,7 +191,7 @@ final class SqlFormatterTest extends TestCase
 
         SqlFormatter::formatSql(
             'SELECT :missing',
-            SqlParameters::named([]),
+            SqlParameters::fromArray(['other' => 1]),
         );
     }
 }

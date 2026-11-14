@@ -3,6 +3,7 @@
 namespace DuckDB\Quack\Tests\Unit\Messages;
 
 use DuckDB\Quack\Error\ServerError;
+use DuckDB\Quack\Exceptions\ProtocolException;
 use DuckDB\Quack\Messages\CancelMessage;
 use DuckDB\Quack\Messages\ConnectionRequestMessage;
 use DuckDB\Quack\Messages\DisconnectMessage;
@@ -41,7 +42,7 @@ final class MessageCodecTest extends TestCase
         self::assertEquals($message, $decoded);
     }
 
-    public function testConnectionRequestRoundTripsOverV1(): void
+    public function testV1IsRejected(): void
     {
         $message = new ConnectionRequestMessage(
             new MessageHeader(MessageType::ConnectionRequest, 'conn-1'),
@@ -52,13 +53,9 @@ final class MessageCodecTest extends TestCase
             maxSupportedQuackVersion: 1,
         );
 
-        $decoded = MessageCodec::decodeMessageForVersion(
-            MessageCodec::encodeMessageForVersion($message, QuackVersion::v1()),
-            QuackVersion::v1(),
-        );
+        $this->expectException(ProtocolException::class);
 
-        self::assertInstanceOf(ConnectionRequestMessage::class, $decoded);
-        self::assertEquals($message, $decoded);
+        MessageCodec::encodeMessageForVersion($message, QuackVersion::v1());
     }
 
     public function testPrepareRequestRoundTrips(): void

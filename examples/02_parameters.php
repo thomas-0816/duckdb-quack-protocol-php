@@ -38,7 +38,7 @@ echo 'formatted positional SQL:', PHP_EOL, $sql, PHP_EOL, PHP_EOL;
 $row = $client->query(
     'SELECT ? + 1 AS answer, ? AS label, ? AS items',
     [41, "can't", [1, 2, 3]],
-)->one();
+)->fetchRow();
 echo 'answer: ';
 var_dump($row['answer']);
 echo 'label:  ';
@@ -55,7 +55,7 @@ SqlFormatter::formatSql('SELECT :id AS id, :label AS label', $named), PHP_EOL;
 $row = $client->query(
     'SELECT :id AS id, :label AS label',
     $named,
-)->one();
+)->fetchRow();
 echo 'id:    ';
 var_dump($row['id']);
 echo 'label: ';
@@ -72,13 +72,13 @@ PHP_EOL;
 $rows = $client->query(
     'SELECT * FROM (VALUES (1), (2), (3), (4)) t(x) WHERE list_contains(?, x) ORDER BY x',
     [[1, 2, 3]],
-)->column('x');
+)->fetchColumn('x');
 echo 'matching values: ';
 print_r($rows);
 
 // The explicit SqlParameter/SqlParameters API is still available when a caller
 // needs to force a specific representation.
-$explicit = \DuckDB\Quack\Sql\SqlParameters::positional([
+$explicit = \DuckDB\Quack\Sql\SqlParameters::fromArray([
     \DuckDB\Quack\Sql\SqlParameter::value(\DuckDB\Quack\Types\Value::string("O'Reilly")),
 ]);
 echo PHP_EOL, 'explicit parameter: ',

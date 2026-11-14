@@ -12,8 +12,8 @@ final class FetchResponseMessage extends QuackMessage
     public function __construct(
         public readonly MessageHeader $header,
         public readonly array $results,
-        public readonly int|string|null $totalBatches = null,
-        public readonly int|string|null $batchIndex = null,
+        public readonly ?int $totalBatches = null,
+        public readonly ?int $batchIndex = null,
     ) {
     }
 

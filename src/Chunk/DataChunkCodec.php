@@ -153,42 +153,6 @@ final class DataChunkCodec
         );
     }
 
-    /**
-     * Builds row maps from a chunk, using "columnN" names when the chunk does
-     * not carry column names.
-     *
-     * @return list<array<string,Value>>
-     */
-    public static function rowsFromChunk(DataChunk $chunk): array
-    {
-        $names = $chunk->columnNames;
-        if ($names === null) {
-            $names = [];
-            for ($index = 0; $index < count($chunk->columns); $index++) {
-                $names[] = "column{$index}";
-            }
-        }
-        return self::rowsFromChunkWithNames($chunk, $names);
-    }
-
-    /**
-     * @param list<string> $names
-     * @return list<array<string,Value>>
-     */
-    public static function rowsFromChunkWithNames(DataChunk $chunk, array $names): array
-    {
-        $rows = [];
-        for ($rowIndex = 0; $rowIndex < $chunk->rowCount; $rowIndex++) {
-            $row = [];
-            foreach ($chunk->columns as $columnIndex => $column) {
-                $name = $names[$columnIndex] ?? "column{$columnIndex}";
-                $row[$name] = $column->values[$rowIndex] ?? Value::null();
-            }
-            $rows[] = $row;
-        }
-        return $rows;
-    }
-
     private static function decodeVectorBody(
         BinaryReader $reader,
         LogicalType $logicalType,

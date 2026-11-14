@@ -2,14 +2,11 @@
 
 namespace DuckDB\Quack;
 
-use DuckDB\Quack\Chunk\ColumnDefinition;
-use DuckDB\Quack\Chunk\DataChunk;
 use DuckDB\Quack\Connection\ClientConnection;
 use DuckDB\Quack\Connection\ConnectionState;
 use DuckDB\Quack\Error\QuackError;
 use DuckDB\Quack\Exceptions\ProtocolException;
 use DuckDB\Quack\Messages\PrepareResponseMessage;
-use DuckDB\Quack\Sql\FetchState;
 use DuckDB\Quack\Sql\QuerySql;
 use DuckDB\Quack\Sql\SqlFormatter;
 use DuckDB\Quack\Sql\SqlParameters;
@@ -57,14 +54,18 @@ final class QuackClient
     }
 
     /**
-     * Run a statement and discard its result.
+     * Run a statement and return the number of changed rows.
      */
-    public function execute(string $sql): void
+    public function execute(string $sql): int
     {
-        $stream = $this->query($sql);
-        foreach ($stream->rows() as $_) {
-            // Discard result rows.
+        $changed = 0;
+        foreach ($this->query($sql) as $row) {
+            $count = $row['Count'] ?? 0;
+            if (is_int($count)) {
+                $changed += $count;
+            }
         }
+        return $changed;
     }
 
     /**
@@ -73,8 +74,34 @@ final class QuackClient
     public function query(
         string $sql,
         array $params = [],
-    ): QuackResult {
-        return $this->queryInner($sql, SqlParameters::coerce($params));
+    ): QuackStatement {
+        if ($this->state->isClosed()) {
+            throw new ProtocolException('Quack client is not connected');
+        }
+        if ($this->busy) {
+            throw new ProtocolException('Quack client is already running a query');
+        }
+        $querySql = new QuerySql(SqlFormatter::formatSql($sql, SqlParameters::coerce($params)));
+        $this->busy = true;
+        try {
+            $response = $this->connection->prepare($querySql->asString());
+            if (!$response instanceof PrepareResponseMessage) {
+                throw $this->connection->protocolFailure(
+                    'expected PREPARE_RESPONSE, got ' . $response->messageType()->name,
+                );
+            }
+
+            return new QuackStatement(
+                $this->connection,
+                $response,
+                function (): void {
+                    $this->busy = false;
+                },
+            );
+        } catch (\Throwable $error) {
+            $this->busy = false;
+            throw $error;
+        }
     }
 
     public function __destruct()
@@ -84,85 +111,5 @@ final class QuackClient
             return;
         }
         $this->connection->disconnectOnDrop();
-    }
-
-    /**
-     * @param list<DataChunk> $chunks
-     * @param list<string> $names
-     */
-    private function attachColumnNames(array $chunks, array $names): void
-    {
-        foreach ($chunks as $chunk) {
-            $chunk->columnNames = $names;
-        }
-    }
-
-    private function queryInner(
-        string $sql,
-        ?SqlParameters $params,
-    ): QuackResult {
-        $querySql = new QuerySql(SqlFormatter::formatSql($sql, $params));
-        $this->beginQuery();
-        try {
-            $response = $this->connection->prepare($querySql->asString());
-            if (!$response instanceof PrepareResponseMessage) {
-                throw $this->connection->protocolFailure(
-                    'expected PREPARE_RESPONSE, got ' . $response->messageType()->name,
-                );
-            }
-
-            $chunks = $response->results;
-            $this->attachColumnNames($chunks, $response->resultNames);
-            $columns = [];
-            $count = min(count($response->resultNames), count($response->resultTypes));
-            for ($index = 0; $index < $count; $index++) {
-                $type = $response->resultTypes[$index];
-                $columns[] = new ColumnDefinition(
-                    $response->resultNames[$index],
-                    $type,
-                );
-            }
-            $columnNames = array_map(
-                static fn (ColumnDefinition $column): string => $column->name,
-                $columns,
-            );
-
-            $fetchState = new FetchState(
-                connection: $this->connection,
-                sql: $querySql,
-                resultUuid: $response->resultUuid,
-                quackVersion: $this->connection->quackVersion(),
-                columnNames: $columnNames,
-                needsMoreFetch: $response->needsMoreFetch,
-            );
-
-            return new QuackResult(
-                $columns,
-                $chunks,
-                $fetchState,
-                function (): void {
-                    $this->releaseQuery();
-                },
-            );
-        } catch (\Throwable $error) {
-            $this->releaseQuery();
-            throw $error;
-        }
-    }
-
-    private function beginQuery(): void
-    {
-        if ($this->state->isClosed()) {
-            throw new ProtocolException('Quack client is not connected');
-        }
-        if ($this->busy) {
-            throw new ProtocolException('Quack client is already running a query');
-        }
-        $this->busy = true;
-    }
-
-    private function releaseQuery(): void
-    {
-        $this->busy = false;
     }
 }

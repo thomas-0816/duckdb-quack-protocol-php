@@ -34,7 +34,7 @@ $sql = <<<'SQL'
         uuid()                                       AS uuid_value
     SQL;
 
-$row = $client->query($sql)->one();
+$row = $client->query($sql)->fetchRow();
 
 foreach ($row as $name => $value) {
     echo $name, ' [', get_debug_type($value), '] = ';

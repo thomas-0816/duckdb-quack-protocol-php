@@ -35,11 +35,19 @@ final class DataChunkCodecTest extends TestCase
 
         self::assertSame(2, $decoded->rowCount);
         self::assertEquals(
+            [Value::int(1), Value::null()],
+            $decoded->columns[0]->values,
+        );
+        self::assertEquals(
+            [Value::string('a'), Value::string('bc')],
+            $decoded->columns[1]->values,
+        );
+        self::assertEquals(
             [
-                ['id' => Value::int(1), 'label' => Value::string('a'), 'items' => Value::list([Value::int(1), Value::int(2)])],
-                ['id' => Value::null(), 'label' => Value::string('bc'), 'items' => Value::list([])],
+                Value::list([Value::int(1), Value::int(2)]),
+                Value::list([]),
             ],
-            DataChunkCodec::rowsFromChunkWithNames($decoded, ['id', 'label', 'items']),
+            $decoded->columns[2]->values,
         );
     }
 
@@ -72,15 +80,15 @@ final class DataChunkCodecTest extends TestCase
             $decoded->types[0],
         );
         self::assertEquals(
-            [[
-                'mapping' => Value::list([
+            [
+                Value::list([
                     Value::struct([
                         'key' => Value::string('a'),
                         'value' => Value::int(1),
                     ]),
                 ]),
-            ]],
-            DataChunkCodec::rowsFromChunkWithNames($decoded, ['mapping']),
+            ],
+            $decoded->columns[0]->values,
         );
     }
 }

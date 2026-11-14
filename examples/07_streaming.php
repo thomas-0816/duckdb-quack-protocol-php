@@ -27,14 +27,11 @@ $stream = $client->query(
     'SELECT range AS n, range * 2 AS doubled FROM range(1, 10001)',
 );
 
-echo 'columns: ', implode(', ', array_map(
-    static fn ($column): string => $column->name,
-    $stream->columns,
-)), PHP_EOL;
+echo 'columns: ', implode(', ', array_keys($stream->columns())), PHP_EOL;
 
 $seen = 0;
 $sum = 0;
-foreach ($stream->rows() as $row) {
+foreach ($stream as $row) {
     $seen++;
     $sum += $row['doubled'];
     if ($seen === 10) {
@@ -44,23 +41,25 @@ foreach ($stream->rows() as $row) {
 $stream->close();
 echo 'first ', $seen, ' rows, doubled sum: ', $sum, PHP_EOL;
 
-// Column metadata stays on the stream; rows() yields native PHP values.
+// Column metadata stays on the stream; iterating yields native PHP values.
 $stream = $client->query('SELECT * FROM (VALUES (1), (2), (3)) t(n)');
-echo PHP_EOL, 'column: ', $stream->columns[0]->name,
-' [', $stream->columns[0]->logicalType->id->name, ']', PHP_EOL;
-foreach ($stream->rows() as $row) {
+$name = array_key_first($stream->columns()) ?? '';
+echo PHP_EOL, 'column: ', $name,
+' [', $stream->columns()[$name]->id->name, ']', PHP_EOL;
+foreach ($stream as $row) {
     echo '  n = ';
     var_dump($row['n']);
 }
 
-// first() reads one row and releases the remaining result early.
+// fetchRow() reads one row; close() releases the remaining result early.
 $stream = $client->query('SELECT * FROM range(1, 100001)');
-$first = $stream->first();
-echo PHP_EOL, 'first(): ';
+$first = $stream->fetchRow();
+$stream->close();
+echo PHP_EOL, 'fetchRow(): ';
 var_dump($first['range'] ?? null);
 
 // Query again; the previous stream's slot has been released.
 echo 'next query: ';
-var_dump($client->query('SELECT 99 AS ready')->one()['ready']);
+var_dump($client->query('SELECT 99 AS ready')->fetchValue('ready'));
 
 echo PHP_EOL, 'done', PHP_EOL;
