@@ -91,6 +91,22 @@ final class QuackClient
     }
 
     /**
+     * Starts a transaction on the server-side connection.
+     */
+    public function beginTransaction(): void
+    {
+        $this->execute('BEGIN TRANSACTION');
+    }
+
+    /**
+     * Commits the active transaction.
+     */
+    public function commitTransaction(): void
+    {
+        $this->execute('COMMIT');
+    }
+
+    /**
      * Runs a statement and returns all rows.
      *
      * @param array<int|string,mixed> $params

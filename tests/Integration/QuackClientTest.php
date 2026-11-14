@@ -207,6 +207,29 @@ final class QuackClientTest extends TestCase
         );
     }
 
+    public function testTransactions(): void
+    {
+        $client = QuackClient::connect(
+            'http://127.0.0.1:9494',
+            'secret',
+            10,
+            300,
+        );
+
+        $client->execute('CREATE TEMP TABLE transaction_rows(id INTEGER)');
+        $client->beginTransaction();
+        self::assertSame(
+            2,
+            $client->execute('INSERT INTO transaction_rows VALUES (1), (2)'),
+        );
+        $client->commitTransaction();
+
+        self::assertSame(
+            [1, 2],
+            $client->fetchColumn('SELECT id FROM transaction_rows ORDER BY id'),
+        );
+    }
+
     public function testBooleanType(): void
     {
         self::assertTrue($this->queryValue('SELECT TRUE::BOOLEAN AS v'));
