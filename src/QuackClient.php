@@ -74,19 +74,15 @@ final class QuackClient
         $query = SqlFormatter::formatSql($sql, SqlParameters::coerce($params));
         $this->connection->setBusy(true);
         try {
-            // Only the first row matters, and returning early is safe because
-            // the next PREPARE resets the server's result cursor.
+            // Changed-row results have a single Count column, so only the first
+            // value matters. Returning early is safe because the next PREPARE
+            // resets the server's result cursor.
             foreach ($this->fetchChunks($this->connection, $query) as $chunk) {
-                $names = $chunk->resultNames;
-                for ($rowIndex = 0; $rowIndex < $chunk->rowCount; $rowIndex++) {
-                    $result = [];
-                    foreach ($chunk->columns as $columnIndex => $column) {
-                        $name = $names[$columnIndex] ?? "column{$columnIndex}";
-                        $result[$name] = $column->values[$rowIndex] ?? null;
-                    }
-                    $count = $result['Count'] ?? 0;
-                    return is_int($count) ? $count : 0;
+                if (($chunk->resultNames[0] ?? null) !== 'Count') {
+                    return 0;
                 }
+                $count = $chunk->columns[0]->values[0] ?? 0;
+                return is_int($count) ? $count : 0;
             }
             return 0;
         } finally {
