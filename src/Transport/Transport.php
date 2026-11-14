@@ -2,6 +2,7 @@
 
 namespace DuckDB\Quack\Transport;
 
+use CurlHandle;
 use DuckDB\Quack\Error\TransportErrorKind;
 use DuckDB\Quack\Exceptions\HttpStatusException;
 use DuckDB\Quack\Exceptions\ProtocolException;
@@ -10,7 +11,6 @@ use DuckDB\Quack\Exceptions\TransportException;
 use DuckDB\Quack\Messages\ErrorMessage;
 use DuckDB\Quack\Messages\MessageCodec;
 use DuckDB\Quack\Messages\QuackMessage;
-use DuckDB\Quack\QuackVersion;
 
 /**
  * HTTP(S) transport for one Quack endpoint, backed by ext-curl.
@@ -20,6 +20,7 @@ final class Transport
     private function __construct(
         private readonly string $baseUrl,
         private readonly bool $ssl,
+        private readonly string $authToken,
         private float $timeout,
         private readonly float $connectTimeout,
         private readonly ?string $sslCertificate,
@@ -28,6 +29,7 @@ final class Transport
 
     public static function new(
         string $uri,
+        string $authToken,
         float $connectTimeout,
         float $timeout,
         ?string $sslCertificate = null,
@@ -35,9 +37,7 @@ final class Transport
         $parsed = UriParser::parseQuackUri($uri);
 
         if ($sslCertificate !== null && !$parsed->ssl) {
-            throw new ProtocolException(
-                'ssl_certificate requires an https:// URL',
-            );
+            throw new ProtocolException('ssl_certificate requires an https:// URL');
         }
 
         if ($timeout <= 0) {
@@ -50,6 +50,7 @@ final class Transport
         return new self(
             rtrim($parsed->baseUrl, '/'),
             $parsed->ssl,
+            $authToken,
             $timeout,
             $connectTimeout,
             $sslCertificate,
@@ -59,6 +60,11 @@ final class Transport
     public function baseUrl(): string
     {
         return $this->baseUrl;
+    }
+
+    public function authToken(): string
+    {
+        return $this->authToken;
     }
 
     public function timeout(): float
@@ -73,15 +79,12 @@ final class Transport
         return $clone;
     }
 
-    public function send(QuackMessage $message, QuackVersion $version): QuackMessage
+    public function send(QuackMessage $message, int $version): QuackMessage
     {
         $bytes = MessageCodec::encodeMessageForVersion($message, $version);
         $curl = curl_init($this->baseUrl . '/quack');
         if ($curl === false) {
-            throw new TransportException(
-                TransportErrorKind::Other,
-                'failed to initialise curl',
-            );
+            throw new TransportException(TransportErrorKind::Other, 'failed to initialise curl');
         }
 
         $headers = [
@@ -147,14 +150,11 @@ final class Transport
      *
      * @param array<int,mixed> $options
      */
-    private static function applyCurlOptions(\CurlHandle $curl, array $options): void
+    private static function applyCurlOptions(CurlHandle $curl, array $options): void
     {
         foreach ($options as $option => $value) {
             if (!curl_setopt($curl, $option, $value)) {
-                throw new TransportException(
-                    TransportErrorKind::Other,
-                    "failed to set curl option {$option}",
-                );
+                throw new TransportException(TransportErrorKind::Other, "failed to set curl option {$option}");
             }
         }
     }
@@ -180,9 +180,6 @@ final class Transport
             ], true) => TransportErrorKind::Connect,
             default => TransportErrorKind::Other,
         };
-        return new TransportException(
-            $kind,
-            $message === '' ? "curl error {$errno}" : "curl error {$errno}: {$message}",
-        );
+        return new TransportException($kind, $message === '' ? "curl error {$errno}" : "curl error {$errno}: {$message}");
     }
 }

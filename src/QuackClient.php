@@ -31,7 +31,7 @@ final class QuackClient
 
     public function __destruct()
     {
-        if ($this->connection->state()->isBusy()) {
+        if ($this->connection->isBusy()) {
             // An active result stream still owns this client and will release it.
             return;
         }
@@ -50,8 +50,8 @@ final class QuackClient
         float $timeout = 120,
         ?string $sslCertificate = null,
     ): self {
-        $transport = Transport::new($uri, $connectTimeout, $timeout, $sslCertificate);
-        $connection = ClientConnection::connect($transport, $authToken);
+        $transport = Transport::new($uri, $authToken, $connectTimeout, $timeout, $sslCertificate);
+        $connection = ClientConnection::connect($transport);
         return new self($connection);
     }
 
@@ -67,14 +67,14 @@ final class QuackClient
      */
     public function execute(string $sql, array $params = []): int
     {
-        if ($this->connection->state()->isClosed()) {
+        if ($this->connection->isClosed()) {
             throw new ProtocolException('Quack client is not connected');
         }
-        if ($this->connection->state()->isBusy()) {
+        if ($this->connection->isBusy()) {
             throw new ProtocolException('Quack client is already running a query');
         }
         $querySql = new QuerySql(SqlFormatter::formatSql($sql, SqlParameters::coerce($params)));
-        $this->connection->state()->setBusy(true);
+        $this->connection->setBusy(true);
         try {
             $response = $this->connection->prepare($querySql->asString());
             if (!$response instanceof PrepareResponseMessage) {
@@ -102,7 +102,7 @@ final class QuackClient
             }
             return 0;
         } finally {
-            $this->connection->state()->setBusy(false);
+            $this->connection->setBusy(false);
         }
     }
 
@@ -114,14 +114,14 @@ final class QuackClient
      */
     public function fetchAll(string $sql, array $params = []): array
     {
-        if ($this->connection->state()->isClosed()) {
+        if ($this->connection->isClosed()) {
             throw new ProtocolException('Quack client is not connected');
         }
-        if ($this->connection->state()->isBusy()) {
+        if ($this->connection->isBusy()) {
             throw new ProtocolException('Quack client is already running a query');
         }
         $querySql = new QuerySql(SqlFormatter::formatSql($sql, SqlParameters::coerce($params)));
-        $this->connection->state()->setBusy(true);
+        $this->connection->setBusy(true);
         try {
             $response = $this->connection->prepare($querySql->asString());
             if (!$response instanceof PrepareResponseMessage) {
@@ -149,7 +149,7 @@ final class QuackClient
             }
             return $rows;
         } finally {
-            $this->connection->state()->setBusy(false);
+            $this->connection->setBusy(false);
         }
     }
 
@@ -161,14 +161,14 @@ final class QuackClient
      */
     public function fetchOne(string $sql, array $params = []): ?array
     {
-        if ($this->connection->state()->isClosed()) {
+        if ($this->connection->isClosed()) {
             throw new ProtocolException('Quack client is not connected');
         }
-        if ($this->connection->state()->isBusy()) {
+        if ($this->connection->isBusy()) {
             throw new ProtocolException('Quack client is already running a query');
         }
         $querySql = new QuerySql(SqlFormatter::formatSql($sql, SqlParameters::coerce($params)));
-        $this->connection->state()->setBusy(true);
+        $this->connection->setBusy(true);
         try {
             $response = $this->connection->prepare($querySql->asString());
             if (!$response instanceof PrepareResponseMessage) {
@@ -195,7 +195,7 @@ final class QuackClient
             }
             return null;
         } finally {
-            $this->connection->state()->setBusy(false);
+            $this->connection->setBusy(false);
         }
     }
 
@@ -207,14 +207,14 @@ final class QuackClient
      */
     public function fetchIterator(string $sql, array $params = []): \Generator
     {
-        if ($this->connection->state()->isClosed()) {
+        if ($this->connection->isClosed()) {
             throw new ProtocolException('Quack client is not connected');
         }
-        if ($this->connection->state()->isBusy()) {
+        if ($this->connection->isBusy()) {
             throw new ProtocolException('Quack client is already running a query');
         }
         $querySql = new QuerySql(SqlFormatter::formatSql($sql, SqlParameters::coerce($params)));
-        $this->connection->state()->setBusy(true);
+        $this->connection->setBusy(true);
         try {
             $response = $this->connection->prepare($querySql->asString());
             if (!$response instanceof PrepareResponseMessage) {
@@ -240,7 +240,7 @@ final class QuackClient
                 }
             }
         } finally {
-            $this->connection->state()->setBusy(false);
+            $this->connection->setBusy(false);
         }
     }
 
@@ -252,14 +252,14 @@ final class QuackClient
      */
     public function fetchColumn(string $sql, array $params = []): array
     {
-        if ($this->connection->state()->isClosed()) {
+        if ($this->connection->isClosed()) {
             throw new ProtocolException('Quack client is not connected');
         }
-        if ($this->connection->state()->isBusy()) {
+        if ($this->connection->isBusy()) {
             throw new ProtocolException('Quack client is already running a query');
         }
         $querySql = new QuerySql(SqlFormatter::formatSql($sql, SqlParameters::coerce($params)));
-        $this->connection->state()->setBusy(true);
+        $this->connection->setBusy(true);
         try {
             $response = $this->connection->prepare($querySql->asString());
             if (!$response instanceof PrepareResponseMessage) {
@@ -274,7 +274,7 @@ final class QuackClient
             }
             return $values;
         } finally {
-            $this->connection->state()->setBusy(false);
+            $this->connection->setBusy(false);
         }
     }
 
@@ -285,14 +285,14 @@ final class QuackClient
      */
     public function fetchValue(string $sql, array $params = []): mixed
     {
-        if ($this->connection->state()->isClosed()) {
+        if ($this->connection->isClosed()) {
             throw new ProtocolException('Quack client is not connected');
         }
-        if ($this->connection->state()->isBusy()) {
+        if ($this->connection->isBusy()) {
             throw new ProtocolException('Quack client is already running a query');
         }
         $querySql = new QuerySql(SqlFormatter::formatSql($sql, SqlParameters::coerce($params)));
-        $this->connection->state()->setBusy(true);
+        $this->connection->setBusy(true);
         try {
             $response = $this->connection->prepare($querySql->asString());
             if (!$response instanceof PrepareResponseMessage) {
@@ -306,7 +306,7 @@ final class QuackClient
             }
             return null;
         } finally {
-            $this->connection->state()->setBusy(false);
+            $this->connection->setBusy(false);
         }
     }
 
@@ -318,14 +318,14 @@ final class QuackClient
      */
     public function fetchKeyValue(string $sql, array $params = []): array
     {
-        if ($this->connection->state()->isClosed()) {
+        if ($this->connection->isClosed()) {
             throw new ProtocolException('Quack client is not connected');
         }
-        if ($this->connection->state()->isBusy()) {
+        if ($this->connection->isBusy()) {
             throw new ProtocolException('Quack client is already running a query');
         }
         $querySql = new QuerySql(SqlFormatter::formatSql($sql, SqlParameters::coerce($params)));
-        $this->connection->state()->setBusy(true);
+        $this->connection->setBusy(true);
         try {
             $response = $this->connection->prepare($querySql->asString());
             if (!$response instanceof PrepareResponseMessage) {
@@ -348,7 +348,7 @@ final class QuackClient
             }
             return $result;
         } finally {
-            $this->connection->state()->setBusy(false);
+            $this->connection->setBusy(false);
         }
     }
 

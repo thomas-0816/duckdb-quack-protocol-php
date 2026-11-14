@@ -17,7 +17,7 @@ ini_set('display_errors', 1);
 // duckdb --cmd "CALL quack_serve('quack:127.0.0.1:9494', token='secret');"
 
 $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 10, 300);
-echo 'connected with Quack protocol version ', $client->getConnection()->quackVersion()->number(), PHP_EOL;
+echo 'connected with Quack protocol version ', $client->getConnection()->quackVersion(), PHP_EOL;
 
 $sql = "SELECT 1, 'foo', [1, 2, 3], null, true, {bar: 'baz'}";
 

@@ -6,7 +6,6 @@ use DuckDB\Quack\Chunk\DataChunk;
 use DuckDB\Quack\Chunk\DataChunkCodec;
 use DuckDB\Quack\Error\ServerError;
 use DuckDB\Quack\Exceptions\ProtocolException;
-use DuckDB\Quack\QuackVersion;
 use DuckDB\Quack\Transport\BinaryReader;
 use DuckDB\Quack\Transport\BinaryWriter;
 use DuckDB\Quack\Types\LogicalType;
@@ -20,18 +19,13 @@ final class MessageCodec
     /** u64::MAX, used as the sentinel for an absent optional index. */
     public const OPTIONAL_INDEX_INVALID = '18446744073709551615';
 
-    public static function encodeMessage(QuackMessage $message): string
-    {
-        return self::encodeMessageForVersion($message, QuackVersion::v3());
-    }
-
     public static function encodeMessageForVersion(
         QuackMessage $message,
-        QuackVersion $version,
+        int $version,
     ): string {
         $writer = BinaryWriter::new();
         self::encodeHeader($writer, $message->header());
-        match ($version->number()) {
+        match ($version) {
             3 => self::encodeBodyV3($writer, $message),
             default => throw new ProtocolException(
                 "unsupported Quack protocol version {$version}",
@@ -40,22 +34,15 @@ final class MessageCodec
         return $writer->intoBytes();
     }
 
-    public static function decodeMessage(string $bytes): QuackMessage
-    {
-        return self::decodeMessageForVersion($bytes, QuackVersion::v3());
-    }
-
     public static function decodeMessageForVersion(
         string $bytes,
-        QuackVersion $version,
+        int $version,
     ): QuackMessage {
         $reader = new BinaryReader($bytes);
         $header = self::decodeHeader($reader);
-        $message = match ($version->number()) {
+        $message = match ($version) {
             3 => self::decodeBodyV3($reader, $header),
-            default => throw new ProtocolException(
-                "unsupported Quack protocol version {$version}",
-            ),
+            default => throw new ProtocolException("unsupported Quack protocol version {$version}"),
         };
         $reader->assertEof();
         return $message;
@@ -162,9 +149,7 @@ final class MessageCodec
 
         if ($message instanceof PrepareRequestMessage) {
             if ($message->queryUuid === null) {
-                throw new ProtocolException(
-                    'protocol v3 PREPARE_REQUEST requires query_uuid',
-                );
+                throw new ProtocolException('protocol v3 PREPARE_REQUEST requires query_uuid');
             }
             $writer->writeObject(static function (BinaryWriter $object) use ($message): void {
                 self::writeOptionalString($object, 1, $message->sql);
@@ -189,9 +174,7 @@ final class MessageCodec
 
         if ($message instanceof FetchRequestMessage) {
             if ($message->batchIndex === null) {
-                throw new ProtocolException(
-                    'protocol v3 FETCH_REQUEST requires batch_index',
-                );
+                throw new ProtocolException('protocol v3 FETCH_REQUEST requires batch_index');
             }
             $writer->writeObject(static function (BinaryWriter $object) use ($message): void {
                 $object->writeField(
@@ -221,9 +204,7 @@ final class MessageCodec
         }
 
         if ($message instanceof AppendRequestMessage) {
-            throw new ProtocolException(
-                'APPEND_REQUEST is not supported by Quack protocol v3',
-            );
+            throw new ProtocolException('APPEND_REQUEST is not supported by Quack protocol v3');
         }
 
         if ($message instanceof SuccessResponseMessage

@@ -14,7 +14,6 @@ use DuckDB\Quack\Messages\MessageHeader;
 use DuckDB\Quack\Messages\MessageType;
 use DuckDB\Quack\Messages\PrepareRequestMessage;
 use DuckDB\Quack\Messages\QuackMessage;
-use DuckDB\Quack\QuackVersion;
 use DuckDB\Quack\Transport\Transport;
 use DuckDB\Quack\Types\HugeIntParts;
 
@@ -30,112 +29,71 @@ final class ClientConnection
 
     private int $queryUuidCounter = 1;
 
+    private bool $closed = false;
+
+    private bool $busy = false;
+
     private function __construct(
         private readonly Transport $transport,
         private readonly string $connectionId,
-        private readonly QuackVersion $quackVersion,
         private readonly ?string $serverDuckdbVersion,
         private readonly ?string $serverPlatform,
-        private readonly ConnectionState $state,
+        private readonly int $quackVersion,
     ) {
     }
 
-    public static function connect(
-        Transport $transport,
-        string $authToken, // TODO move authToken into Transport class
-    ): self {
-        $minVersion = QuackVersion::fromNumber(3);
-        $maxVersion = QuackVersion::fromNumber(3);
-        if ($minVersion === null || $maxVersion === null) {
-            throw new ProtocolException('invalid supported Quack protocol version range');
+    public static function connect(Transport $transport): self
+    {
+        $quackVersion = 3;
+        $response = $transport->send(
+            new ConnectionRequestMessage(
+                header: MessageHeader::new(MessageType::ConnectionRequest),
+                authString: $transport->authToken(),
+                clientPlatform: 'quack-php',
+                minSupportedQuackVersion: $quackVersion,
+                maxSupportedQuackVersion: $quackVersion,
+                heartbeatTimeoutSeconds: (int) ceil($transport->timeout()),
+            ),
+            $quackVersion,
+        );
+
+        if (!$response instanceof ConnectionResponseMessage) {
+            throw new ProtocolException('expected CONNECTION_RESPONSE, got ' . $response->messageType()->name);
         }
-        if ($minVersion->number() > $maxVersion->number()) {
-            throw new ProtocolException(
-                "minimum Quack protocol version {$minVersion} exceeds maximum {$maxVersion}",
-            );
+        $connectionId = $response->header->connectionId;
+        if ($connectionId === null || $connectionId === '') {
+            throw new ProtocolException('CONNECTION_RESPONSE did not include a connection id');
         }
-
-        $versions = array_values(array_filter(
-            QuackVersion::supported(),
-            static fn (QuackVersion $version): bool => $version->number() >= $minVersion->number()
-                && $version->number() <= $maxVersion->number(),
-        ));
-        if ($versions === []) {
-            throw new ProtocolException(
-                'supported Quack protocol version is 3, requested range was '
-                . "{$minVersion}..{$maxVersion}",
-            );
-        }
-
-        $previousError = null;
-        $lastIndex = count($versions) - 1;
-        foreach ($versions as $index => $version) {
-            try {
-                $response = $transport->send(
-                    new ConnectionRequestMessage(
-                        header: MessageHeader::new(MessageType::ConnectionRequest),
-                        authString: $authToken,
-                        clientPlatform: 'quack-php',
-                        minSupportedQuackVersion: $version->number(),
-                        maxSupportedQuackVersion: $version->number(),
-                        heartbeatTimeoutSeconds: (int) ceil($transport->timeout()),
-                    ),
-                    $version,
-                );
-            } catch (QuackError $error) {
-                if ($index < $lastIndex
-                    && $version->number() === 3
-                    && self::isVersionNegotiationError($error)) {
-                    $previousError = $error;
-                    continue;
-                }
-                if ($previousError !== null && self::isVersionNegotiationError($error)) {
-                    throw $previousError;
-                }
-                throw $error;
-            }
-
-            if (!$response instanceof ConnectionResponseMessage) {
-                throw new ProtocolException(
-                    'expected CONNECTION_RESPONSE, got ' . $response->messageType()->name,
-                );
-            }
-            $connectionId = $response->header->connectionId;
-            if ($connectionId === null || $connectionId === '') {
-                throw new ProtocolException(
-                    'CONNECTION_RESPONSE did not include a connection id',
-                );
-            }
-            if ((string) $response->quackVersion !== (string) $version->number()) {
-                $selected = $response->quackVersion === null
-                    ? 'none'
-                    : (string) $response->quackVersion;
-                throw new ProtocolException(
-                    "server selected Quack protocol version {$selected}, expected {$version}",
-                );
-            }
-
-            return new self(
-                $transport,
-                $connectionId,
-                $version,
-                $response->serverDuckdbVersion,
-                $response->serverPlatform,
-                new ConnectionState(),
-            );
+        if ($response->quackVersion !== $quackVersion) {
+            $selected = $response->quackVersion === null ? 'none' : (string) $response->quackVersion;
+            throw new ProtocolException("server selected Quack protocol version {$selected}, expected {$quackVersion}");
         }
 
-        throw new ProtocolException(
-            'no compatible Quack protocol version was attempted',
+        return new self(
+            $transport,
+            $connectionId,
+            $response->serverDuckdbVersion,
+            $response->serverPlatform,
+            $quackVersion,
         );
     }
 
-    public function state(): ConnectionState
+    public function isClosed(): bool
     {
-        return $this->state;
+        return $this->closed;
     }
 
-    public function quackVersion(): QuackVersion
+    public function setBusy(bool $busy): void
+    {
+        $this->busy = $busy;
+    }
+
+    public function isBusy(): bool
+    {
+        return $this->busy;
+    }
+
+    public function quackVersion(): int
     {
         return $this->quackVersion;
     }
@@ -168,7 +126,7 @@ final class ClientConnection
         return $this->send(new PrepareRequestMessage(
             header: $this->scopedHeader(MessageType::PrepareRequest),
             sql: $sql,
-            queryUuid: $this->quackVersion->number() === 3 ? $queryUuid : null,
+            queryUuid: $queryUuid,
             inlineRows: null,
         ));
     }
@@ -182,8 +140,8 @@ final class ClientConnection
         return $this->send(new FetchRequestMessage(
             header: $this->scopedHeader(MessageType::FetchRequest),
             resultUuid: $resultUuid,
-            batchIndex: $this->quackVersion->number() === 3 ? $batchIndex : null,
-            ackIndex: $this->quackVersion->number() === 3 ? $ackIndex : null,
+            batchIndex: $batchIndex,
+            ackIndex: $ackIndex,
         ));
     }
 
@@ -192,7 +150,7 @@ final class ClientConnection
      */
     public function disconnectOnDrop(): void
     {
-        if ($this->state->isClosed()) {
+        if ($this->closed) {
             return;
         }
         $message = new DisconnectMessage(
@@ -203,7 +161,7 @@ final class ClientConnection
         } catch (QuackError) {
             // The caller is gone; nothing useful can be reported.
         } finally {
-            $this->state->close();
+            $this->closed = true;
         }
     }
 
@@ -221,7 +179,7 @@ final class ClientConnection
 
     private function ensureOpen(): void
     {
-        if ($this->state->isClosed()) {
+        if ($this->closed) {
             throw new ProtocolException('Quack client is not connected');
         }
     }

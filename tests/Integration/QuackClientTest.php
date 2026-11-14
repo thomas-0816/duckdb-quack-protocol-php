@@ -17,7 +17,7 @@ final class QuackClientTest extends TestCase
             300,
             self::sslCertificate(),
         );
-        self::assertSame(3, $client->getConnection()->quackVersion()->number());
+        self::assertSame(3, $client->getConnection()->quackVersion());
     }
 
     public function testConnect(): void
@@ -28,7 +28,7 @@ final class QuackClientTest extends TestCase
             10,
             300,
         );
-        self::assertSame(3, $client->getConnection()->quackVersion()->number());
+        self::assertSame(3, $client->getConnection()->quackVersion());
 
         self::assertSame(
             [
@@ -156,7 +156,7 @@ final class QuackClientTest extends TestCase
 
         // Creating an iterator without starting it does not acquire the client.
         $notStarted = $client->fetchIterator('SELECT 1 AS n');
-        self::assertFalse($client->getConnection()->state()->isBusy());
+        self::assertFalse($client->getConnection()->isBusy());
         unset($notStarted);
 
         // A partially consumed iterator still owns the client.

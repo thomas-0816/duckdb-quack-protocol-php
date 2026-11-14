@@ -3,7 +3,6 @@
 namespace DuckDB\Quack\Tests\Unit\Messages;
 
 use DuckDB\Quack\Error\ServerError;
-use DuckDB\Quack\Exceptions\ProtocolException;
 use DuckDB\Quack\Messages\CancelMessage;
 use DuckDB\Quack\Messages\ConnectionRequestMessage;
 use DuckDB\Quack\Messages\DisconnectMessage;
@@ -14,7 +13,6 @@ use DuckDB\Quack\Messages\MessageCodec;
 use DuckDB\Quack\Messages\MessageHeader;
 use DuckDB\Quack\Messages\MessageType;
 use DuckDB\Quack\Messages\PrepareRequestMessage;
-use DuckDB\Quack\QuackVersion;
 use DuckDB\Quack\Types\HugeIntParts;
 use PHPUnit\Framework\TestCase;
 
@@ -34,28 +32,12 @@ final class MessageCodecTest extends TestCase
         );
 
         $decoded = MessageCodec::decodeMessageForVersion(
-            MessageCodec::encodeMessageForVersion($message, QuackVersion::v3()),
-            QuackVersion::v3(),
+            MessageCodec::encodeMessageForVersion($message, 3),
+            3,
         );
 
         self::assertInstanceOf(ConnectionRequestMessage::class, $decoded);
         self::assertEquals($message, $decoded);
-    }
-
-    public function testV1IsRejected(): void
-    {
-        $message = new ConnectionRequestMessage(
-            new MessageHeader(MessageType::ConnectionRequest, 'conn-1'),
-            authString: 'secret',
-            clientDuckdbVersion: '1.5.0',
-            clientPlatform: 'php',
-            minSupportedQuackVersion: 1,
-            maxSupportedQuackVersion: 1,
-        );
-
-        $this->expectException(ProtocolException::class);
-
-        MessageCodec::encodeMessageForVersion($message, QuackVersion::v1());
     }
 
     public function testPrepareRequestRoundTrips(): void
@@ -68,8 +50,8 @@ final class MessageCodecTest extends TestCase
         );
 
         $decoded = MessageCodec::decodeMessageForVersion(
-            MessageCodec::encodeMessageForVersion($message, QuackVersion::v3()),
-            QuackVersion::v3(),
+            MessageCodec::encodeMessageForVersion($message, 3),
+            3,
         );
 
         self::assertInstanceOf(PrepareRequestMessage::class, $decoded);
@@ -93,8 +75,8 @@ final class MessageCodecTest extends TestCase
 
         foreach ($messages as $message) {
             $decoded = MessageCodec::decodeMessageForVersion(
-                MessageCodec::encodeMessageForVersion($message, QuackVersion::v3()),
-                QuackVersion::v3(),
+                MessageCodec::encodeMessageForVersion($message, 3),
+                3,
             );
 
             self::assertEquals($message, $decoded);
@@ -111,8 +93,8 @@ final class MessageCodecTest extends TestCase
         );
 
         $decoded = MessageCodec::decodeMessageForVersion(
-            MessageCodec::encodeMessageForVersion($message, QuackVersion::v3()),
-            QuackVersion::v3(),
+            MessageCodec::encodeMessageForVersion($message, 3),
+            3,
         );
 
         self::assertInstanceOf(FetchRequestMessage::class, $decoded);
@@ -132,8 +114,8 @@ final class MessageCodecTest extends TestCase
         );
 
         $decoded = MessageCodec::decodeMessageForVersion(
-            MessageCodec::encodeMessageForVersion($message, QuackVersion::v3()),
-            QuackVersion::v3(),
+            MessageCodec::encodeMessageForVersion($message, 3),
+            3,
         );
 
         self::assertInstanceOf(ErrorMessage::class, $decoded);

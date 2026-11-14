@@ -1,0 +1,7 @@
+{
+    "search.exclude": {
+        ".php-cs-fixer.cache": true,
+        ".phpstan/**": true,
+        ".phpunit.cache/**": true
+    }
+}
