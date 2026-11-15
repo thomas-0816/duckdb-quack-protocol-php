@@ -125,8 +125,30 @@ final class Transport
         $body = curl_exec($curl);
         if ($body === false) {
             $errno = curl_errno($curl);
-            $error = curl_error($curl);
-            throw self::transportError($errno, $error);
+            $message = curl_error($curl);
+            $kind = match (true) {
+                $errno === CURLE_OPERATION_TIMEDOUT => TransportErrorKind::Timeout,
+                in_array($errno, [
+                    CURLE_COULDNT_RESOLVE_PROXY,
+                    CURLE_COULDNT_RESOLVE_HOST,
+                    CURLE_COULDNT_CONNECT,
+                    CURLE_SSL_CONNECT_ERROR,
+                    CURLE_SSL_CERTPROBLEM,
+                    CURLE_SSL_CIPHER,
+                    CURLE_SSL_CACERT,
+                    CURLE_SSL_CACERT_BADFILE,
+                    // CURLE_SSL_ISSUER_ERROR (83) and CURLE_SSL_INVALIDCERTSTATUS
+                    // (91) are missing from some curl/PHPStan constant stubs.
+                    83,
+                    CURLE_SSL_PINNEDPUBKEYNOTMATCH,
+                    91,
+                ], true) => TransportErrorKind::Connect,
+                default => TransportErrorKind::Other,
+            };
+            throw new TransportException(
+                $kind,
+                $message === '' ? "curl error {$errno}" : "curl error {$errno}: {$message}",
+            );
         }
 
         $status = (int) curl_getinfo($curl, CURLINFO_RESPONSE_CODE);
@@ -144,29 +166,5 @@ final class Transport
             throw new ServerException($decoded->error);
         }
         return $decoded;
-    }
-
-    public static function transportError(int $errno, string $message): TransportException // TODO inline code
-    {
-        $kind = match (true) {
-            $errno === CURLE_OPERATION_TIMEDOUT => TransportErrorKind::Timeout,
-            in_array($errno, [
-                CURLE_COULDNT_RESOLVE_PROXY,
-                CURLE_COULDNT_RESOLVE_HOST,
-                CURLE_COULDNT_CONNECT,
-                CURLE_SSL_CONNECT_ERROR,
-                CURLE_SSL_CERTPROBLEM,
-                CURLE_SSL_CIPHER,
-                CURLE_SSL_CACERT,
-                CURLE_SSL_CACERT_BADFILE,
-                // CURLE_SSL_ISSUER_ERROR (83) and CURLE_SSL_INVALIDCERTSTATUS
-                // (91) are missing from some curl/PHPStan constant stubs.
-                83,
-                CURLE_SSL_PINNEDPUBKEYNOTMATCH,
-                91,
-            ], true) => TransportErrorKind::Connect,
-            default => TransportErrorKind::Other,
-        };
-        return new TransportException($kind, $message === '' ? "curl error {$errno}" : "curl error {$errno}: {$message}");
     }
 }
