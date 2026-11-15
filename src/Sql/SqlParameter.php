@@ -50,49 +50,39 @@ final class SqlParameter
         if ($value instanceof self) {
             return $value;
         }
-
         if (is_array($value)) {
             try {
                 return self::value(Value::string(json_encode($value, JSON_THROW_ON_ERROR)));
             } catch (\JsonException $error) {
-                throw new ProtocolException(
-                    'could not JSON-encode SQL array parameter',
-                    previous: $error,
-                );
+                throw new ProtocolException('could not JSON-encode SQL array parameter', previous: $error);
             }
         }
-
-        return self::value(self::valueFromPhp($value));
-    }
-
-    private static function valueFromPhp(mixed $value): Value
-    {
         if ($value instanceof Value) {
-            return $value;
+            return self::value($value);
         }
         if ($value === null) {
-            return Value::null();
+            return self::value(Value::null());
         }
         if (is_bool($value)) {
-            return Value::bool($value);
+            return self::value(Value::bool($value));
         }
         if (is_int($value)) {
-            return Value::int($value);
+            return self::value(Value::int($value));
         }
         if (is_float($value)) {
-            return Value::double($value);
+            return self::value(Value::double($value));
         }
         if (is_string($value)) {
-            return Value::string($value);
+            return self::value(Value::string($value));
         }
         if ($value instanceof \BackedEnum) {
-            return self::valueFromPhp($value->value);
+            return self::value(is_int($value->value) ? Value::int($value->value) : Value::string($value->value));
         }
         if ($value instanceof \UnitEnum) {
-            return Value::string($value->name);
+            return self::value(Value::string($value->name));
         }
         if ($value instanceof \Stringable) {
-            return Value::string((string) $value);
+            return self::value(Value::string((string) $value));
         }
         if (is_resource($value)) {
             $contents = stream_get_contents($value);
@@ -100,22 +90,17 @@ final class SqlParameter
                 throw new ProtocolException('could not read resource SQL parameter');
             }
 
-            return Value::bytes($contents);
+            return self::value(Value::bytes($contents));
         }
         if (is_object($value)) {
             try {
-                return Value::string(json_encode($value, JSON_THROW_ON_ERROR));
+                return self::value(Value::string(json_encode($value, JSON_THROW_ON_ERROR)));
             } catch (\JsonException $error) {
-                throw new ProtocolException(
-                    'could not JSON-encode SQL parameter of type ' . get_debug_type($value),
-                    previous: $error,
-                );
+                throw new ProtocolException('could not JSON-encode SQL parameter of type ' . get_debug_type($value), previous: $error);
             }
         }
 
-        throw new ProtocolException(
-            'unsupported SQL parameter type ' . get_debug_type($value),
-        );
+        throw new ProtocolException('unsupported SQL parameter type ' . get_debug_type($value));
     }
 
     public function asValue(): Value
