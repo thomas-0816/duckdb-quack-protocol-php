@@ -214,6 +214,12 @@ final class ValueToPhpTest extends TestCase
             ),
         );
 
+        // DuckDB writes non-finite doubles as bare tokens; PDO returns them
+        // unchanged instead of rejecting the value.
+        self::assertSame('NaN', Value::string('NaN')->toPhp($jsonType));
+        self::assertSame('Infinity', Value::string('Infinity')->toPhp($jsonType));
+        self::assertSame('-Infinity', Value::string('-Infinity')->toPhp($jsonType));
+
         // Without type information the raw JSON text is preserved.
         self::assertSame(
             '{"a":1}',
