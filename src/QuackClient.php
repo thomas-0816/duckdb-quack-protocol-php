@@ -11,6 +11,7 @@ use DuckDB\Quack\Messages\PrepareResponseMessage;
 use DuckDB\Quack\Sql\SqlFormatter;
 use DuckDB\Quack\Sql\SqlParameters;
 use DuckDB\Quack\Transport\Transport;
+use DuckDB\Quack\Types\Value;
 use Generator;
 
 /**
@@ -36,19 +37,41 @@ final class QuackClient
     /**
      * Opens a session, negotiating a supported Quack protocol version.
      *
-     * @throws QuackError if the connection cannot be established.
+     * @param array<string,scalar|null> $configuration
+     *
+     * @throws QuackError if the connection cannot be established or a setting is rejected.
      */
     public static function connect(
         string $uri,
         string $authToken,
-        float $connectTimeout = 10,
-        float $queryTimeout = 30,
+        float $connectTimeout,
+        float $queryTimeout,
+        array $configuration = [],
         ?string $sslCertificate = null,
     ): self {
+        $settings = [];
+        foreach ($configuration as $name => $value) {
+            if (!is_scalar($value) && $value !== null) {
+                throw new ProtocolException("config setting {$name} must be a scalar or null");
+            }
+            $literal = match (true) {
+                $value === null => Value::null(),
+                is_bool($value) => Value::bool($value),
+                is_int($value) => Value::int($value),
+                is_float($value) => Value::double($value),
+                default => Value::string($value),
+            };
+            $settings[] = 'SET ' . $name . ' = ' . SqlFormatter::valueLiteral($literal) . ';';
+        }
         $transport = Transport::new($uri, $authToken, $connectTimeout, $queryTimeout, $sslCertificate);
         $connection = ClientConnection::connect($transport);
 
-        return new self($connection);
+        $client = new self($connection);
+        if ($settings !== []) {
+            $client->execute(implode('', $settings));
+        }
+
+        return $client;
     }
 
     public function getConnection(): ClientConnection
