@@ -8,6 +8,7 @@ use DuckDB\Quack\Transport\BinaryReader;
 use DuckDB\Quack\Transport\BinaryWriter;
 use DuckDB\Quack\Types\LogicalTypes;
 use DuckDB\Quack\Types\Value;
+use DuckDB\Quack\Types\VectorType;
 use PHPUnit\Framework\TestCase;
 
 final class DataChunkCodecTest extends TestCase
@@ -85,6 +86,37 @@ final class DataChunkCodecTest extends TestCase
             ],
             $decoded->columns[0]->values,
         );
+    }
+
+    public function testDecodesSequenceVectors(): void
+    {
+        $reader = self::sequenceVector(10, -3);
+        $decoded = DataChunkCodec::decodeVector($reader, LogicalTypes::bigint(), 4);
+        $reader->assertEof();
+        self::assertSame([10, 7, 4, 1], $decoded->values);
+
+        $reader = self::sequenceVector(1, 2);
+        $decoded = DataChunkCodec::decodeVector($reader, LogicalTypes::date(), 3);
+        $reader->assertEof();
+        self::assertSame(
+            ['1970-01-02', '1970-01-04', '1970-01-06'],
+            $decoded->values,
+        );
+    }
+
+    private static function sequenceVector(int $start, int $increment): BinaryReader
+    {
+        $writer = BinaryWriter::new();
+        $writer->writeObject(static function (BinaryWriter $writer) use ($start, $increment): void {
+            $writer->writeField(
+                90,
+                static fn (BinaryWriter $w) => $w->writeUleb(VectorType::Sequence->value),
+            );
+            $writer->writeField(91, static fn (BinaryWriter $w) => $w->writeSleb($start));
+            $writer->writeField(92, static fn (BinaryWriter $w) => $w->writeSleb($increment));
+        });
+
+        return new BinaryReader($writer->intoBytes());
     }
 
     public function testDataChunkDecodesDirectlyToPhpWithProvidedTypes(): void
