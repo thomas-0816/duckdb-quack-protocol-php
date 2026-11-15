@@ -285,7 +285,15 @@ final class BinaryReader
 
     public function readFixedF32(): float
     {
-        return $this->unpackFloat('g', 4);
+        $value = $this->unpackFloat('g', 4);
+        if (is_nan($value) || is_infinite($value)) {
+            return $value;
+        }
+
+        // FLOAT carries about seven significant decimal digits. Rendering it
+        // that way first mirrors PDO_duckdb, so a value cast to FLOAT reads
+        // back as 0.9 rather than 0.8999999761581421.
+        return (float) sprintf('%.7g', $value);
     }
 
     public function readFixedF64(): float
