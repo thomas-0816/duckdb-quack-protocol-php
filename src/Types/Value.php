@@ -461,6 +461,43 @@ final class Value
     }
 
     /**
+     * Converts a decoded MAP key to a PHP array key.
+     *
+     * List keys are flattened and joined with ", " like PDO_duckdb does; PHP
+     * arrays cannot be used as keys directly.
+     */
+    public static function mapKeyToPhp(mixed $key): int|string
+    {
+        if (is_int($key) || is_string($key)) {
+            return $key;
+        }
+        return self::mapKeyToString($key);
+    }
+
+    private static function mapKeyToString(mixed $value): string
+    {
+        if (is_array($value)) {
+            $parts = [];
+            foreach ($value as $element) {
+                $parts[] = self::mapKeyToString($element);
+            }
+            return implode(', ', $parts);
+        }
+        if ($value === null) {
+            return '';
+        }
+        if (is_bool($value)) {
+            return $value ? '1' : '';
+        }
+        if (is_int($value) || is_float($value) || is_string($value)) {
+            return (string) $value;
+        }
+        throw new ProtocolException(
+            'MAP key cannot be represented as a PHP array key',
+        );
+    }
+
+    /**
      * @param list<Value> $pairs
      * @return array<int|string,mixed>
      */
@@ -480,12 +517,7 @@ final class Value
         $result = [];
         foreach ($pairs as $pair) {
             $fields = $pair->asStruct();
-            $key = ($fields['key'] ?? Value::null())->toPhp($keyType);
-            if (!is_int($key) && !is_string($key)) {
-                throw new ProtocolException(
-                    'MAP key cannot be represented as a PHP array key',
-                );
-            }
+            $key = self::mapKeyToPhp(($fields['key'] ?? Value::null())->toPhp($keyType));
             $result[$key] = ($fields['value'] ?? Value::null())->toPhp($valueType);
         }
 
