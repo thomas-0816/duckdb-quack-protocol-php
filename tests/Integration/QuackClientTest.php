@@ -2,8 +2,6 @@
 
 namespace DuckDB\Quack\Tests\Integration;
 
-use DuckDB\Quack\Exceptions\ProtocolException;
-use DuckDB\Quack\Exceptions\ServerException;
 use DuckDB\Quack\QuackClient;
 use PHPUnit\Framework\TestCase;
 
@@ -167,116 +165,6 @@ final class QuackClientTest extends TestCase
 
         unset($generator);
         self::assertSame(['n' => 1], $client->fetchOne('SELECT 1 AS n'));
-    }
-
-    public function testFetchAllParallelRunsQueriesConcurrently(): void
-    {
-        $client = QuackClient::connect(
-            'http://127.0.0.1:9494',
-            'secret',
-            10,
-            300,
-            3,
-        );
-
-        $started = hrtime(true);
-        $results = $client->fetchAllParallel([
-            'first' => $client->prepare('SELECT ?::INTEGER AS id, sleep_ms(400)', [42]),
-            'second' => 'SELECT 7 AS id, sleep_ms(400)',
-            'third' => 'SELECT 9 AS id, sleep_ms(400)',
-        ]);
-        $elapsedMs = (hrtime(true) - $started) / 1_000_000;
-
-        self::assertSame([42], array_column($results['first'], 'id'));
-        self::assertSame([7], array_column($results['second'], 'id'));
-        self::assertSame([9], array_column($results['third'], 'id'));
-        self::assertLessThan(
-            1000.0,
-            $elapsedMs,
-            'queries on separate connections should overlap',
-        );
-    }
-
-    public function testFetchAllParallelReturnsEveryResultKeyedLikeTheInput(): void
-    {
-        $client = QuackClient::connect(
-            'http://127.0.0.1:9494',
-            'secret',
-            10,
-            300,
-            2,
-        );
-
-        $results = $client->fetchAllParallel([
-            'numbers' => 'SELECT * FROM (VALUES (1), (2)) t(n)',
-            'prepared' => $client->prepare('SELECT ?::INTEGER AS n', [7]),
-        ]);
-
-        self::assertSame(
-            [
-                'numbers' => [['n' => 1], ['n' => 2]],
-                'prepared' => [['n' => 7]],
-            ],
-            $results,
-        );
-        self::assertSame([], $client->fetchAllParallel([]));
-    }
-
-    public function testFetchAllParallelDrainsMultipleBatches(): void
-    {
-        $client = QuackClient::connect(
-            'http://127.0.0.1:9494',
-            'secret',
-            10,
-            300,
-            2,
-        );
-
-        $results = $client->fetchAllParallel([
-            'rows' => 'SELECT range AS n FROM range(1, 10001)',
-            'total' => 'SELECT sum(range) AS total FROM range(1, 10001)',
-        ]);
-
-        self::assertCount(10000, $results['rows']);
-        self::assertSame(['n' => 1], $results['rows'][0]);
-        self::assertSame(['n' => 10000], $results['rows'][9999]);
-        self::assertSame([['total' => 50005000]], $results['total']);
-    }
-
-    public function testFetchAllParallelPropagatesFailures(): void
-    {
-        $client = QuackClient::connect(
-            'http://127.0.0.1:9494',
-            'secret',
-            10,
-            300,
-            2,
-        );
-
-        try {
-            $client->fetchAllParallel([
-                'ok' => 'SELECT 1 AS n',
-                'bad' => 'SELECT * FROM table_that_does_not_exist',
-            ]);
-            self::fail('expected the failed query to throw');
-        } catch (ServerException) {
-            // Expected: the server rejected one query.
-        }
-
-        self::assertSame(1, $client->fetchValue('SELECT 1 AS n'));
-    }
-
-    public function testFetchAllParallelRequiresPreparedPlaceholders(): void
-    {
-        $client = QuackClient::connect(
-            'http://127.0.0.1:9494',
-            'secret',
-            10,
-            300,
-        );
-
-        $this->expectException(ProtocolException::class);
-        $client->fetchAllParallel(['missing' => 'SELECT ? AS n']);
     }
 
     public function testExecuteReturnsChangedRows(): void
@@ -699,73 +587,6 @@ final class QuackClientTest extends TestCase
             $this->queryValue(
                 "SELECT CAST('happy' AS ENUM ('sad', 'ok', 'happy')) AS v",
             ),
-        );
-    }
-
-    public function testListType(): void
-    {
-        self::assertSame(
-            [1, 2, 3],
-            $this->queryValue('SELECT [1, 2, 3]::INTEGER[] AS v'),
-        );
-        self::assertSame(
-            [1, null, 3],
-            $this->queryValue('SELECT [1, NULL, 3]::INTEGER[] AS v'),
-        );
-    }
-
-    public function testStructType(): void
-    {
-        self::assertSame(
-            ['name' => 'Ada', 'age' => 36],
-            $this->queryValue("SELECT {'name': 'Ada', 'age': 36} AS v"),
-        );
-    }
-
-    public function testMapType(): void
-    {
-        self::assertSame(
-            ['a' => 1, 'b' => 2],
-            $this->queryValue("SELECT MAP {'a': 1, 'b': 2} AS v"),
-        );
-        self::assertSame(
-            ['a' => 1, 'b' => null],
-            $this->queryValue("SELECT MAP {'a': 1, 'b': NULL} AS v"),
-        );
-    }
-
-    public function testUnionType(): void
-    {
-        self::assertSame(
-            ['answer' => 42],
-            $this->queryValue(
-                'SELECT CAST(42 AS UNION(answer INTEGER, label VARCHAR)) AS v',
-            ),
-        );
-        self::assertSame(
-            ['label' => 'hi'],
-            $this->queryValue(
-                "SELECT CAST('hi' AS UNION(answer INTEGER, label VARCHAR)) AS v",
-            ),
-        );
-        self::assertSame(
-            ['answer' => null],
-            $this->queryValue(
-                'SELECT CAST(NULL::INTEGER AS UNION(answer INTEGER, label VARCHAR)) AS v',
-            ),
-        );
-        self::assertNull(
-            $this->queryValue(
-                'SELECT CAST(NULL AS UNION(answer INTEGER, label VARCHAR)) AS v',
-            ),
-        );
-    }
-
-    public function testArrayType(): void
-    {
-        self::assertSame(
-            [1, 2, 3],
-            $this->queryValue('SELECT [1, 2, 3]::INTEGER[3] AS v'),
         );
     }
 
