@@ -470,11 +470,56 @@ final class DataChunkCodec
      */
     private static function logicalStructToPhp(LogicalType $logicalType, array $row): mixed
     {
+        if (strcasecmp($logicalType->alias() ?? '', 'INET') === 0) {
+            return self::inetStructToPhp($row);
+        }
+
         return match ($logicalType->id) {
             LogicalTypeId::Union => self::unionToPhp($row, $logicalType),
             LogicalTypeId::Variant => VariantDecoder::fromPhp($row)->decode(),
             default => $row,
         };
+    }
+
+    /**
+     * Formats the inet extension's STRUCT representation as its text form.
+     *
+     * @param array<string,mixed> $row
+     */
+    private static function inetStructToPhp(array $row): string
+    {
+        $family = $row['ip_type'] ?? null;
+        $address = $row['address'] ?? null;
+        $mask = $row['mask'] ?? null;
+        if (!is_int($family) || !(is_int($address) || is_string($address)) || !is_int($mask)) {
+            throw new ProtocolException('malformed INET value');
+        }
+
+        if ($family === 1) {
+            $length = 4;
+            $maxMask = 32;
+            $addressValue = BigInt::coerce($address)->lowBits($length * 8);
+        } elseif ($family === 2) {
+            $length = 16;
+            $maxMask = 128;
+            $addressValue = BigInt::coerce($address)->lowBits($length * 8);
+            // DuckDB flips the top bit of IPv6 addresses when storing them as
+            // signed HUGEINTs so that ordering works; flip it back.
+            $signBit = BigInt::pow2(127);
+            $addressValue = $addressValue->compare($signBit) >= 0
+                ? $addressValue->sub($signBit)
+                : $addressValue->add($signBit);
+        } else {
+            throw new ProtocolException("unknown INET address family {$family}");
+        }
+
+        $bytes = $addressValue->toBytesLE($length, false);
+        $text = inet_ntop(strrev($bytes));
+        if ($text === false) {
+            throw new ProtocolException('cannot format INET value');
+        }
+
+        return $mask === $maxMask ? $text : "{$text}/{$mask}";
     }
 
     /**
