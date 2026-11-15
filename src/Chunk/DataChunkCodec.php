@@ -556,12 +556,7 @@ final class DataChunkCodec
             if (!is_array($pair)) {
                 throw new ProtocolException('MAP entry is not a struct');
             }
-            $key = $pair['key'] ?? null;
-            if (!is_int($key) && !is_string($key)) {
-                throw new ProtocolException(
-                    'MAP key cannot be represented as a PHP array key',
-                );
-            }
+            $key = Value::mapKeyToPhp($pair['key'] ?? null);
             $result[$key] = $pair['value'] ?? null;
         }
 
