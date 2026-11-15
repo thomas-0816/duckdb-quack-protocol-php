@@ -886,9 +886,16 @@ final class DataChunkCodec
     ): array {
         $reader = new BinaryReader($bytes);
         $values = [];
+        $size = LogicalTypeCodec::physicalTypeSize($physicalType);
         for ($index = 0; $index < $count; $index++) {
-            $value = self::decodeFixedValueToPhp($reader, $logicalType, $physicalType);
-            $values[] = self::isValid($validity, $index) ? $value : null;
+            if (!self::isValid($validity, $index)) {
+                // Null slots may contain arbitrary payload bytes, so skip them
+                // instead of decoding a value that could be malformed.
+                $reader->readBytes($size);
+                $values[] = null;
+                continue;
+            }
+            $values[] = self::decodeFixedValueToPhp($reader, $logicalType, $physicalType);
         }
         $reader->assertEof();
         return $values;
@@ -1232,6 +1239,7 @@ final class DataChunkCodec
             LogicalTypeId::UInteger => 'UINTEGER',
             LogicalTypeId::UBigInt => 'UBIGINT',
             LogicalTypeId::TimestampTz => 'TIMESTAMP WITH TIME ZONE',
+            LogicalTypeId::TimestampTzNs => 'TIMESTAMP_TZ_NS',
             LogicalTypeId::TimeTz => 'TIME WITH TIME ZONE',
             LogicalTypeId::TimeNs => 'TIME_NS',
             LogicalTypeId::Bit => 'BIT',
@@ -1254,6 +1262,7 @@ final class DataChunkCodec
             LogicalTypeId::Union => 'UNION',
             LogicalTypeId::Array => 'ARRAY',
             LogicalTypeId::Variant => 'VARIANT',
+            LogicalTypeId::Tuple => 'TUPLE',
         };
     }
 
