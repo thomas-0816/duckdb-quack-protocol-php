@@ -12,7 +12,6 @@ use DuckDB\Quack\Messages\MessageHeader;
 use DuckDB\Quack\Messages\MessageType;
 use DuckDB\Quack\Messages\PrepareRequestMessage;
 use DuckDB\Quack\Messages\QuackMessage;
-use DuckDB\Quack\Transport\PendingRequest;
 use DuckDB\Quack\Transport\Transport;
 use DuckDB\Quack\Types\HugeIntParts;
 use DuckDB\Quack\Types\LogicalType;
@@ -44,7 +43,7 @@ final class ClientConnection
 
     public static function connect(Transport $transport): self
     {
-        $response = $transport->createRequest(
+        $response = $transport->send(
             new ConnectionRequestMessage(
                 header: MessageHeader::new(MessageType::ConnectionRequest),
                 authString: $transport->authToken(),
@@ -54,7 +53,7 @@ final class ClientConnection
                 heartbeatTimeoutSeconds: (int) ceil($transport->timeout()),
             ),
             self::QUACK_VERSION,
-        )->wait();
+        );
 
         if (!$response instanceof ConnectionResponseMessage) {
             throw new ProtocolException('expected CONNECTION_RESPONSE, got ' . $response->messageType()->name);
@@ -122,57 +121,44 @@ final class ClientConnection
         );
     }
 
-    /**
-     * Starts a PREPARE without waiting for its response.
-     */
-    public function beginPrepare(string $sql): PendingRequest
+    public function prepare(string $sql): QuackMessage
     {
         if ($this->closed) {
             throw new ProtocolException('Quack client is not connected');
         }
         $queryUuid = new HugeIntParts(0, $this->queryUuidCounter++);
-        return $this->transport->createRequest(
-            new PrepareRequestMessage(
-                header: MessageHeader::new(MessageType::PrepareRequest)
-                    ->withConnection($this->connectionId)
-                    ->withClientQueryId($this->queryCounter++),
-                sql: $sql,
-                queryUuid: $queryUuid,
-                inlineRows: null,
-            ),
-            $this->quackVersion,
-        );
+        return $this->send(new PrepareRequestMessage(
+            header: MessageHeader::new(MessageType::PrepareRequest)
+                ->withConnection($this->connectionId)
+                ->withClientQueryId($this->queryCounter++),
+            sql: $sql,
+            queryUuid: $queryUuid,
+            inlineRows: null,
+        ));
     }
 
     /**
-     * Starts a FETCH without waiting for its response.
-     *
      * @param list<LogicalType> $resultTypes schema for decoding result chunks
      * @param list<string>      $resultNames column names for decoding result chunks
      */
-    public function beginFetch(
+    public function fetch(
         HugeIntParts $resultUuid,
         int $batchIndex,
         int $ackIndex,
         array $resultTypes = [],
         array $resultNames = [],
-    ): PendingRequest {
+    ): QuackMessage {
         if ($this->closed) {
             throw new ProtocolException('Quack client is not connected');
         }
-        return $this->transport->createRequest(
-            new FetchRequestMessage(
-                header: MessageHeader::new(MessageType::FetchRequest)
-                    ->withConnection($this->connectionId)
-                    ->withClientQueryId($this->queryCounter++),
-                resultUuid: $resultUuid,
-                batchIndex: $batchIndex,
-                ackIndex: $ackIndex,
-            ),
-            $this->quackVersion,
-            $resultTypes,
-            $resultNames,
-        );
+        return $this->send(new FetchRequestMessage(
+            header: MessageHeader::new(MessageType::FetchRequest)
+                ->withConnection($this->connectionId)
+                ->withClientQueryId($this->queryCounter++),
+            resultUuid: $resultUuid,
+            batchIndex: $batchIndex,
+            ackIndex: $ackIndex,
+        ), $resultTypes, $resultNames);
     }
 
     /**
