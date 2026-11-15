@@ -2,7 +2,6 @@
 
 namespace DuckDB\Quack\Transport;
 
-use CurlHandle;
 use DuckDB\Quack\Error\TransportErrorKind;
 use DuckDB\Quack\Exceptions\HttpStatusException;
 use DuckDB\Quack\Exceptions\ProtocolException;
@@ -24,7 +23,6 @@ final class Transport
         private readonly string $authToken,
         private float $timeout,
         private readonly float $connectTimeout,
-        private readonly int $maxConnections,
         private readonly ?string $sslCertificate,
     ) {
     }
@@ -34,7 +32,6 @@ final class Transport
         string $authToken,
         float $connectTimeout,
         float $timeout,
-        int $maxConnections = 1,
         ?string $sslCertificate = null,
     ): self {
         $parsed = UriParser::parseQuackUri($uri);
@@ -49,9 +46,6 @@ final class Transport
         if ($connectTimeout <= 0) {
             throw new ProtocolException('Quack connect timeout must be greater than zero');
         }
-        if ($maxConnections < 1) {
-            throw new ProtocolException('Quack client needs at least one connection');
-        }
 
         return new self(
             rtrim($parsed->baseUrl, '/'),
@@ -59,7 +53,6 @@ final class Transport
             $authToken,
             $timeout,
             $connectTimeout,
-            $maxConnections,
             $sslCertificate,
         );
     }
@@ -79,11 +72,6 @@ final class Transport
         return $this->timeout;
     }
 
-    public function maxConnections(): int
-    {
-        return $this->maxConnections;
-    }
-
     public function withTimeout(float $timeout): self
     {
         $clone = clone $this;
@@ -101,44 +89,18 @@ final class Transport
         array $resultTypes = [],
         array $resultNames = [],
     ): QuackMessage {
-        return $this->createRequest($message, $version, $resultTypes, $resultNames)->wait();
-    }
-
-    /**
-     * Encodes a request and prepares its curl handle without sending it.
-     *
-     * @param list<LogicalType> $resultTypes schema for decoding result chunks
-     * @param list<string>      $resultNames column names for decoding result chunks
-     */
-    public function createRequest(
-        QuackMessage $message,
-        int $version,
-        array $resultTypes = [],
-        array $resultNames = [],
-    ): PendingRequest {
-        $bytes = MessageCodec::encodeMessageForVersion($message, $version);
         $curl = curl_init($this->baseUrl . '/quack');
         if ($curl === false) {
             throw new TransportException(TransportErrorKind::Other, 'failed to initialise curl');
         }
 
-        $headers = [
-            'Accept: application/duckdb',
-            'Content-Type: application/duckdb',
-        ];
-
-        $timeoutMs = (int) max(1, round($this->timeout * 1000));
-        $connectTimeoutMs = (int) max(1, round(
-            min($this->connectTimeout, $this->timeout) * 1000,
-        ));
-
         $options = [
             CURLOPT_POST => true,
-            CURLOPT_POSTFIELDS => $bytes,
+            CURLOPT_POSTFIELDS => MessageCodec::encodeMessageForVersion($message, $version),
             CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_HTTPHEADER => $headers,
-            CURLOPT_TIMEOUT_MS => $timeoutMs,
-            CURLOPT_CONNECTTIMEOUT_MS => $connectTimeoutMs,
+            CURLOPT_HTTPHEADER => ['Accept: application/duckdb', 'Content-Type: application/duckdb'],
+            CURLOPT_TIMEOUT_MS => (int) max(1, round($this->timeout * 1000)),
+            CURLOPT_CONNECTTIMEOUT_MS => (int) max(1, round(min($this->connectTimeout, $this->timeout) * 1000)),
             CURLOPT_PROTOCOLS => CURLPROTO_HTTPS | CURLPROTO_HTTP,
             CURLOPT_REDIR_PROTOCOLS => CURLPROTO_HTTPS,
             CURLOPT_FOLLOWLOCATION => false,
@@ -152,47 +114,39 @@ final class Transport
                 $options[CURLOPT_CAINFO_BLOB] = $this->sslCertificate;
             }
         }
-        self::applyCurlOptions($curl, $options);
-
-        return new PendingRequest(
-            $curl,
-            static function (string $body) use ($curl, $version, $resultTypes, $resultNames): QuackMessage {
-                $status = (int) curl_getinfo($curl, CURLINFO_RESPONSE_CODE);
-
-                if ($status < 200 || $status >= 300) {
-                    $raw = $body;
-                    if (strlen($raw) > 16 * 1024) {
-                        $raw = substr($raw, 0, 16 * 1024);
-                    }
-                    throw new HttpStatusException($status, $raw);
-                }
-
-                $decoded = MessageCodec::decodeMessageForVersion($body, $version, $resultTypes, $resultNames);
-                if ($decoded instanceof ErrorMessage) {
-                    throw new ServerException($decoded->error);
-                }
-                return $decoded;
-            },
-        );
-    }
-
-    /**
-     * Applies curl options one at a time so option value types stay unchecked
-     * by static analysis; curl_setopt_array's stubs are narrower than curl's
-     * actual accepted values.
-     *
-     * @param array<int,mixed> $options
-     */
-    private static function applyCurlOptions(CurlHandle $curl, array $options): void
-    {
+        // Apply options one at a time; curl_setopt_array's stubs are narrower
+        // than the option values curl actually accepts.
         foreach ($options as $option => $value) {
             if (!curl_setopt($curl, $option, $value)) {
                 throw new TransportException(TransportErrorKind::Other, "failed to set curl option {$option}");
             }
         }
+
+        $body = curl_exec($curl);
+        if ($body === false) {
+            $errno = curl_errno($curl);
+            $error = curl_error($curl);
+            throw self::transportError($errno, $error);
+        }
+
+        $status = (int) curl_getinfo($curl, CURLINFO_RESPONSE_CODE);
+
+        if ($status < 200 || $status >= 300) {
+            $raw = (string) $body;
+            if (strlen($raw) > 16 * 1024) {
+                $raw = substr($raw, 0, 16 * 1024);
+            }
+            throw new HttpStatusException($status, $raw);
+        }
+
+        $decoded = MessageCodec::decodeMessageForVersion((string) $body, $version, $resultTypes, $resultNames);
+        if ($decoded instanceof ErrorMessage) {
+            throw new ServerException($decoded->error);
+        }
+        return $decoded;
     }
 
-    public static function transportError(int $errno, string $message): TransportException
+    public static function transportError(int $errno, string $message): TransportException // TODO inline code
     {
         $kind = match (true) {
             $errno === CURLE_OPERATION_TIMEDOUT => TransportErrorKind::Timeout,
