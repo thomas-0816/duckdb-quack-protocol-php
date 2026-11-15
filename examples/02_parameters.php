@@ -8,7 +8,7 @@
  *
  * Raw PHP values are detected automatically:
  *   null -> NULL, bool -> TRUE/FALSE, int -> integer, float -> double,
- *   string -> VARCHAR, sequential array -> LIST, string-keyed array -> STRUCT.
+ *   string -> VARCHAR, array -> JSON text (VARCHAR).
  *
  * Run: php examples/02_parameters.php
  */
@@ -26,7 +26,7 @@ $client = QuackClient::connect(
     300.0,
 );
 
-// Scalars, lists, and structs are detected without wrapping them in Value.
+// Scalars and arrays are detected without wrapping them in Value.
 $params = [41, "can't", [1, 2, 3], ['name' => 'Ada', 'tags' => ['math', 'code']]];
 $sql = SqlFormatter::formatSql(
     'SELECT ? + 1 AS answer, ? AS label, ? AS items, ? AS person, '
@@ -36,7 +36,7 @@ $sql = SqlFormatter::formatSql(
 echo 'formatted positional SQL:', PHP_EOL, $sql, PHP_EOL, PHP_EOL;
 
 $row = $client->fetchOne(
-    'SELECT ? + 1 AS answer, ? AS label, ? AS items',
+    'SELECT ? + 1 AS answer, ? AS label, ?::INTEGER[] AS items',
     [41, "can't", [1, 2, 3]],
 ) ?? [];
 echo 'answer: ';
