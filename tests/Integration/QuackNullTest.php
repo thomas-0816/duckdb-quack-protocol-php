@@ -2,12 +2,7 @@
 
 namespace DuckDB\Quack\Tests\Integration;
 
-use DuckDB\Quack\Chunk\DataChunk;
-use DuckDB\Quack\Messages\PrepareResponseMessage;
 use DuckDB\Quack\QuackClient;
-use DuckDB\Quack\Types\Info\ListTypeInfo;
-use DuckDB\Quack\Types\LogicalType;
-use DuckDB\Quack\Types\LogicalTypeId;
 use PHPUnit\Framework\TestCase;
 
 final class QuackNullTest extends TestCase

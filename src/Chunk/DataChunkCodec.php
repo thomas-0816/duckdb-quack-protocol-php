@@ -452,13 +452,25 @@ final class DataChunkCodec
                 $values[] = null;
                 continue;
             }
+            $isTuple = $logicalType->id === LogicalTypeId::Tuple;
+            $tuple = [];
             $row = [];
             foreach ($children as $childIndex => $child) {
                 $childVector = $childVectors[$childIndex] ?? null;
                 if ($childVector === null) {
                     throw new ProtocolException("STRUCT child {$childIndex} is incomplete");
                 }
-                $row[$child->name] = $childVector->values[$rowIndex] ?? null;
+                $value = $childVector->values[$rowIndex] ?? null;
+                if ($isTuple) {
+                    // TUPLE children are unnamed, so keep them positional.
+                    $tuple[] = $value;
+                } else {
+                    $row[$child->name] = $value;
+                }
+            }
+            if ($isTuple) {
+                $values[] = $tuple;
+                continue;
             }
             $values[] = self::logicalStructToPhp($logicalType, $row);
         }
