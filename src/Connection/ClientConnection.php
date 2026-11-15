@@ -3,9 +3,7 @@
 namespace DuckDB\Quack\Connection;
 
 use DuckDB\Quack\Error\QuackError;
-use DuckDB\Quack\Exceptions\HttpStatusException;
 use DuckDB\Quack\Exceptions\ProtocolException;
-use DuckDB\Quack\Exceptions\ServerException;
 use DuckDB\Quack\Messages\ConnectionRequestMessage;
 use DuckDB\Quack\Messages\ConnectionResponseMessage;
 use DuckDB\Quack\Messages\DisconnectMessage;
@@ -14,6 +12,7 @@ use DuckDB\Quack\Messages\MessageHeader;
 use DuckDB\Quack\Messages\MessageType;
 use DuckDB\Quack\Messages\PrepareRequestMessage;
 use DuckDB\Quack\Messages\QuackMessage;
+use DuckDB\Quack\Transport\PendingRequest;
 use DuckDB\Quack\Transport\Transport;
 use DuckDB\Quack\Types\HugeIntParts;
 use DuckDB\Quack\Types\LogicalType;
@@ -26,6 +25,8 @@ use DuckDB\Quack\Types\LogicalType;
  */
 final class ClientConnection
 {
+    private const QUACK_VERSION = 3;
+
     private int $queryCounter = 1;
 
     private int $queryUuidCounter = 1;
@@ -43,18 +44,17 @@ final class ClientConnection
 
     public static function connect(Transport $transport): self
     {
-        $quackVersion = 3;
-        $response = $transport->send(
+        $response = $transport->createRequest(
             new ConnectionRequestMessage(
                 header: MessageHeader::new(MessageType::ConnectionRequest),
                 authString: $transport->authToken(),
                 clientPlatform: 'quack-php',
-                minSupportedQuackVersion: $quackVersion,
-                maxSupportedQuackVersion: $quackVersion,
+                minSupportedQuackVersion: self::QUACK_VERSION,
+                maxSupportedQuackVersion: self::QUACK_VERSION,
                 heartbeatTimeoutSeconds: (int) ceil($transport->timeout()),
             ),
-            $quackVersion,
-        );
+            self::QUACK_VERSION,
+        )->wait();
 
         if (!$response instanceof ConnectionResponseMessage) {
             throw new ProtocolException('expected CONNECTION_RESPONSE, got ' . $response->messageType()->name);
@@ -63,9 +63,9 @@ final class ClientConnection
         if ($connectionId === null || $connectionId === '') {
             throw new ProtocolException('CONNECTION_RESPONSE did not include a connection id');
         }
-        if ($response->quackVersion !== $quackVersion) {
+        if ($response->quackVersion !== self::QUACK_VERSION) {
             $selected = $response->quackVersion === null ? 'none' : (string) $response->quackVersion;
-            throw new ProtocolException("server selected Quack protocol version {$selected}, expected {$quackVersion}");
+            throw new ProtocolException("server selected Quack protocol version {$selected}, expected " . self::QUACK_VERSION);
         }
 
         return new self(
@@ -73,7 +73,7 @@ final class ClientConnection
             $connectionId,
             $response->serverDuckdbVersion,
             $response->serverPlatform,
-            $quackVersion,
+            self::QUACK_VERSION,
         );
     }
 
@@ -111,7 +111,9 @@ final class ClientConnection
         array $resultTypes = [],
         array $resultNames = [],
     ): QuackMessage {
-        $this->ensureOpen();
+        if ($this->closed) {
+            throw new ProtocolException('Quack client is not connected');
+        }
         return $this->transport->send(
             $message,
             $this->quackVersion,
@@ -120,36 +122,57 @@ final class ClientConnection
         );
     }
 
-    public function prepare(string $sql): QuackMessage
+    /**
+     * Starts a PREPARE without waiting for its response.
+     */
+    public function beginPrepare(string $sql): PendingRequest
     {
-        $this->ensureOpen();
+        if ($this->closed) {
+            throw new ProtocolException('Quack client is not connected');
+        }
         $queryUuid = new HugeIntParts(0, $this->queryUuidCounter++);
-        return $this->send(new PrepareRequestMessage(
-            header: $this->scopedHeader(MessageType::PrepareRequest),
-            sql: $sql,
-            queryUuid: $queryUuid,
-            inlineRows: null,
-        ));
+        return $this->transport->createRequest(
+            new PrepareRequestMessage(
+                header: MessageHeader::new(MessageType::PrepareRequest)
+                    ->withConnection($this->connectionId)
+                    ->withClientQueryId($this->queryCounter++),
+                sql: $sql,
+                queryUuid: $queryUuid,
+                inlineRows: null,
+            ),
+            $this->quackVersion,
+        );
     }
 
     /**
+     * Starts a FETCH without waiting for its response.
+     *
      * @param list<LogicalType> $resultTypes schema for decoding result chunks
      * @param list<string>      $resultNames column names for decoding result chunks
      */
-    public function fetch(
+    public function beginFetch(
         HugeIntParts $resultUuid,
         int $batchIndex,
         int $ackIndex,
         array $resultTypes = [],
         array $resultNames = [],
-    ): QuackMessage {
-        $this->ensureOpen();
-        return $this->send(new FetchRequestMessage(
-            header: $this->scopedHeader(MessageType::FetchRequest),
-            resultUuid: $resultUuid,
-            batchIndex: $batchIndex,
-            ackIndex: $ackIndex,
-        ), $resultTypes, $resultNames);
+    ): PendingRequest {
+        if ($this->closed) {
+            throw new ProtocolException('Quack client is not connected');
+        }
+        return $this->transport->createRequest(
+            new FetchRequestMessage(
+                header: MessageHeader::new(MessageType::FetchRequest)
+                    ->withConnection($this->connectionId)
+                    ->withClientQueryId($this->queryCounter++),
+                resultUuid: $resultUuid,
+                batchIndex: $batchIndex,
+                ackIndex: $ackIndex,
+            ),
+            $this->quackVersion,
+            $resultTypes,
+            $resultNames,
+        );
     }
 
     /**
@@ -161,7 +184,9 @@ final class ClientConnection
             return;
         }
         $message = new DisconnectMessage(
-            $this->scopedHeader(MessageType::DisconnectMessage),
+            MessageHeader::new(MessageType::DisconnectMessage)
+                ->withConnection($this->connectionId)
+                ->withClientQueryId($this->queryCounter++),
         );
         try {
             $this->transport->withTimeout(10.0)->send($message, $this->quackVersion);
@@ -170,49 +195,5 @@ final class ClientConnection
         } finally {
             $this->closed = true;
         }
-    }
-
-    public function protocolFailure(string $message): ProtocolException
-    {
-        return new ProtocolException($message);
-    }
-
-    private function scopedHeader(MessageType $messageType): MessageHeader
-    {
-        return MessageHeader::new($messageType)
-            ->withConnection($this->connectionId)
-            ->withClientQueryId($this->queryCounter++);
-    }
-
-    private function ensureOpen(): void
-    {
-        if ($this->closed) {
-            throw new ProtocolException('Quack client is not connected');
-        }
-    }
-
-    /**
-     * Whether an error means the server probably does not understand the
-     * protocol version that was attempted, so a lower version may work.
-     */
-    public static function isVersionNegotiationError(QuackError $error): bool
-    {
-        if ($error instanceof HttpStatusException) {
-            return $error->status() === 500;
-        }
-        $message = match (true) {
-            $error instanceof ProtocolException => $error->getMessage(),
-            $error instanceof ServerException => $error->serverError()->message(),
-            default => null,
-        };
-        if ($message === null) {
-            return false;
-        }
-        $message = strtolower($message);
-        return str_contains($message, 'quack version')
-            || str_contains($message, 'protocol version')
-            || str_contains($message, 'deserialize')
-            || str_contains($message, 'end of object')
-            || str_contains($message, 'unexpected field');
     }
 }
