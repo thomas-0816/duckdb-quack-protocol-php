@@ -38,10 +38,12 @@ final class SqlParameter
     /**
      * Detects the DuckDB type of an arbitrary PHP value.
      *
-     * Sequential arrays become LIST parameters and string-keyed arrays become
-     * STRUCT parameters. Scalars map to their natural DuckDB types, enums map
-     * to their backing value or name, resources map to BLOB, Stringable objects
+     * Sequential and string-keyed arrays are JSON-encoded to VARCHAR
+     * parameters. Scalars map to their natural DuckDB types, enums map to
+     * their backing value or name, resources map to BLOB, Stringable objects
      * map to VARCHAR, and other objects are JSON-encoded to VARCHAR.
+     *
+     * Use {@see self::list()} to force a DuckDB LIST literal instead.
      */
     public static function fromPhp(mixed $value): self
     {
@@ -50,57 +52,17 @@ final class SqlParameter
         }
 
         if (is_array($value)) {
-            if (array_is_list($value)) {
-                $items = [];
-                foreach ($value as $item) {
-                    $items[] = self::fromPhp($item);
-                }
-
-                return self::list($items);
+            try {
+                return self::value(Value::string(json_encode($value, JSON_THROW_ON_ERROR)));
+            } catch (\JsonException $error) {
+                throw new ProtocolException(
+                    'could not JSON-encode SQL array parameter',
+                    previous: $error,
+                );
             }
-
-            $fields = [];
-            foreach ($value as $name => $item) {
-                if (!is_string($name)) {
-                    throw new ProtocolException('STRUCT parameter keys must be strings');
-                }
-                $fields[$name] = self::toValue($item);
-            }
-
-            return self::value(Value::struct($fields));
         }
 
-        return self::value(self::toValue($value));
-    }
-
-    /**
-     * Converts an arbitrary PHP value, including nested arrays, into a Value.
-     */
-    private static function toValue(mixed $value): Value
-    {
-        if ($value instanceof Value) {
-            return $value;
-        }
-        if (is_array($value)) {
-            if (array_is_list($value)) {
-                return Value::list(array_map(
-                    static fn (mixed $item): Value => self::toValue($item),
-                    $value,
-                ));
-            }
-
-            $fields = [];
-            foreach ($value as $name => $item) {
-                if (!is_string($name)) {
-                    throw new ProtocolException('STRUCT parameter keys must be strings');
-                }
-                $fields[$name] = self::toValue($item);
-            }
-
-            return Value::struct($fields);
-        }
-
-        return self::valueFromPhp($value);
+        return self::value(self::valueFromPhp($value));
     }
 
     private static function valueFromPhp(mixed $value): Value

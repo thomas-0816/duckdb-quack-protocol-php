@@ -121,18 +121,18 @@ final class SqlFormatterTest extends TestCase
         );
     }
 
-    public function testDetectsSequentialArraysAsLists(): void
+    public function testJsonEncodesSequentialArrays(): void
     {
         self::assertSame(
-            'SELECT [1, 2, 3] AS value',
+            "SELECT '[1,2,3]' AS value",
             SqlFormatter::formatSql('SELECT ? AS value', [[1, 2, 3]]),
         );
     }
 
-    public function testDetectsStringKeyedArraysAsStructs(): void
+    public function testJsonEncodesStringKeyedArrays(): void
     {
         self::assertSame(
-            "SELECT {'name': 'Ada', 'tags': ['math', 'code']} AS value",
+            'SELECT \'{"name":"Ada","tags":["math","code"]}\' AS value',
             SqlFormatter::formatSql(
                 'SELECT ? AS value',
                 [['name' => 'Ada', 'tags' => ['math', 'code']]],
