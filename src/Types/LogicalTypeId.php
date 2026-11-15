@@ -36,6 +36,7 @@ enum LogicalTypeId: int
     case UInteger = 30;
     case UBigInt = 31;
     case TimestampTz = 32;
+    case TimestampTzNs = 33;
     case TimeTz = 34;
     case TimeNs = 35;
     case Bit = 36;
@@ -58,6 +59,7 @@ enum LogicalTypeId: int
     case Union = 107;
     case Array = 108;
     case Variant = 109;
+    case Tuple = 110;
 
     public static function fromId(int $value): self
     {
