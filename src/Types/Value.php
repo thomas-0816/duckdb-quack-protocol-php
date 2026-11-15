@@ -162,8 +162,29 @@ final class Value
         if ($type !== null && $type->id === LogicalTypeId::Map && $this->kind === self::LIST) {
             return self::mapToPhp($this->asList(), $type);
         }
-        if ($type !== null && self::isJsonType($type) && $this->kind === self::STRING) {
-            return self::jsonToPhp($this->asString());
+        if ($type !== null
+            && $type->id === LogicalTypeId::Varchar
+            && strcasecmp($type->alias() ?? '', 'JSON') === 0
+            && $this->kind === self::STRING) {
+            $json = $this->asString();
+            try {
+                return json_decode(
+                    $json,
+                    true,
+                    512,
+                    JSON_THROW_ON_ERROR | JSON_BIGINT_AS_STRING,
+                );
+            } catch (\JsonException $error) {
+                // DuckDB writes non-finite doubles as bare tokens, which are
+                // not valid JSON but are returned verbatim by PDO_duckdb.
+                $token = trim($json);
+                if ($token === 'NaN' || $token === 'Infinity' || $token === '-Infinity') {
+                    return $token;
+                }
+                throw new ProtocolException(
+                    'invalid JSON value: ' . $error->getMessage(),
+                );
+            }
         }
         if ($type !== null && $type->id === LogicalTypeId::Union && $this->kind === self::STRUCT) {
             return self::unionToPhp($this->asStruct(), $type);
@@ -436,34 +457,6 @@ final class Value
             LogicalTypeId::List, LogicalTypeId::Array => LogicalTypeCodec::getChildType($type),
             default => null,
         };
-    }
-
-    private static function isJsonType(LogicalType $type): bool
-    {
-        return $type->id === LogicalTypeId::Varchar
-            && strcasecmp($type->alias() ?? '', 'JSON') === 0;
-    }
-
-    private static function jsonToPhp(string $json): mixed
-    {
-        try {
-            return json_decode(
-                $json,
-                true,
-                512,
-                JSON_THROW_ON_ERROR | JSON_BIGINT_AS_STRING,
-            );
-        } catch (\JsonException $error) {
-            // DuckDB writes non-finite doubles as bare tokens, which are not
-            // valid JSON but are returned verbatim by PDO_duckdb.
-            $token = trim($json);
-            if ($token === 'NaN' || $token === 'Infinity' || $token === '-Infinity') {
-                return $token;
-            }
-            throw new ProtocolException(
-                'invalid JSON value: ' . $error->getMessage(),
-            );
-        }
     }
 
     /**
