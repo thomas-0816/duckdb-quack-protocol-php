@@ -149,18 +149,25 @@ final class QuackRowTest extends TestCase
     {
         $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 10, 300);
 
-        $this->assertServerError($client, "SELECT struct_extract(row(), 'a')", 'Can\'t extract something from an empty struct');
-        $this->assertServerError($client, 'SELECT row()[1]', 'Can\'t extract something from an empty struct');
-        $this->assertServerError($client, 'SELECT unnest(row())', 'UNNEST of an empty struct is not supported');
-    }
-
-    private function assertServerError(QuackClient $client, string $sql, string $message): void // TODO inline code
-    {
         try {
-            $client->fetchAll($sql);
+            $client->fetchAll("SELECT struct_extract(row(), 'a')");
             self::fail('expected the query to fail');
         } catch (ServerException $e) {
-            self::assertStringContainsString($message, $e->getMessage());
+            self::assertStringContainsString('Can\'t extract something from an empty struct', $e->getMessage());
+        }
+
+        try {
+            $client->fetchAll('SELECT row()[1]');
+            self::fail('expected the query to fail');
+        } catch (ServerException $e) {
+            self::assertStringContainsString('Can\'t extract something from an empty struct', $e->getMessage());
+        }
+
+        try {
+            $client->fetchAll('SELECT unnest(row())');
+            self::fail('expected the query to fail');
+        } catch (ServerException $e) {
+            self::assertStringContainsString('UNNEST of an empty struct is not supported', $e->getMessage());
         }
     }
 }
