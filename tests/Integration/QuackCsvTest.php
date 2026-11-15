@@ -87,7 +87,7 @@ final class QuackCsvTest extends TestCase
                         'extra' => null,
                     ],
                 ],
-                $client->fetchAll('SHOW test_csv'),
+                $client->fetchAll('DESCRIBE test_csv'),
             );
         } finally {
             unlink($csvFile);
