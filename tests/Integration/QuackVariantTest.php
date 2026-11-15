@@ -98,6 +98,8 @@ final class QuackVariantTest extends TestCase
 
     public function testVariantTimestampsInUtc(): void
     {
+        date_default_timezone_set('UTC');
+
         $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 10);
         $client->execute("SET TimeZone = 'UTC'");
         $client->execute('CREATE TEMP TABLE variant_values (v2 VARIANT)');
@@ -117,6 +119,8 @@ final class QuackVariantTest extends TestCase
 
     public function testVariantTimestampsUseUtcRegardlessOfSessionTimezone(): void
     {
+        date_default_timezone_set('Europe/Berlin');
+
         $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 10);
         $client->execute("SET TimeZone = 'Europe/Berlin'");
         $client->execute('CREATE TEMP TABLE variant_values (v3 VARIANT)');
