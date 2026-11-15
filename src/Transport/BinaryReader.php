@@ -275,12 +275,18 @@ final class BinaryReader
 
     public function readFixedI64(): int
     {
-        return BigInt::fromBytesLE($this->readBytes(8), true)->toInt();
+        // 'P' reads a little-endian unsigned 64-bit integer. PHP integers are
+        // signed 64-bit, so the two's-complement bits already carry the signed
+        // value.
+        return $this->unpackInt('P', 8);
     }
 
     public function readFixedU64(): int|string
     {
-        return BigInt::fromBytesLE($this->readBytes(8), false)->toIntOrString();
+        $value = $this->unpackInt('P', 8);
+        // Values above PHP_INT_MAX are represented as negative integers by
+        // unpack(); '%u' formats the underlying unsigned 64-bit value.
+        return $value >= 0 ? $value : sprintf('%u', $value);
     }
 
     public function readFixedF32(): float
