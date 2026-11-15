@@ -39,10 +39,7 @@ final class QuackClientTest extends TestCase
             ),
         );
 
-        $row = $client->fetchOne(
-            'SELECT ? + 1 AS answer, ? AS label, ? AS list_value',
-            [41, "can't", [1, 2, 3]],
-        ) ?? self::fail('expected a row');
+        $row = $client->fetchOne('SELECT ? + 1 AS answer, ? AS label, ?::INTEGER[] AS list_value', [41, "can't", [1, 2, 3]]) ?? self::fail('expected a row');
         self::assertSame(42, $row['answer']);
         self::assertSame("can't", $row['label']);
         self::assertSame([1, 2, 3], $row['list_value']);
