@@ -9,7 +9,7 @@ final class QuackNullTest extends TestCase
 {
     public function testNullColumnTypesAndValues(): void
     {
-        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 10, 300);
+        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 10);
 
         $sql = <<<'SQL'
             SELECT
@@ -77,7 +77,7 @@ final class QuackNullTest extends TestCase
 
     public function testNullUnion(): void
     {
-        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 10, 300);
+        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 10);
 
         $sql = 'select null::varchar union select null::integer[] union select null::struct(i1 integer)';
         self::assertSame(
@@ -88,7 +88,7 @@ final class QuackNullTest extends TestCase
 
     public function testNullJson(): void
     {
-        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 10, 300);
+        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 10);
 
         $sql = "select 'null'::JSON, NULL::JSON";
         self::assertSame(

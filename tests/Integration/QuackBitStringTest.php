@@ -9,7 +9,7 @@ final class QuackBitStringTest extends TestCase
 {
     public function testBitValues(): void
     {
-        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 10, 300);
+        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 10);
 
         self::assertSame(
             [
@@ -29,7 +29,7 @@ final class QuackBitStringTest extends TestCase
 
     public function testBitCount(): void
     {
-        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 10, 300);
+        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 10);
 
         self::assertSame(
             [['bitcount' => 3]],
@@ -39,7 +39,7 @@ final class QuackBitStringTest extends TestCase
 
     public function testBitConcat(): void
     {
-        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 10, 300);
+        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 10);
 
         self::assertSame(
             [['concat' => '1010101011110000']],
@@ -51,7 +51,7 @@ final class QuackBitStringTest extends TestCase
 
     public function testBitTable(): void
     {
-        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 10, 300);
+        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 10);
 
         $client->execute('CREATE TEMP TABLE bit_table (id INTEGER, b BIT)');
         $client->execute(

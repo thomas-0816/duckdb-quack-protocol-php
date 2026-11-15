@@ -9,7 +9,7 @@ final class QuackEnumTest extends TestCase
 {
     public function testEnumType(): void
     {
-        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 10, 300);
+        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 10);
 
         $client->execute('DROP TYPE IF EXISTS mood');
         $client->execute("CREATE TYPE mood AS ENUM ('sad', 'ok', 'happy')");
@@ -28,7 +28,7 @@ final class QuackEnumTest extends TestCase
 
     public function testEnumTable(): void
     {
-        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 10, 300);
+        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 10);
 
         $client->execute('DROP TYPE IF EXISTS mood');
         $client->execute("CREATE TYPE mood AS ENUM ('sad', 'ok', 'happy')");
@@ -47,7 +47,7 @@ final class QuackEnumTest extends TestCase
 
     public function testInlineEnum(): void
     {
-        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 10, 300);
+        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 10);
 
         self::assertSame(
             [
@@ -61,7 +61,7 @@ final class QuackEnumTest extends TestCase
 
     public function testEnumUnnest(): void
     {
-        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 10, 300);
+        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 10);
 
         $client->execute('DROP TYPE IF EXISTS priority');
         $client->execute("CREATE TYPE priority AS ENUM ('low', 'medium', 'high')");

@@ -10,7 +10,7 @@ final class QuackRowTest extends TestCase
 {
     public function testRowAndStructPack(): void
     {
-        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 10, 300);
+        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 10);
 
         self::assertSame(
             [
@@ -31,7 +31,7 @@ final class QuackRowTest extends TestCase
 
     public function testRowEquality(): void
     {
-        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 10, 300);
+        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 10);
 
         self::assertSame(
             [['("row"() = "row"())' => true, '("row"() IS NOT DISTINCT FROM "row"())' => true]],
@@ -41,7 +41,7 @@ final class QuackRowTest extends TestCase
 
     public function testNestedRow(): void
     {
-        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 10, 300);
+        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 10);
 
         self::assertSame(
             [
@@ -57,7 +57,7 @@ final class QuackRowTest extends TestCase
 
     public function testRowTable(): void
     {
-        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 10, 300);
+        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 10);
 
         $client->execute('CREATE TEMP TABLE quack_row_test(i INTEGER, s STRUCT)');
         $client->execute('INSERT INTO quack_row_test VALUES (1, row()), (2, NULL)');
@@ -86,7 +86,7 @@ final class QuackRowTest extends TestCase
 
     public function testStructConcat(): void
     {
-        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 10, 300);
+        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 10);
 
         self::assertSame(
             [['struct_concat("row"(), "row"(1, 2))' => [1, 2]]],
@@ -96,7 +96,7 @@ final class QuackRowTest extends TestCase
 
     public function testStructContains(): void
     {
-        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 10, 300);
+        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 10);
 
         self::assertSame(
             [['struct_contains("row"(), \'a\')' => false, 'struct_contains("row"(), 5)' => false]],
@@ -106,7 +106,7 @@ final class QuackRowTest extends TestCase
 
     public function testStructConcatEmpty(): void
     {
-        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 10, 300);
+        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 10);
 
         self::assertSame(
             [
@@ -122,7 +122,7 @@ final class QuackRowTest extends TestCase
 
     public function testStructExtract(): void
     {
-        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 10, 300);
+        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 10);
 
         self::assertSame(
             [['struct_extract(struct_pack(a := 1), \'a\')' => 1]],
@@ -132,7 +132,7 @@ final class QuackRowTest extends TestCase
 
     public function testUnnestRow(): void
     {
-        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 10, 300);
+        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 10);
 
         self::assertSame(
             [['element1' => 1, 'element2' => 2]],
@@ -147,7 +147,7 @@ final class QuackRowTest extends TestCase
 
     public function testEmptyRowErrors(): void
     {
-        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 10, 300);
+        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 10);
 
         try {
             $client->fetchAll("SELECT struct_extract(row(), 'a')");

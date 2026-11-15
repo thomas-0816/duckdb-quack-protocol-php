@@ -9,7 +9,7 @@ final class QuackStructTest extends TestCase
 {
     public function testStructPackAndLiterals(): void
     {
-        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 10, 300);
+        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 10);
 
         self::assertSame(
             [['s' => ['key1' => 'value1', 'key2' => 42]]],
@@ -29,7 +29,7 @@ final class QuackStructTest extends TestCase
 
     public function testStructValues(): void
     {
-        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 10, 300);
+        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 10);
 
         self::assertSame(
             [['s' => ['x' => 1, 'y' => 2, 'z' => 3]]],
@@ -67,7 +67,7 @@ final class QuackStructTest extends TestCase
 
     public function testStructUpdateAndExtract(): void
     {
-        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 10, 300);
+        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 10);
 
         self::assertSame(
             [['s' => ['a' => 1, 'b' => 3, 'c' => 4]]],
@@ -97,7 +97,7 @@ final class QuackStructTest extends TestCase
 
     public function testUnnestAndExclude(): void
     {
-        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 10, 300);
+        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 10);
 
         self::assertSame(
             [['x' => 1, 'y' => 2, 'z' => 3]],
@@ -117,7 +117,7 @@ final class QuackStructTest extends TestCase
 
     public function testRowAndTuple(): void
     {
-        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 10, 300);
+        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 10);
 
         self::assertSame(
             [['a' => [1, 2, 'a']]],
@@ -132,7 +132,7 @@ final class QuackStructTest extends TestCase
 
     public function testStructComparison(): void
     {
-        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 10, 300);
+        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 10);
 
         self::assertSame(
             [['(struct_pack(k1 := 1, k2 := 0) < struct_pack(k1 := 0, k2 := 1))' => false]],
@@ -147,7 +147,7 @@ final class QuackStructTest extends TestCase
 
     public function testStructWithMaps(): void
     {
-        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 10, 300);
+        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 10);
 
         self::assertSame(
             [['struct' => ['test' => [[1 => 42.1, 5 => 45.0], [1 => 42.1, 5 => 45.0]]]]],
@@ -157,7 +157,7 @@ final class QuackStructTest extends TestCase
 
     public function testStructTable(): void
     {
-        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 10, 300);
+        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 10);
 
         $client->execute('CREATE TEMP TABLE quack_struct_test (s STRUCT(v VARCHAR, i INTEGER, a VARCHAR[], j JSON))');
         $client->execute('INSERT INTO quack_struct_test VALUES (?)', [[
@@ -184,7 +184,7 @@ final class QuackStructTest extends TestCase
 
     public function testNestedVariantJson(): void
     {
-        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 10, 300);
+        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 10);
 
         $values = $client->fetchColumn('SELECT {a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:(1, 42.21, null, {a: null})::variant}}}}}}}}}}}} as a');
         self::assertSame(

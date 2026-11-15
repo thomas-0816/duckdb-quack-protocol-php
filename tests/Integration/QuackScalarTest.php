@@ -9,7 +9,7 @@ final class QuackScalarTest extends TestCase
 {
     public function testScalarValues(): void
     {
-        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 10, 300);
+        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 10);
 
         self::assertSame(
             [
@@ -27,7 +27,7 @@ final class QuackScalarTest extends TestCase
 
     public function testNullComparison(): void
     {
-        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 10, 300);
+        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 10);
 
         self::assertSame(
             [['(NULL = NULL)' => null]],
@@ -37,7 +37,7 @@ final class QuackScalarTest extends TestCase
 
     public function testTypeValues(): void
     {
-        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 10, 300);
+        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 10);
 
         self::assertSame(
             [

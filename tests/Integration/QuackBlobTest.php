@@ -9,7 +9,7 @@ final class QuackBlobTest extends TestCase
 {
     public function testBlobValues(): void
     {
-        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 10, 300);
+        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 10);
 
         self::assertSame(
             "\xAA",

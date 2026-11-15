@@ -9,7 +9,7 @@ final class QuackTypesTest extends TestCase
 {
     public function testUserDefinedStructAndListTypes(): void
     {
-        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 10, 300);
+        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 10);
         $client->beginTransaction();
 
         $client->execute("CREATE TYPE Person AS STRUCT(id INTEGER, name VARCHAR)");

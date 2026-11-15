@@ -9,7 +9,7 @@ final class QuackIntervalTest extends TestCase
 {
     public function testIntervalLiterals(): void
     {
-        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 10, 300);
+        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 10);
 
         self::assertSame(
             [
@@ -29,7 +29,7 @@ final class QuackIntervalTest extends TestCase
 
     public function testIntervalYears(): void
     {
-        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 10, 300);
+        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 10);
 
         self::assertSame(
             [['to_years(CAST(trunc(CAST(\'1.5\' AS DOUBLE)) AS INTEGER))' => '1 year']],
@@ -39,7 +39,7 @@ final class QuackIntervalTest extends TestCase
 
     public function testIntervalMonthAddition(): void
     {
-        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 10, 300);
+        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 10);
 
         self::assertSame(
             [['i' => '2000-01-01 00:00:00'], ['i' => '2000-02-01 00:00:00']],
@@ -49,7 +49,7 @@ final class QuackIntervalTest extends TestCase
 
     public function testDatePart(): void
     {
-        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 10, 300);
+        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 10);
 
         self::assertSame(
             [
@@ -68,7 +68,7 @@ final class QuackIntervalTest extends TestCase
 
     public function testDateArithmetic(): void
     {
-        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 10, 300);
+        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 10);
 
         self::assertSame(
             [
@@ -86,7 +86,7 @@ final class QuackIntervalTest extends TestCase
 
     public function testIntervalDifference(): void
     {
-        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 10, 300);
+        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 10);
 
         self::assertSame(
             [

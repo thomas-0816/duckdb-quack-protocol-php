@@ -9,7 +9,7 @@ final class QuackArrayTest extends TestCase
 {
     public function testArrayValue(): void
     {
-        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 10, 300);
+        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 10);
 
         self::assertSame(
             [['aa' => [1, 2, 3]]],
@@ -19,7 +19,7 @@ final class QuackArrayTest extends TestCase
 
     public function testArrayIndex(): void
     {
-        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 10, 300);
+        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 10);
 
         self::assertSame(
             [['aa' => 2]],
@@ -29,7 +29,7 @@ final class QuackArrayTest extends TestCase
 
     public function testArrayLiteral(): void
     {
-        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 10, 300);
+        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 10);
 
         self::assertSame(
             [['aa' => [3, 2, 1]]],
@@ -39,7 +39,7 @@ final class QuackArrayTest extends TestCase
 
     public function testNestedArrays(): void
     {
-        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 10, 300);
+        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 10);
 
         self::assertSame(
             [['aa' => [[1, 2], [3, 4], [5, 6]]]],
@@ -51,7 +51,7 @@ final class QuackArrayTest extends TestCase
 
     public function testArrayOfStructs(): void
     {
-        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 10, 300);
+        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 10);
 
         self::assertSame(
             [
@@ -70,7 +70,7 @@ final class QuackArrayTest extends TestCase
 
     public function testArrayTable(): void
     {
-        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 10, 300);
+        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 10);
 
         $client->execute('CREATE TEMP TABLE array_table (id INTEGER, arr INTEGER[3])');
         $client->execute(
@@ -104,7 +104,7 @@ final class QuackArrayTest extends TestCase
 
     public function testFloatArrays(): void
     {
-        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 10, 300);
+        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 10);
 
         $client->execute('CREATE TEMP TABLE x (i INTEGER, v FLOAT[3])');
         $client->execute('CREATE TEMP TABLE y (i INTEGER, v FLOAT[3])');
@@ -128,7 +128,7 @@ final class QuackArrayTest extends TestCase
 
     public function testHnswIndex(): void
     {
-        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 10, 300);
+        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 10);
 
         $client->execute('INSTALL vss; LOAD vss');
         $client->execute(
@@ -150,10 +150,9 @@ final class QuackArrayTest extends TestCase
 
     public function testNestedVariantArray(): void
     {
-        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 10, 300);
+        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 10);
 
         $expected = [[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[['foo' => 42]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]];
-
         self::assertSame(
             $expected,
             $client->fetchValue(

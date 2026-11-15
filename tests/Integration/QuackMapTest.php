@@ -9,7 +9,7 @@ final class QuackMapTest extends TestCase
 {
     public function testMapLiteral(): void
     {
-        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 10, 300);
+        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 10);
 
         self::assertSame(
             [
@@ -27,7 +27,7 @@ final class QuackMapTest extends TestCase
 
     public function testMapFromEntries(): void
     {
-        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 10, 300);
+        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 10);
 
         self::assertSame(
             [
@@ -45,7 +45,7 @@ final class QuackMapTest extends TestCase
 
     public function testMapFunction(): void
     {
-        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 10, 300);
+        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 10);
 
         self::assertSame(
             [
@@ -63,7 +63,7 @@ final class QuackMapTest extends TestCase
 
     public function testMapNumericKeys(): void
     {
-        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 10, 300);
+        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 10);
 
         self::assertSame(
             [
@@ -80,7 +80,7 @@ final class QuackMapTest extends TestCase
 
     public function testMapListKeys(): void
     {
-        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 10, 300);
+        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 10);
 
         self::assertSame(
             [
@@ -97,7 +97,7 @@ final class QuackMapTest extends TestCase
 
     public function testMapLookup(): void
     {
-        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 10, 300);
+        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 10);
 
         self::assertSame(
             [
@@ -111,7 +111,7 @@ final class QuackMapTest extends TestCase
 
     public function testMapMissingLookup(): void
     {
-        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 10, 300);
+        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 10);
 
         self::assertSame(
             [
@@ -125,7 +125,7 @@ final class QuackMapTest extends TestCase
 
     public function testMapExtract(): void
     {
-        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 10, 300);
+        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 10);
 
         self::assertSame(
             [
@@ -139,7 +139,7 @@ final class QuackMapTest extends TestCase
 
     public function testMapListKey(): void
     {
-        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 10, 300);
+        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 10);
 
         self::assertSame(
             [
@@ -155,7 +155,7 @@ final class QuackMapTest extends TestCase
 
     public function testMapNestedListKey(): void
     {
-        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 10, 300);
+        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 10);
 
         self::assertSame(
             [
@@ -171,7 +171,7 @@ final class QuackMapTest extends TestCase
 
     public function testMapListKeyAndValue(): void
     {
-        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 10, 300);
+        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 10);
 
         self::assertSame(
             [
@@ -187,7 +187,7 @@ final class QuackMapTest extends TestCase
 
     public function testMapNullListKey(): void
     {
-        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 10, 300);
+        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 10);
 
         self::assertSame(
             [
@@ -203,7 +203,7 @@ final class QuackMapTest extends TestCase
 
     public function testMapNulBytes(): void
     {
-        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 10, 300);
+        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 10);
 
         self::assertSame(
             '[{"\"map\"(list_value(((\'a\' || chr(0)) || \'b\')), list_value(((\'c\' || chr(0)) || \'d\')))":{"a\u0000b":"c\u0000d"}}]',

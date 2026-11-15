@@ -9,7 +9,7 @@ final class QuackUnicodeTest extends TestCase
 {
     public function testUnicodeInsert(): void
     {
-        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 10, 300);
+        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 10);
 
         $client->execute('CREATE TEMP TABLE unicode_test (id INTEGER, latin VARCHAR, mb4 VARCHAR)');
         $client->execute(
@@ -31,7 +31,7 @@ final class QuackUnicodeTest extends TestCase
 
     public function testUnicodeLiterals(): void
     {
-        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 10, 300);
+        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 10);
 
         self::assertSame(
             [
@@ -50,7 +50,7 @@ final class QuackUnicodeTest extends TestCase
 
     public function testUnicodeMultipleRows(): void
     {
-        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 10, 300);
+        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 10);
 
         $client->execute('CREATE TEMP TABLE unicode_test (id INTEGER, latin VARCHAR, mb4 VARCHAR)');
         $client->execute(
@@ -81,7 +81,7 @@ final class QuackUnicodeTest extends TestCase
 
     public function testQuotedUnicode(): void
     {
-        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 10, 300);
+        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 10);
 
         $client->execute('CREATE TEMP TABLE unicode_test (c VARCHAR)');
 

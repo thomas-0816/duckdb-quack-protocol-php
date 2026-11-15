@@ -9,7 +9,7 @@ final class QuackListTest extends TestCase
 {
     public function testIntegerList(): void
     {
-        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 10, 300);
+        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 10);
 
         self::assertSame(
             [['list_value(1, 2, 3)' => [1, 2, 3]]],
@@ -19,7 +19,7 @@ final class QuackListTest extends TestCase
 
     public function testStringListWithNull(): void
     {
-        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 10, 300);
+        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 10);
 
         self::assertSame(
             [
@@ -38,7 +38,7 @@ final class QuackListTest extends TestCase
 
     public function testNestedLists(): void
     {
-        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 10, 300);
+        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 10);
 
         self::assertSame(
             [
@@ -57,7 +57,7 @@ final class QuackListTest extends TestCase
 
     public function testListValue(): void
     {
-        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 10, 300);
+        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 10);
 
         self::assertSame(
             [['list_value(1, 2, 3)' => [1, 2, 3]]],
@@ -67,7 +67,7 @@ final class QuackListTest extends TestCase
 
     public function testListSlice(): void
     {
-        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 10, 300);
+        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 10);
 
         self::assertSame(
             [["list_value('a', 'b', 'c')[1:2]" => ['a', 'b']]],
@@ -77,7 +77,7 @@ final class QuackListTest extends TestCase
 
     public function testListSliceFunction(): void
     {
-        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 10, 300);
+        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 10);
 
         self::assertSame(
             [["list_slice(list_value('a', 'b', 'c'), 2, 3)" => ['b', 'c']]],

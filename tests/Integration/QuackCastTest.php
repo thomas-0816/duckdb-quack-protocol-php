@@ -10,7 +10,7 @@ final class QuackCastTest extends TestCase
 {
     public function testCastScalars(): void
     {
-        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 10, 300);
+        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 10);
 
         self::assertSame(
             [
@@ -25,7 +25,7 @@ final class QuackCastTest extends TestCase
 
     public function testCastFloatAndList(): void
     {
-        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 10, 300);
+        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 10);
 
         self::assertSame(
             [
@@ -43,7 +43,7 @@ final class QuackCastTest extends TestCase
 
     public function testCastStructAddsNull(): void
     {
-        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 10, 300);
+        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 10);
 
         self::assertSame(
             [
@@ -65,7 +65,7 @@ final class QuackCastTest extends TestCase
 
     public function testCastStructReorders(): void
     {
-        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 10, 300);
+        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 10);
 
         self::assertSame(
             [
@@ -87,7 +87,7 @@ final class QuackCastTest extends TestCase
 
     public function testStructList(): void
     {
-        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 10, 300);
+        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 10);
 
         self::assertSame(
             [
@@ -110,7 +110,7 @@ final class QuackCastTest extends TestCase
 
     public function testNestedStructUnion(): void
     {
-        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 10, 300);
+        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 10);
 
         self::assertSame(
             [
@@ -145,7 +145,7 @@ final class QuackCastTest extends TestCase
 
     public function testCastOutOfRangeAndTinyInt(): void
     {
-        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 10, 300);
+        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 10);
 
         try {
             $client->fetchValue('SELECT CAST(999 AS TINYINT)');

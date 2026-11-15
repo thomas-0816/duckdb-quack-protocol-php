@@ -9,7 +9,7 @@ final class QuackCustomTest extends TestCase
 {
     public function testInetValues(): void
     {
-        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 10, 300);
+        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 10);
         $client->execute('INSTALL inet; LOAD inet;');
 
         self::assertSame(
@@ -33,7 +33,7 @@ final class QuackCustomTest extends TestCase
 
     public function testNullInet(): void
     {
-        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 10, 300);
+        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 10);
         $client->execute('INSTALL inet; LOAD inet;');
 
         self::assertSame(

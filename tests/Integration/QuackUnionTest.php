@@ -9,7 +9,7 @@ final class QuackUnionTest extends TestCase
 {
     public function testUnionList(): void
     {
-        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 10, 300);
+        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 10);
 
         self::assertSame(
             [
@@ -28,7 +28,7 @@ final class QuackUnionTest extends TestCase
 
     public function testUnionTable(): void
     {
-        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 10, 300);
+        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 10);
 
         $client->execute('CREATE TEMP TABLE tbl1 (u UNION(num INTEGER, str VARCHAR))');
         $client->execute("INSERT INTO tbl1 VALUES (1), ('two'), (union_value(str := 'three'))");
