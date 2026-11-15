@@ -6,34 +6,45 @@ use DuckDB\Quack\Chunk\DataChunk;
 use DuckDB\Quack\Connection\ClientConnection;
 use DuckDB\Quack\Error\QuackError;
 use DuckDB\Quack\Exceptions\ProtocolException;
-use DuckDB\Quack\Messages\FetchResponseMessage;
-use DuckDB\Quack\Messages\PrepareResponseMessage;
+use DuckDB\Quack\Query\QueryPool;
+use DuckDB\Quack\Query\QueryStream;
 use DuckDB\Quack\Sql\SqlFormatter;
 use DuckDB\Quack\Sql\SqlParameters;
 use DuckDB\Quack\Transport\Transport;
+use Generator;
 
 /**
- * One session on a Quack server.
+ * A Quack client with one or more server-side sessions.
  *
- * A client maps to exactly one server-side connection id. The server runs one
- * statement per connection and a new PREPARE supersedes the current result
- * stream, so finish or discard a stream before sending another query.
- * Concurrent work needs separate clients or separate processes.
+ * The first connection backs the synchronous helpers. fetchAllParallel() runs
+ * $maxConnections queries in parallel.
+ * Temp tables and transactions are per connection.
  */
 final class QuackClient
 {
+    /**
+     * @var list<ClientConnection>
+     */
+    private array $pool;
+
     public function __construct(
         private readonly ClientConnection $connection,
+        private readonly Transport $transport,
     ) {
+        $this->pool = [$connection];
     }
 
     public function __destruct()
     {
-        $this->connection->disconnectOnDrop();
+        foreach ($this->pool as $connection) {
+            $connection->disconnectOnDrop();
+        }
     }
 
     /**
-     * Open a session, negotiating a supported Quack protocol version.
+     * Opens a session, negotiating a supported Quack protocol version.
+     *
+     * Extra connections for fetchAllParallel() are opened on first use.
      *
      * @throws QuackError if the connection cannot be established.
      */
@@ -42,16 +53,28 @@ final class QuackClient
         string $authToken,
         float $connectTimeout = 10,
         float $queryTimeout = 30,
+        int $maxConnections = 1,
         ?string $sslCertificate = null,
     ): self {
-        $transport = Transport::new($uri, $authToken, $connectTimeout, $queryTimeout, $sslCertificate);
+        $transport = Transport::new($uri, $authToken, $connectTimeout, $queryTimeout, $maxConnections, $sslCertificate);
         $connection = ClientConnection::connect($transport);
-        return new self($connection);
+
+        return new self($connection, $transport);
     }
 
     public function getConnection(): ClientConnection
     {
         return $this->connection;
+    }
+
+    /**
+     * Formats a statement, rendering its placeholders as literals.
+     *
+     * @param array<int|string,mixed> $params
+     */
+    public function prepare(string $sql, array $params = []): string
+    {
+        return SqlFormatter::formatSql($sql, SqlParameters::coerce($params));
     }
 
     /**
@@ -141,14 +164,64 @@ final class QuackClient
         foreach ($this->fetchChunks($this->connection, $query) as $chunk) {
             $names = $chunk->resultNames;
             for ($rowIndex = 0; $rowIndex < $chunk->rowCount; $rowIndex++) {
-                $result = [];
+                $row = [];
                 foreach ($chunk->columns as $columnIndex => $column) {
                     $name = $names[$columnIndex] ?? "column{$columnIndex}";
-                    $result[$name] = $column->values[$rowIndex] ?? null;
+                    $row[$name] = $column->values[$rowIndex] ?? null;
                 }
-                $rows[] = $result;
+                $rows[] = $row;
             }
         }
+        return $rows;
+    }
+
+    /**
+     * Runs all queries concurrently on the connection pool and returns every
+     * result set keyed like the input.
+     *
+     * Each query runs on its own connection, so at most the configured number
+     * of connections run at a time. Queries must not depend on temp tables or
+     * transactions created by another query, because they may land on a
+     * different connection.
+     *
+     * @param array<int|string,string> $queries
+     * @return array<int|string,list<array<string,mixed>>>
+     */
+    public function fetchAllParallel(array $queries): array
+    {
+        if ($this->connection->isClosed()) {
+            throw new ProtocolException('Quack client is not connected');
+        }
+        if ($queries === []) {
+            return [];
+        }
+
+        $sql = [];
+        foreach ($queries as $key => $query) {
+            $sql[$key] = SqlFormatter::formatSql($query, []);
+        }
+
+        $connectionCount = min($this->transport->maxConnections(), count($sql));
+        while (count($this->pool) < $connectionCount) {
+            $this->pool[] = ClientConnection::connect($this->transport);
+        }
+
+        $chunks = QueryPool::fetchChunks($this->pool, $sql);
+        $rows = [];
+        foreach ($chunks as $key => $resultChunks) {
+            foreach ($resultChunks as $chunk) {
+                $names = $chunk->resultNames;
+                for ($rowIndex = 0; $rowIndex < $chunk->rowCount; $rowIndex++) {
+                    $row = [];
+                    foreach ($chunk->columns as $columnIndex => $column) {
+                        $name = $names[$columnIndex] ?? "column{$columnIndex}";
+                        $row[$name] = $column->values[$rowIndex] ?? null;
+                    }
+                    $rows[$key][] = $row;
+                }
+            }
+        }
+
         return $rows;
     }
 
@@ -167,12 +240,12 @@ final class QuackClient
         foreach ($this->fetchChunks($this->connection, $query) as $chunk) {
             $names = $chunk->resultNames;
             for ($rowIndex = 0; $rowIndex < $chunk->rowCount; $rowIndex++) {
-                $result = [];
+                $row = [];
                 foreach ($chunk->columns as $columnIndex => $column) {
                     $name = $names[$columnIndex] ?? "column{$columnIndex}";
-                    $result[$name] = $column->values[$rowIndex] ?? null;
+                    $row[$name] = $column->values[$rowIndex] ?? null;
                 }
-                return $result;
+                return $row;
             }
         }
         return null;
@@ -193,12 +266,12 @@ final class QuackClient
         foreach ($this->fetchChunks($this->connection, $query) as $chunk) {
             $names = $chunk->resultNames;
             for ($rowIndex = 0; $rowIndex < $chunk->rowCount; $rowIndex++) {
-                $result = [];
+                $row = [];
                 foreach ($chunk->columns as $columnIndex => $column) {
                     $name = $names[$columnIndex] ?? "column{$columnIndex}";
-                    $result[$name] = $column->values[$rowIndex] ?? null;
+                    $row[$name] = $column->values[$rowIndex] ?? null;
                 }
-                yield $result;
+                yield $row;
             }
         }
     }
@@ -274,58 +347,13 @@ final class QuackClient
      *
      * @return \Generator<int,DataChunk>
      */
-    private function fetchChunks(ClientConnection $connection, string $query): \Generator
+    private function fetchChunks(ClientConnection $connection, string $query): Generator
     {
-        $response = $connection->prepare($query);
-        if (!$response instanceof PrepareResponseMessage) {
-            throw $connection->protocolFailure('expected PREPARE_RESPONSE, got ' . $response->messageType()->name);
-        }
-
-        $needsMoreFetch = $response->needsMoreFetch;
-        $nextBatchIndex = 1;
-        $ackIndex = 0;
-        $firstChunk = $response->results[0] ?? null;
-        $resultTypes = $firstChunk->types ?? [];
-        $resultNames = $firstChunk->resultNames ?? [];
-
-        foreach ($response->results as $chunk) {
-            yield $chunk;
-        }
-
-        while ($needsMoreFetch) {
-            $fetchResponse = $connection->fetch(
-                $response->resultUuid,
-                $nextBatchIndex,
-                $ackIndex,
-                $resultTypes,
-                $resultNames,
-            );
-            if (!$fetchResponse instanceof FetchResponseMessage) {
-                throw $connection->protocolFailure('expected FETCH_RESPONSE, got ' . $fetchResponse->messageType()->name);
-            }
-
-            $results = $fetchResponse->results;
-            $batchIndex = $fetchResponse->batchIndex;
-            if ($batchIndex !== null) {
-                if ($batchIndex !== $nextBatchIndex) {
-                    throw $connection->protocolFailure("expected FETCH_RESPONSE batch {$nextBatchIndex}, got {$batchIndex}");
-                }
-                if ($results === []) {
-                    throw $connection->protocolFailure('FETCH_RESPONSE batch did not include any chunks');
-                }
-                $ackIndex = $batchIndex;
-                $nextBatchIndex++;
-            } elseif ($results === []) {
-                $totalBatches = $fetchResponse->totalBatches;
-                if ($totalBatches !== null && $totalBatches !== $ackIndex) {
-                    throw $connection->protocolFailure("FETCH_RESPONSE ended after {$ackIndex} batches but announced {$totalBatches}");
-                }
-            } else {
-                throw $connection->protocolFailure('FETCH_RESPONSE with chunks did not include a batch index');
-            }
-            $needsMoreFetch = $batchIndex !== null;
-
-            foreach ($results as $chunk) {
+        $stream = new QueryStream($connection, $query);
+        $request = $stream->start();
+        while ($request !== null) {
+            [$request, $chunks] = $stream->advance($request->wait());
+            foreach ($chunks as $chunk) {
                 yield $chunk;
             }
         }
