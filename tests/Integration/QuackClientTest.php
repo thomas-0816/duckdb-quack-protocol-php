@@ -360,15 +360,11 @@ final class QuackClientTest extends TestCase
     {
         self::assertSame(
             '170141183460469231731687303715884105727',
-            $this->queryValue(
-                'SELECT 170141183460469231731687303715884105727::HUGEINT AS v',
-            ),
+            $this->queryValue('SELECT 170141183460469231731687303715884105727::HUGEINT AS v'),
         );
         self::assertSame(
             '-170141183460469231731687303715884105728',
-            $this->queryValue(
-                'SELECT (-170141183460469231731687303715884105728)::HUGEINT AS v',
-            ),
+            $this->queryValue('SELECT (-170141183460469231731687303715884105728)::HUGEINT AS v'),
         );
     }
 
@@ -376,9 +372,7 @@ final class QuackClientTest extends TestCase
     {
         self::assertSame(
             '340282366920938463463374607431768211455',
-            $this->queryValue(
-                'SELECT 340282366920938463463374607431768211455::UHUGEINT AS v',
-            ),
+            $this->queryValue('SELECT 340282366920938463463374607431768211455::UHUGEINT AS v'),
         );
     }
 
@@ -401,9 +395,7 @@ final class QuackClientTest extends TestCase
         );
         self::assertSame(
             '12345678901234567890.1234567890',
-            $this->queryValue(
-                "SELECT CAST('12345678901234567890.1234567890' AS DECIMAL(38,10)) AS v",
-            ),
+            $this->queryValue("SELECT CAST('12345678901234567890.1234567890' AS DECIMAL(38,10)) AS v"),
         );
     }
 
@@ -521,9 +513,7 @@ final class QuackClientTest extends TestCase
     {
         self::assertSame(
             '1970-01-01 00:00:01.123456789',
-            $this->queryValue(
-                "SELECT TIMESTAMP_NS '1970-01-01 00:00:01.123456789' AS v",
-            ),
+            $this->queryValue("SELECT TIMESTAMP_NS '1970-01-01 00:00:01.123456789' AS v"),
         );
     }
 
@@ -531,10 +521,40 @@ final class QuackClientTest extends TestCase
     {
         self::assertSame(
             '1970-01-01 00:00:01+00',
+            $this->queryValue("SELECT TIMESTAMPTZ '1970-01-01 00:00:01+00' AS v", ['timezone' => 'UTC']),
+        );
+    }
+
+    public function testConnectConfigAppliesSessionSettings(): void
+    {
+        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 10, 300, ['timezone' => 'Europe/Berlin']);
+
+        self::assertSame(
+            'Europe/Berlin',
+            $client->fetchValue("SELECT current_setting('TimeZone') AS tz"),
+        );
+    }
+
+    public function testTimestampTzUsesConfiguredTimezone(): void
+    {
+        self::assertSame(
+            '1970-01-01 01:00:01+01',
             $this->queryValue(
                 "SELECT TIMESTAMPTZ '1970-01-01 00:00:01+00' AS v",
+                ['timezone' => 'Europe/Berlin'],
             ),
         );
+    }
+
+    public function testConfiguredTimezonesDoNotLeakBetweenClients(): void
+    {
+        $berlin = QuackClient::connect('http://127.0.0.1:9494', 'secret', 10, 300, ['timezone' => 'Europe/Berlin']);
+        $utc = QuackClient::connect('http://127.0.0.1:9494', 'secret', 10, 300, ['timezone' => 'UTC']);
+        $sql = "SELECT TIMESTAMPTZ '1970-01-01 00:00:01+00' AS v";
+
+        self::assertSame('1970-01-01 01:00:01+01', $berlin->fetchValue($sql));
+        self::assertSame('1970-01-01 00:00:01+00', $utc->fetchValue($sql));
+        self::assertSame('1970-01-01 01:00:01+01', $berlin->fetchValue($sql));
     }
 
     public function testIntervalType(): void
@@ -727,13 +747,17 @@ final class QuackClientTest extends TestCase
         return $pem;
     }
 
-    private function queryValue(string $sql): mixed
+    /**
+     * @param array<string,scalar|null> $config
+     */
+    private function queryValue(string $sql, array $config = []): mixed
     {
         $client = QuackClient::connect(
             'http://127.0.0.1:9494',
             'secret',
             10,
             300,
+            configuration: $config,
         );
 
         return $client->fetchValue($sql);
