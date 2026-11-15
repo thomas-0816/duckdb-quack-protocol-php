@@ -1208,6 +1208,12 @@ final class DataChunkCodec
                 JSON_THROW_ON_ERROR | JSON_BIGINT_AS_STRING,
             );
         } catch (\JsonException $error) {
+            // DuckDB writes non-finite doubles as bare tokens, which are not
+            // valid JSON but are returned verbatim by PDO_duckdb.
+            $token = trim($json);
+            if ($token === 'NaN' || $token === 'Infinity' || $token === '-Infinity') {
+                return $token;
+            }
             throw new ProtocolException(
                 'invalid JSON value: ' . $error->getMessage(),
             );
