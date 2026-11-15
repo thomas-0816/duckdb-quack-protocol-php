@@ -24,6 +24,7 @@ final class Transport
         private readonly string $authToken,
         private float $timeout,
         private readonly float $connectTimeout,
+        private readonly int $maxConnections,
         private readonly ?string $sslCertificate,
     ) {
     }
@@ -33,6 +34,7 @@ final class Transport
         string $authToken,
         float $connectTimeout,
         float $timeout,
+        int $maxConnections = 1,
         ?string $sslCertificate = null,
     ): self {
         $parsed = UriParser::parseQuackUri($uri);
@@ -47,6 +49,9 @@ final class Transport
         if ($connectTimeout <= 0) {
             throw new ProtocolException('Quack connect timeout must be greater than zero');
         }
+        if ($maxConnections < 1) {
+            throw new ProtocolException('Quack client needs at least one connection');
+        }
 
         return new self(
             rtrim($parsed->baseUrl, '/'),
@@ -54,6 +59,7 @@ final class Transport
             $authToken,
             $timeout,
             $connectTimeout,
+            $maxConnections,
             $sslCertificate,
         );
     }
@@ -73,6 +79,11 @@ final class Transport
         return $this->timeout;
     }
 
+    public function maxConnections(): int
+    {
+        return $this->maxConnections;
+    }
+
     public function withTimeout(float $timeout): self
     {
         $clone = clone $this;
@@ -90,6 +101,21 @@ final class Transport
         array $resultTypes = [],
         array $resultNames = [],
     ): QuackMessage {
+        return $this->createRequest($message, $version, $resultTypes, $resultNames)->wait();
+    }
+
+    /**
+     * Encodes a request and prepares its curl handle without sending it.
+     *
+     * @param list<LogicalType> $resultTypes schema for decoding result chunks
+     * @param list<string>      $resultNames column names for decoding result chunks
+     */
+    public function createRequest(
+        QuackMessage $message,
+        int $version,
+        array $resultTypes = [],
+        array $resultNames = [],
+    ): PendingRequest {
         $bytes = MessageCodec::encodeMessageForVersion($message, $version);
         $curl = curl_init($this->baseUrl . '/quack');
         if ($curl === false) {
@@ -128,28 +154,26 @@ final class Transport
         }
         self::applyCurlOptions($curl, $options);
 
-        $body = curl_exec($curl);
-        if ($body === false) {
-            $errno = curl_errno($curl);
-            $error = curl_error($curl);
-            throw self::transportError($errno, $error);
-        }
+        return new PendingRequest(
+            $curl,
+            static function (string $body) use ($curl, $version, $resultTypes, $resultNames): QuackMessage {
+                $status = (int) curl_getinfo($curl, CURLINFO_RESPONSE_CODE);
 
-        $status = (int) curl_getinfo($curl, CURLINFO_RESPONSE_CODE);
+                if ($status < 200 || $status >= 300) {
+                    $raw = $body;
+                    if (strlen($raw) > 16 * 1024) {
+                        $raw = substr($raw, 0, 16 * 1024);
+                    }
+                    throw new HttpStatusException($status, $raw);
+                }
 
-        if ($status < 200 || $status >= 300) {
-            $raw = (string) $body;
-            if (strlen($raw) > 16 * 1024) {
-                $raw = substr($raw, 0, 16 * 1024);
-            }
-            throw new HttpStatusException($status, $raw);
-        }
-
-        $decoded = MessageCodec::decodeMessageForVersion((string) $body, $version, $resultTypes, $resultNames);
-        if ($decoded instanceof ErrorMessage) {
-            throw new ServerException($decoded->error);
-        }
-        return $decoded;
+                $decoded = MessageCodec::decodeMessageForVersion($body, $version, $resultTypes, $resultNames);
+                if ($decoded instanceof ErrorMessage) {
+                    throw new ServerException($decoded->error);
+                }
+                return $decoded;
+            },
+        );
     }
 
     /**
@@ -168,7 +192,7 @@ final class Transport
         }
     }
 
-    private static function transportError(int $errno, string $message): TransportException
+    public static function transportError(int $errno, string $message): TransportException
     {
         $kind = match (true) {
             $errno === CURLE_OPERATION_TIMEDOUT => TransportErrorKind::Timeout,
