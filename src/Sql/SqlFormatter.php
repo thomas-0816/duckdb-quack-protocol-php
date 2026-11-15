@@ -92,6 +92,11 @@ final class SqlFormatter
      */
     private static function formatPositionalSql(string $sql, array $params): string
     {
+        if ($params === [] && !str_contains($sql, '?')) {
+            // Avoid scanning large statements (for example embedded JSON
+            // documents) when there is nothing that could be replaced.
+            return $sql;
+        }
         $index = 0;
         $formatted = self::scanSql($sql, static function (string $token) use ($params, &$index): string {
             if ($token !== '?') {
@@ -145,6 +150,17 @@ final class SqlFormatter
         $output = '';
         $index = 0;
         while ($index < $length) {
+            // Copy runs of ordinary characters in one step; only the
+            // characters below can start something that needs handling.
+            $span = strcspn($sql, "'\"-/:?", $index);
+            if ($span > 0) {
+                $output .= substr($sql, $index, $span);
+                $index += $span;
+                if ($index >= $length) {
+                    break;
+                }
+            }
+
             $ch = $sql[$index];
             $next = $index + 1 < $length ? $sql[$index + 1] : null;
 
@@ -203,34 +219,28 @@ final class SqlFormatter
     {
         $length = strlen($sql);
         $index = $start + 1;
-        while ($index < $length) {
-            if ($sql[$index] === "'" && $index + 1 < $length && $sql[$index + 1] === "'") {
-                $index += 2;
+        while (($quote = strpos($sql, "'", $index)) !== false) {
+            if ($quote + 1 < $length && $sql[$quote + 1] === "'") {
+                $index = $quote + 2;
                 continue;
             }
-            if ($sql[$index] === "'") {
-                return $index + 1;
-            }
-            $index++;
+            return $quote + 1;
         }
-        return $index;
+        return $length;
     }
 
     private static function readDoubleQuoted(string $sql, int $start): int
     {
         $length = strlen($sql);
         $index = $start + 1;
-        while ($index < $length) {
-            if ($sql[$index] === '"' && $index + 1 < $length && $sql[$index + 1] === '"') {
-                $index += 2;
+        while (($quote = strpos($sql, '"', $index)) !== false) {
+            if ($quote + 1 < $length && $sql[$quote + 1] === '"') {
+                $index = $quote + 2;
                 continue;
             }
-            if ($sql[$index] === '"') {
-                return $index + 1;
-            }
-            $index++;
+            return $quote + 1;
         }
-        return $index;
+        return $length;
     }
 
     private static function isIdentifierStart(string $ch): bool

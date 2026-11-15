@@ -185,6 +185,31 @@ final class SqlFormatterTest extends TestCase
         );
     }
 
+    public function testEmptyParametersReturnSqlWithoutScanning(): void
+    {
+        $sql = <<<'SQL'
+            INSERT INTO t SELECT value->>'id' FROM json_each('[{"id":1},{"id":2}]') -- no placeholders
+            SQL;
+
+        self::assertSame($sql, SqlFormatter::formatSql($sql, []));
+    }
+
+    public function testEmptyParametersStillIgnorePlaceholdersInsideStrings(): void
+    {
+        self::assertSame(
+            "SELECT '?', 'it''s ?' AS \"?\" /* ? */",
+            SqlFormatter::formatSql("SELECT '?', 'it''s ?' AS \"?\" /* ? */", []),
+        );
+    }
+
+    public function testEmptyParametersIgnoreDoubleColonCasts(): void
+    {
+        self::assertSame(
+            "SELECT '?', 1::INT, 2.5::DECIMAL(10,2)",
+            SqlFormatter::formatSql("SELECT '?', 1::INT, 2.5::DECIMAL(10,2)", []),
+        );
+    }
+
     public function testRejectsMissingNamedParameter(): void
     {
         $this->expectException(ProtocolException::class);
