@@ -12,7 +12,6 @@ use DuckDB\Quack\Messages\MessageHeader;
 use DuckDB\Quack\Messages\MessageType;
 use DuckDB\Quack\Messages\PrepareRequestMessage;
 use DuckDB\Quack\Messages\QuackMessage;
-use DuckDB\Quack\Messages\SuccessResponseMessage;
 use DuckDB\Quack\Transport\Transport;
 use DuckDB\Quack\Types\HugeIntParts;
 
