@@ -30,9 +30,6 @@ use DuckDB\Quack\Types\WktFormatter;
 
 /**
  * Encodes and decodes DuckDB data chunks and their column vectors.
- *
- * The layouts mirror the Rust SDK. Flat vectors are used for encoding; decoding
- * additionally understands constant, dictionary, and sequence vectors.
  */
 final class DataChunkCodec
 {

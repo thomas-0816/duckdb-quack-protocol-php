@@ -7,8 +7,7 @@ use DuckDB\Quack\Exceptions\ProtocolException;
 /**
  * A decoded Quack value.
  *
- * The tagged union mirrors the Rust SDK. Large integers are `int|string` so
- * values outside PHP's signed 64-bit range stay exact.
+ * Large integers are `int|string` so values outside PHP's signed 64-bit range stay exact.
  */
 final class Value
 {
