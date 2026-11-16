@@ -35,7 +35,7 @@ final class QuackGeometryTest extends TestCase
                         . 'POLYGON ((40 40, 20 45, 45 30, 40 40)))',
                 ],
             ],
-            $client->fetchAll('SELECT ST_AsText(geom) AS geom FROM geometries'),
+            $client->fetchAll('SELECT geom FROM geometries'),
         );
     }
 }

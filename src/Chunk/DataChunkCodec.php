@@ -24,6 +24,7 @@ use DuckDB\Quack\Types\TimeUnit;
 use DuckDB\Quack\Types\Value;
 use DuckDB\Quack\Types\VariantDecoder;
 use DuckDB\Quack\Types\VectorType;
+use DuckDB\Quack\Types\WktFormatter;
 
 /**
  * Encodes and decodes DuckDB data chunks and their column vectors.
@@ -1573,7 +1574,7 @@ final class DataChunkCodec
             return Bignum::fromStorage($raw);
         }
         if ($logicalType->id === LogicalTypeId::Geometry) {
-            return $raw;
+            return WktFormatter::fromWkb($raw);
         }
         if ($raw !== '' && preg_match('//u', $raw) !== 1) {
             throw new Utf8Exception('invalid UTF-8 string');
