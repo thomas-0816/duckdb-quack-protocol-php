@@ -44,8 +44,8 @@ final class QuackClient
     public static function connect(
         string $uri,
         string $authToken,
-        float $connectTimeout,
-        float $queryTimeout,
+        int $connectTimeout,
+        int $queryTimeout,
         array $configuration = [],
         ?string $sslCertificate = null,
     ): self {

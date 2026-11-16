@@ -24,8 +24,8 @@ final class Transport
         private readonly string $baseUrl,
         private readonly bool $ssl,
         private readonly string $authToken,
-        private float $timeout,
-        private readonly float $connectTimeout,
+        private int $timeout,
+        private readonly int $connectTimeout,
         private readonly ?string $sslCertificate,
     ) {
     }
@@ -33,8 +33,8 @@ final class Transport
     public static function new(
         string $uri,
         string $authToken,
-        float $connectTimeout,
-        float $timeout,
+        int $connectTimeout,
+        int $timeout,
         ?string $sslCertificate = null,
     ): self {
         $parsed = UriParser::parseQuackUri($uri);
@@ -70,12 +70,12 @@ final class Transport
         return $this->authToken;
     }
 
-    public function timeout(): float
+    public function timeout(): int
     {
         return $this->timeout;
     }
 
-    public function withTimeout(float $timeout): self
+    public function withTimeout(int $timeout): self
     {
         $clone = clone $this;
         $clone->timeout = $timeout;
