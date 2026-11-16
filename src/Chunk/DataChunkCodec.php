@@ -99,7 +99,7 @@ final class DataChunkCodec
 
         return match ($vectorType) {
             VectorType::Flat => self::decodeFlatVectorBody($reader, $logicalType, $count, $vectorType),
-            VectorType::Fsst => throw new UnsupportedTypeException('FSST-compressed vectors are not supported'),
+            VectorType::Fsst => self::decodeFsstVector($reader, $logicalType, $count, $vectorType),
             VectorType::Constant => self::decodeConstantVector($reader, $logicalType, $count),
             VectorType::Dictionary => self::decodeDictionaryVector($reader, $logicalType, $count),
             VectorType::Sequence => self::decodeSequenceVector($reader, $logicalType, $count),
@@ -288,6 +288,26 @@ final class DataChunkCodec
         }
 
         return new DecodedVector(VectorType::Sequence, $values);
+    }
+
+    /**
+     * FSST is an in-memory compression for string vectors. DuckDB does not put
+     * its compressed representation on the wire: Vector::Serialize() flattens
+     * FSST buffers first and then writes the regular string vector fields.
+     * Accept the vector type tag and decode the body as a flat vector so that a
+     * server preserving the tag still round-trips.
+     */
+    private static function decodeFsstVector(
+        BinaryReader $reader,
+        LogicalType $logicalType,
+        int $count,
+        VectorType $vectorType,
+    ): DecodedVector {
+        if (LogicalTypeCodec::getPhysicalType($logicalType) !== PhysicalType::Varchar) {
+            throw new ProtocolException('FSST vectors can only decode string columns');
+        }
+
+        return self::decodeFlatVectorBody($reader, $logicalType, $count, $vectorType);
     }
 
     private static function decodeFlatVectorBody(
