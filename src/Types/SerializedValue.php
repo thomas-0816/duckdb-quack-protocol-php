@@ -28,8 +28,8 @@ final class SerializedValue
     /**
      * Converts the value to native PHP.
      *
-     * Nested lists become lists, structs become associative arrays, and TYPE
-     * values become a {@see LogicalType}.
+     * Nested lists become lists, structs become associative arrays, ENUM
+     * indices become their labels, and TYPE values become a {@see LogicalType}.
      */
     public function toPhp(): mixed
     {
@@ -39,12 +39,30 @@ final class SerializedValue
         if ($this->logicalType->id === LogicalTypeId::Type) {
             return $this->value;
         }
+        if ($this->logicalType->id === LogicalTypeId::Enum) {
+            return $this->enumToPhp();
+        }
 
         return match (LogicalTypeCodec::getPhysicalType($this->logicalType)) {
             PhysicalType::List, PhysicalType::Array => $this->listToPhp(),
             PhysicalType::Struct => $this->structToPhp(),
             default => $this->value,
         };
+    }
+
+    private function enumToPhp(): string
+    {
+        $index = $this->value;
+        if (!is_int($index) && !is_string($index)) {
+            throw new ProtocolException('serialized DuckDB ENUM value is not an index');
+        }
+        $values = LogicalTypeCodec::getEnumValues($this->logicalType);
+        $position = (int) $index;
+        if ((string) $position !== (string) $index || !isset($values[$position])) {
+            throw new ProtocolException("ENUM index {$index} is out of range");
+        }
+
+        return $values[$position];
     }
 
     /**
