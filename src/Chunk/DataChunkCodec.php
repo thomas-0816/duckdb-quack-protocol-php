@@ -95,16 +95,11 @@ final class DataChunkCodec
                 static fn (BinaryReader $r) => LogicalTypeCodec::skipLogicalTypeList($r),
             );
             if (count($chunkTypeIds) !== count($types)) {
-                throw new ProtocolException(
-                    'DataChunk declared ' . count($chunkTypeIds)
-                    . ' types but the prepared result has ' . count($types),
-                );
+                throw new ProtocolException('DataChunk declared ' . count($chunkTypeIds) . ' types but the prepared result has ' . count($types));
             }
             foreach ($types as $index => $type) {
                 if (($chunkTypeIds[$index] ?? null) !== $type->id->value) {
-                    throw new ProtocolException(
-                        "DataChunk type {$index} does not match the prepared result type",
-                    );
+                    throw new ProtocolException("DataChunk type {$index} does not match the prepared result type");
                 }
             }
 
@@ -128,18 +123,14 @@ final class DataChunkCodec
                 static function (BinaryReader $rr, int $index) use ($types, $rowCount): DecodedVector {
                     $logicalType = $types[$index] ?? null;
                     if ($logicalType === null) {
-                        throw new ProtocolException(
-                            "column vector {$index} has no matching logical type",
-                        );
+                        throw new ProtocolException("column vector {$index} has no matching logical type");
                     }
                     return self::decodeVector($rr, $logicalType, $rowCount);
                 },
             ),
         );
         if (count($columns) !== count($types)) {
-            throw new ProtocolException(
-                'DataChunk declared ' . count($types) . ' types but serialized '
-                . count($columns) . ' columns',
+            throw new ProtocolException('DataChunk declared ' . count($types) . ' types but serialized ' . count($columns) . ' columns',
             );
         }
         return new DataChunk($rowCount, $types, $columns, $resultNames);
@@ -157,9 +148,7 @@ final class DataChunkCodec
         $result = [];
         foreach ($values as $value) {
             if (!$value instanceof Value) {
-                throw new ProtocolException(
-                    "column {$columnIndex} contains a decoded PHP value and cannot be re-encoded",
-                );
+                throw new ProtocolException("column {$columnIndex} contains a decoded PHP value and cannot be re-encoded");
             }
             $result[] = $value;
         }
@@ -189,10 +178,7 @@ final class DataChunkCodec
                             throw new ProtocolException("column {$index} has no logical type");
                         }
                         if (count($column->values) !== $chunk->rowCount) {
-                            throw new ProtocolException(
-                                "column {$index} has " . count($column->values)
-                                . " values, expected {$chunk->rowCount}",
-                            );
+                            throw new ProtocolException("column {$index} has " . count($column->values) . " values, expected {$chunk->rowCount}");
                         }
                         self::encodeVector(
                             $ww,
@@ -226,12 +212,7 @@ final class DataChunkCodec
         int $count,
     ): void {
         $writer->writeObject(
-            static fn (BinaryWriter $object) => self::encodeFlatVectorBody(
-                $object,
-                $logicalType,
-                $values,
-                $count,
-            ),
+            static fn (BinaryWriter $object) => self::encodeFlatVectorBody($object, $logicalType, $values, $count),
         );
     }
 
@@ -248,15 +229,8 @@ final class DataChunkCodec
         $vectorType = VectorType::fromId((int) $rawVectorType);
 
         return match ($vectorType) {
-            VectorType::Flat => self::decodeFlatVectorBody(
-                $reader,
-                $logicalType,
-                $count,
-                $vectorType,
-            ),
-            VectorType::Fsst => throw new UnsupportedTypeException(
-                'FSST-compressed vectors are not supported',
-            ),
+            VectorType::Flat => self::decodeFlatVectorBody($reader, $logicalType, $count, $vectorType),
+            VectorType::Fsst => throw new UnsupportedTypeException('FSST-compressed vectors are not supported'),
             VectorType::Constant => self::decodeConstantVector($reader, $logicalType, $count),
             VectorType::Dictionary => self::decodeDictionaryVector($reader, $logicalType, $count),
             VectorType::Sequence => self::decodeSequenceVector($reader, $logicalType, $count),
@@ -287,9 +261,7 @@ final class DataChunkCodec
                 $bytes = $r->readBlob();
                 $expected = $count * 4;
                 if (strlen($bytes) !== $expected) {
-                    throw new ProtocolException(
-                        'selection vector has ' . strlen($bytes) . " bytes, expected {$expected}",
-                    );
+                    throw new ProtocolException('selection vector has ' . strlen($bytes) . " bytes, expected {$expected}");
                 }
                 $unpacked = unpack('V*', $bytes);
                 if ($unpacked === false) {
@@ -314,8 +286,7 @@ final class DataChunkCodec
 
         $values = [];
         foreach ($selection as $index) {
-            $values[] = $dictionary->values[$index]
-                ?? throw new ProtocolException("dictionary selection {$index} is out of range");
+            $values[] = $dictionary->values[$index] ?? throw new ProtocolException("dictionary selection {$index} is out of range");
         }
         return new DecodedVector(VectorType::Dictionary, $values);
     }
@@ -418,9 +389,7 @@ final class DataChunkCodec
                     $expected = intdiv($count + 63, 64) * 8;
                     $bytes = $r->readBlob();
                     if (strlen($bytes) !== $expected) {
-                        throw new ProtocolException(
-                            'validity mask has ' . strlen($bytes) . " bytes, expected {$expected}",
-                        );
+                        throw new ProtocolException('validity mask has ' . strlen($bytes) . " bytes, expected {$expected}");
                     }
                     $values = [];
                     for ($index = 0; $index < $count; $index++) {
@@ -441,10 +410,7 @@ final class DataChunkCodec
                 static fn (BinaryReader $r) => $r->readBlob(),
             );
             if (strlen($bytes) !== $byteLength) {
-                throw new ProtocolException(
-                    'fixed-size vector data has ' . strlen($bytes)
-                    . " bytes, expected {$byteLength}",
-                );
+                throw new ProtocolException('fixed-size vector data has ' . strlen($bytes) . " bytes, expected {$byteLength}");
             }
             $values = self::decodeFixedValuesToPhp(
                 $logicalType,
@@ -485,9 +451,7 @@ final class DataChunkCodec
                 $validity,
                 $vectorType,
             ),
-            default => throw new UnsupportedTypeException(
-                "variable-width physical type {$physicalType->name} is not supported",
-            ),
+            default => throw new UnsupportedTypeException("variable-width physical type {$physicalType->name} is not supported"),
         };
     }
 
@@ -529,9 +493,7 @@ final class DataChunkCodec
                     static function (BinaryReader $rr, int $index) use ($children, $count): DecodedVector {
                         $child = $children[$index] ?? null;
                         if ($child === null) {
-                            throw new ProtocolException(
-                                "STRUCT child vector {$index} has no matching type metadata",
-                            );
+                            throw new ProtocolException("STRUCT child vector {$index} has no matching type metadata");
                         }
                         return self::decodeVector($rr, $child->logicalType, $count);
                     },
@@ -660,9 +622,7 @@ final class DataChunkCodec
                     static fn (BinaryReader $rr) => $rr->readObject($readEntry),
                 );
                 if (count($entries) !== $count) {
-                    throw new ProtocolException(
-                        'LIST vector serialized ' . count($entries) . " entries for {$count} rows",
-                    );
+                    throw new ProtocolException('LIST vector serialized ' . count($entries) . " entries for {$count} rows");
                 }
 
                 return $entries;
@@ -682,9 +642,7 @@ final class DataChunkCodec
                 continue;
             }
             if ($offset > count($childVector->values) || $offset + $length > count($childVector->values)) {
-                throw new ProtocolException(
-                    "LIST entry {$rowIndex} overruns the child vector",
-                );
+                throw new ProtocolException("LIST entry {$rowIndex} overruns the child vector");
             }
             $items = array_slice($childVector->values, $offset, $length);
             $values[] = $isMap ? self::mapPairsToPhp($items, $logicalType) : $items;
@@ -752,9 +710,7 @@ final class DataChunkCodec
         );
         $expected = LogicalTypeCodec::getArraySize($logicalType);
         if ($arraySize !== $expected) {
-            throw new ProtocolException(
-                "ARRAY vector serialized size {$arraySize}, expected {$expected}",
-            );
+            throw new ProtocolException("ARRAY vector serialized size {$arraySize}, expected {$expected}");
         }
         $childType = LogicalTypeCodec::getChildType($logicalType);
         $childVector = $reader->readRequiredField(
@@ -784,9 +740,7 @@ final class DataChunkCodec
         int $count,
     ): void {
         if (count($values) !== $count) {
-            throw new ProtocolException(
-                'vector value count ' . count($values) . " does not match row count {$count}",
-            );
+            throw new ProtocolException('vector value count ' . count($values) . " does not match row count {$count}");
         }
         if ($logicalType->id === LogicalTypeId::Geometry) {
             $writer->writeField(99, static fn (BinaryWriter $w) => $w->writeUleb(1));
@@ -822,21 +776,21 @@ final class DataChunkCodec
 
         match ($physicalType) {
             PhysicalType::Varchar => self::encodeStringVector($writer, $logicalType, $values),
-            PhysicalType::Struct => self::encodeStructVector(
-                $writer,
-                $logicalType,
-                $values,
-                $count,
-            ),
+            PhysicalType::Struct => self::encodeStructVector($writer, $logicalType, $values, $count),
             PhysicalType::List => self::encodeListVector($writer, $logicalType, $values),
             PhysicalType::Array => self::encodeArrayVector($writer, $logicalType, $values),
-            default => throw new UnsupportedTypeException(
-                "cannot encode physical type {$physicalType->name}",
-            ),
+            default => throw new UnsupportedTypeException("cannot encode physical type {$physicalType->name}"),
         };
     }
 
     /**
+     * Encodes a VARCHAR-like vector.
+     *
+     * DuckDB storage version 2.0 (Quack v3) packs the strings as a u32 length
+     * per row (field 108) and one contiguous byte blob (field 109), preceded by
+     * the blob length (field 107). GEOMETRY is the exception: DuckDB always
+     * serializes its WKB values as a list (field 102).
+     *
      * @param list<Value> $values
      */
     private static function encodeStringVector(
@@ -864,12 +818,28 @@ final class DataChunkCodec
                 $encoded[] = self::valueToDisplayString($value);
             }
         }
-        $writer->writeField(102, static function (BinaryWriter $w) use ($encoded): void {
-            $w->writeList(
-                $encoded,
-                static fn (BinaryWriter $ww, string $bytes) => $ww->writeStringBytes($bytes),
-            );
-        });
+
+        if ($logicalType->id === LogicalTypeId::Geometry) {
+            $writer->writeField(102, static function (BinaryWriter $w) use ($encoded): void {
+                $w->writeList($encoded, static fn (BinaryWriter $ww, string $bytes) => $ww->writeStringBytes($bytes));
+            });
+            return;
+        }
+
+        $lengths = '';
+        $bytes = '';
+        foreach ($encoded as $value) {
+            $length = strlen($value);
+            if ($length > 0xFFFFFFFF) {
+                throw new ProtocolException('string value is longer than u32::MAX bytes');
+            }
+            $lengths .= pack('V', $length);
+            $bytes .= $value;
+        }
+
+        $writer->writeField(107, static fn (BinaryWriter $w) => $w->writeUleb(strlen($bytes)));
+        $writer->writeField(108, static fn (BinaryWriter $w) => $w->writeBlob($lengths));
+        $writer->writeField(109, static fn (BinaryWriter $w) => $w->writeBlob($bytes));
     }
 
     /**
@@ -932,26 +902,15 @@ final class DataChunkCodec
                 $entries,
                 static function (BinaryWriter $writer, array $entry): void {
                     $writer->writeObject(static function (BinaryWriter $object) use ($entry): void {
-                        $object->writeField(
-                            100,
-                            static fn (BinaryWriter $field) => $field->writeUleb($entry[0]),
-                        );
-                        $object->writeField(
-                            101,
-                            static fn (BinaryWriter $field) => $field->writeUleb($entry[1]),
-                        );
+                        $object->writeField(100, static fn (BinaryWriter $field) => $field->writeUleb($entry[0]));
+                        $object->writeField(101, static fn (BinaryWriter $field) => $field->writeUleb($entry[1]));
                     });
                 },
             );
         });
         $writer->writeField(
             106,
-            static fn (BinaryWriter $w) => self::encodeVector(
-                $w,
-                $childType,
-                $childValues,
-                count($childValues),
-            ),
+            static fn (BinaryWriter $w) => self::encodeVector($w, $childType, $childValues, count($childValues)),
         );
     }
 
@@ -977,27 +936,14 @@ final class DataChunkCodec
                 throw new ProtocolException('ARRAY values must be lists');
             }
             if (count($value->asList()) !== $arraySize) {
-                throw new ProtocolException(
-                    "ARRAY values must be lists of length {$arraySize}",
-                );
+                throw new ProtocolException("ARRAY values must be lists of length {$arraySize}");
             }
             foreach ($value->asList() as $item) {
                 $childValues[] = $item;
             }
         }
-        $writer->writeField(
-            103,
-            static fn (BinaryWriter $w) => $w->writeUleb($arraySize),
-        );
-        $writer->writeField(
-            104,
-            static fn (BinaryWriter $w) => self::encodeVector(
-                $w,
-                $childType,
-                $childValues,
-                count($childValues),
-            ),
-        );
+        $writer->writeField(103, static fn (BinaryWriter $w) => $w->writeUleb($arraySize));
+        $writer->writeField(104, static fn (BinaryWriter $w) => self::encodeVector($w, $childType, $childValues, count($childValues)));
     }
 
     /**
@@ -1041,16 +987,10 @@ final class DataChunkCodec
             static fn (BinaryReader $r) => $r->readBlob(),
         );
         if (strlen($lengthData) !== $count * 4) {
-            throw new ProtocolException(
-                'string vector has ' . strlen($lengthData)
-                . ' bytes of lengths, expected ' . ($count * 4) . " for {$count} rows",
-            );
+            throw new ProtocolException('string vector has ' . strlen($lengthData) . ' bytes of lengths, expected ' . ($count * 4) . " for {$count} rows");
         }
         if (strlen($byteData) !== (int) $byteDataLength) {
-            throw new ProtocolException(
-                'string vector has ' . strlen($byteData)
-                . " bytes of data, header declares {$byteDataLength}",
-            );
+            throw new ProtocolException('string vector has ' . strlen($byteData) . " bytes of data, header declares {$byteDataLength}");
         }
 
         /** @var list<int> $lengths */
