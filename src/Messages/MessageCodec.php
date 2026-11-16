@@ -165,7 +165,8 @@ final class MessageCodec
         }
 
         if ($message instanceof DisconnectMessage || $message instanceof HeartbeatRequestMessage) {
-            $writer->writeObject(static function (BinaryWriter $_): void {});
+            $writer->writeObject(static function (BinaryWriter $_): void {
+            });
             return;
         }
 
