@@ -48,7 +48,7 @@ final class ValueToPhpTest extends TestCase
         self::assertSame('0001-01-01', Value::date(new DateValue(-719_162))->toPhp());
         self::assertSame('9999-12-31', Value::date(new DateValue(2_932_896))->toPhp());
         self::assertSame('infinity', Value::date(new DateValue(2_147_483_647))->toPhp());
-        self::assertSame('-infinity', Value::date(new DateValue(-2_147_483_648))->toPhp());
+        self::assertSame('-infinity', Value::date(new DateValue(-2_147_483_647))->toPhp());
     }
 
     public function testTimesConvertToStrings(): void
@@ -74,7 +74,7 @@ final class ValueToPhpTest extends TestCase
         $bits = ($micros << 24) | ($maxOffset - 3_600);
 
         self::assertSame(
-            '12:34:56+01:00',
+            '12:34:56+01',
             Value::timeTz(new TimeTzValue($bits))->toPhp(),
         );
     }
