@@ -371,7 +371,7 @@ final class QuackClient
      */
     private function fetchChunks(ClientConnection $connection, string $query): Generator
     {
-        $response = $connection->prepare($query);
+        $response = $connection->prepare($query, null);
         if (!$response instanceof PrepareResponseMessage) {
             throw new ProtocolException('expected PREPARE_RESPONSE, got ' . $response->messageType()->name);
         }

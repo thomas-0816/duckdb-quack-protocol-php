@@ -107,7 +107,7 @@ final class ClientConnection
         return $this->connectionId;
     }
 
-    public function prepare(string $sql): QuackMessage
+    public function prepare(string $sql, ?int $inlineRows): QuackMessage
     {
         if ($this->closed) {
             throw new ProtocolException('Quack client is not connected');
@@ -118,7 +118,7 @@ final class ClientConnection
                 ->withClientQueryId($this->queryCounter++),
             sql: $sql,
             queryUuid: new HugeIntParts(0, $this->queryUuidCounter++),
-            inlineRows: null,
+            inlineRows: $inlineRows,
         );
         try {
             return $this->transport->send($message, $this->quackVersion);
