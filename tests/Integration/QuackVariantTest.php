@@ -176,10 +176,9 @@ final class QuackVariantTest extends TestCase
     {
         $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 10);
 
-        $client->beginTransaction();
         try {
             $client->execute('SET variant_minimum_shredding_size = 0');
-            $client->execute("CREATE TABLE shredded (id INTEGER, v VARIANT)");
+            $client->execute('CREATE TABLE shredded (id INTEGER, v VARIANT)');
             $client->execute(
                 "INSERT INTO shredded
                     SELECT i, {'id': i, 'tags': ['a' || i], 'nested': {'v': i * 2}}
@@ -198,7 +197,7 @@ final class QuackVariantTest extends TestCase
                 $client->fetchOne("SELECT v FROM shredded ORDER BY id DESC LIMIT 1"),
             );
         } finally {
-            $client->rollback();
+            $client->execute('DROP TABLE IF EXISTS shredded');
             $client->execute('SET variant_minimum_shredding_size = 30000');
         }
     }
