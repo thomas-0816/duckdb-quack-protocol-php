@@ -201,7 +201,7 @@ final class QuackClientTest extends TestCase
 
     public function testTransactionCallbackCommitsOnSuccess(): void
     {
-        $client = QuackClient::connect( 'http://127.0.0.1:9494', 'secret', 3, 10);
+        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 10);
 
         $client->execute('CREATE TEMP TABLE transaction_callback(id INTEGER)');
         $result = $client->transaction(function (QuackClient $client): string {
