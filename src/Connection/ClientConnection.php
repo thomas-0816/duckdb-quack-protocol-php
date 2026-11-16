@@ -23,7 +23,8 @@ use DuckDB\Quack\Types\LogicalType;
  * heartbeat timeout. This synchronous port requests a lease with headroom
  * over the longest request it allows, so ordinary traffic renews the lease
  * without a background timer. It sends a best-effort DISCONNECT when it is
- * dropped.
+ * dropped. A connection-fatal error retires the session, which is never
+ * reused or replayed automatically.
  */
 final class ClientConnection
 {
@@ -53,7 +54,7 @@ final class ClientConnection
                 clientPlatform: 'quack-php',
                 minSupportedQuackVersion: self::QUACK_VERSION,
                 maxSupportedQuackVersion: self::QUACK_VERSION,
-                heartbeatTimeoutSeconds: (int) min(300, ($transport->timeout() * 3) + 1),
+                heartbeatTimeoutSeconds: 90,
             ),
             self::QUACK_VERSION,
         );
@@ -116,12 +117,19 @@ final class ClientConnection
         if ($this->closed) {
             throw new ProtocolException('Quack client is not connected');
         }
-        return $this->transport->send(
-            $message,
-            $this->quackVersion,
-            $resultTypes,
-            $resultNames,
-        );
+        try {
+            return $this->transport->send(
+                $message,
+                $this->quackVersion,
+                $resultTypes,
+                $resultNames,
+            );
+        } catch (QuackError $error) {
+            if ($error->isConnectionFatal()) {
+                $this->closed = true;
+            }
+            throw $error;
+        }
     }
 
     public function prepare(string $sql): QuackMessage
