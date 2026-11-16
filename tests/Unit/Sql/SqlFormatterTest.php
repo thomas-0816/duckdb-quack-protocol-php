@@ -10,6 +10,7 @@ use DuckDB\Quack\Types\DateValue;
 use DuckDB\Quack\Types\DecimalValue;
 use DuckDB\Quack\Types\TimestampUnit;
 use DuckDB\Quack\Types\TimestampValue;
+use DuckDB\Quack\Types\TimeTzValue;
 use DuckDB\Quack\Types\Value;
 use PHPUnit\Framework\TestCase;
 
@@ -106,6 +107,34 @@ final class SqlFormatterTest extends TestCase
             "TIMESTAMPTZ '1970-01-01 00:00:01.000+00'",
             SqlFormatter::valueLiteral(Value::timestamp(
                 new TimestampValue(TimestampUnit::Seconds, 1, true),
+            )),
+        );
+    }
+
+    public function testFormatsTimeWithTimeZone(): void
+    {
+        self::assertSame(
+            "TIMETZ '12:34:56+01:00'",
+            SqlFormatter::valueLiteral(Value::timeTz(
+                new TimeTzValue(self::timeTzBits(45_296_000_000, 3_600)),
+            )),
+        );
+        self::assertSame(
+            "TIMETZ '12:34:56.123456+01:00'",
+            SqlFormatter::valueLiteral(Value::timeTz(
+                new TimeTzValue(self::timeTzBits(45_296_123_456, 3_600)),
+            )),
+        );
+        self::assertSame(
+            "TIMETZ '12:34:56-05:30'",
+            SqlFormatter::valueLiteral(Value::timeTz(
+                new TimeTzValue(self::timeTzBits(45_296_000_000, -19_800)),
+            )),
+        );
+        self::assertSame(
+            "TIMETZ '12:34:56+05:30:15'",
+            SqlFormatter::valueLiteral(Value::timeTz(
+                new TimeTzValue(self::timeTzBits(45_296_000_000, 19_815)),
             )),
         );
     }
@@ -218,6 +247,13 @@ final class SqlFormatterTest extends TestCase
             'SELECT :missing',
             SqlParameters::fromArray(['other' => 1]),
         );
+    }
+
+    private static function timeTzBits(int $micros, int $offsetSeconds): int
+    {
+        // DuckDB stores a TIMETZ as micros since midnight in the high 40 bits
+        // and an inverted offset from +16:00 in the low 24 bits.
+        return ($micros << 24) | ((16 * 3_600 - 1) - $offsetSeconds);
     }
 }
 
