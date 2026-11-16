@@ -84,9 +84,9 @@ final class LogicalTypeCodecTest extends TestCase
         self::writeValue(
             $blob,
             LogicalTypeId::Blob,
-            static fn (BinaryWriter $w) => $w->writeString('\x00\xff'),
+            static fn (BinaryWriter $w) => $w->writeString('hi\x00\xffa\x5Cxb'),
         );
-        self::assertSame("\x00\xff", self::decodeValue($blob)->toPhp());
+        self::assertSame("hi\x00\xffa\\xb", self::decodeValue($blob)->toPhp());
 
         $null = BinaryWriter::new();
         self::writeNullValue($null, LogicalTypeId::Varchar);
