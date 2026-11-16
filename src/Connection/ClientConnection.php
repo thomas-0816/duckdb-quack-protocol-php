@@ -4,6 +4,7 @@ namespace DuckDB\Quack\Connection;
 
 use DuckDB\Quack\Error\QuackError;
 use DuckDB\Quack\Exceptions\ProtocolException;
+use DuckDB\Quack\Messages\CancelMessage;
 use DuckDB\Quack\Messages\ConnectionRequestMessage;
 use DuckDB\Quack\Messages\ConnectionResponseMessage;
 use DuckDB\Quack\Messages\DisconnectMessage;
@@ -142,6 +143,32 @@ final class ClientConnection
             resultUuid: $resultUuid,
             batchIndex: $batchIndex,
             ackIndex: $ackIndex,
+        );
+        try {
+            return $this->transport->send($message, $this->quackVersion);
+        } catch (QuackError $error) {
+            if ($error->isConnectionFatal()) {
+                $this->closed = true;
+            }
+            throw $error;
+        }
+    }
+
+    /**
+     * Cancels the query running, or still producing results, on this connection.
+     *
+     * A null uuid sends the zero wildcard, which cancels whatever is active.
+     */
+    public function cancel(HugeIntParts $queryUuid): QuackMessage
+    {
+        if ($this->closed) {
+            throw new ProtocolException('Quack client is not connected');
+        }
+        $message = new CancelMessage(
+            header: MessageHeader::new(MessageType::CancelRequest)
+                ->withConnection($this->connectionId)
+                ->withClientQueryId($this->queryCounter++),
+            queryUuid: $queryUuid
         );
         try {
             return $this->transport->send($message, $this->quackVersion);
