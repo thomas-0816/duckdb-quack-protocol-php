@@ -19,12 +19,7 @@ use DuckDB\Quack\QuackClient;
 use DuckDB\Quack\Sql\SqlFormatter;
 use DuckDB\Quack\Sql\SqlParameter;
 
-$client = QuackClient::connect(
-    'http://127.0.0.1:9494',
-    'secret',
-    10.0,
-    300.0,
-);
+$client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 10, 30);
 
 // Scalars and arrays are detected without wrapping them in Value.
 $params = [41, "can't", [1, 2, 3], ['name' => 'Ada', 'tags' => ['math', 'code']]];

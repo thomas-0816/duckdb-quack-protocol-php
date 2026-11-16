@@ -14,12 +14,7 @@ require __DIR__ . '/../vendor/autoload.php';
 
 use DuckDB\Quack\QuackClient;
 
-$client = QuackClient::connect(
-    'http://127.0.0.1:9494',
-    'secret',
-    10.0,
-    300.0,
-);
+$client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 10, 30);
 
 $sql = <<<'SQL'
     SELECT

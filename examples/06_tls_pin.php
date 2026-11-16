@@ -31,13 +31,7 @@ if ($pem === false) {
     exit(1);
 }
 
-$client = QuackClient::connect(
-    'https://localhost:9494',
-    'secret',
-    10.0,
-    300.0,
-    sslCertificate: $pem,
-);
+$client = QuackClient::connect('https://localhost:9494', 'secret', 3, 10, [], $pem);
 
 echo 'connected over TLS to https://localhost:9494', PHP_EOL;
 echo 'server DuckDB: ', $client->getConnection()->serverDuckdbVersion() ?? 'unknown', PHP_EOL;
