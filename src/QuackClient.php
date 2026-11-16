@@ -51,9 +51,6 @@ final class QuackClient
     ): self {
         $settings = [];
         foreach ($configuration as $name => $value) {
-            if (!is_scalar($value) && $value !== null) {
-                continue;
-            }
             $literal = match (true) {
                 $value === null => Value::null(),
                 is_bool($value) => Value::bool($value),
