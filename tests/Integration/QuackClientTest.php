@@ -2,6 +2,7 @@
 
 namespace DuckDB\Quack\Tests\Integration;
 
+use DuckDB\Quack\Exceptions\ServerException;
 use DuckDB\Quack\QuackClient;
 use PHPUnit\Framework\TestCase;
 
@@ -691,6 +692,22 @@ final class QuackClientTest extends TestCase
         }
 
         return $pem;
+    }
+
+    public function testRejectsInvalidTimezoneBeforeConnecting(): void
+    {
+        $this->expectException(ServerException::class);
+        $this->expectExceptionMessage("quack server error: Unknown TimeZone 'Not/AZone'");
+
+        QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 10, ['timezone' => 'Not/AZone']);
+    }
+
+    public function testRejectsNonStringTimezoneBeforeConnecting(): void
+    {
+        $this->expectException(ServerException::class);
+        $this->expectExceptionMessage("quack server error: Unknown TimeZone '42'");
+
+        QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 10, ['timezone' => 42]);
     }
 
     /**
