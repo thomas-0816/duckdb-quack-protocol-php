@@ -53,9 +53,7 @@ final class SqlFormatter
             Value::DECIMAL => $value->asDecimal()->toString(),
             Value::DATE => "DATE '" . self::dateFromDays($value->asDate()->days) . "'",
             Value::TIME => "TIME '" . self::formatTime($value->asTime()->value, $value->asTime()->unit) . "'",
-            Value::TIME_TZ => throw new ProtocolException(
-                'TIME WITH TIME ZONE parameters are not supported as SQL literals',
-            ),
+            Value::TIME_TZ => "TIMETZ '" . TemporalFormatter::formatTimeTz($value->asTimeTz()->bits) . "'",
             Value::TIMESTAMP => (
                 $value->asTimestamp()->timezoneUtc ? 'TIMESTAMPTZ' : 'TIMESTAMP'
             ) . " '" . self::formatTimestamp(
