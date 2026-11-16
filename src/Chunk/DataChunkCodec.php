@@ -7,7 +7,6 @@ use DuckDB\Quack\Exceptions\UnsupportedTypeException;
 use DuckDB\Quack\Exceptions\Utf8Exception;
 use DuckDB\Quack\Messages\MessageCodec;
 use DuckDB\Quack\Transport\BinaryReader;
-use DuckDB\Quack\Transport\BinaryWriter;
 use DuckDB\Quack\Types\BigInt;
 use DuckDB\Quack\Types\Bignum;
 use DuckDB\Quack\Types\BitString;
@@ -33,38 +32,25 @@ use DuckDB\Quack\Types\WktFormatter;
  */
 final class DataChunkCodec
 {
-    public static function encodeDataChunkWrapper(BinaryWriter $writer, DataChunk $chunk): void
-    {
-        $writer->writeObject(function (BinaryWriter $object) use ($chunk): void {
-            $object->writeField(300, fn (BinaryWriter $w) => self::encodeDataChunk($w, $chunk));
-        });
-    }
-
-    /**
-     * @param list<string>      $resultNames
-     */
-    public static function decodeDataChunkWrapperToPhp(BinaryReader $reader, array $resultNames = []): DataChunk
+    public static function decodeDataChunkWrapperToPhp(BinaryReader $reader): DataChunk
     {
         return $reader->readObject(
             static fn (BinaryReader $object) => $object->readRequiredField(
                 300,
-                static fn (BinaryReader $r) => self::decodeDataChunkToPhp($r, $resultNames),
+                static fn (BinaryReader $r) => self::decodeDataChunkToPhp($r),
             ),
         );
     }
 
     /**
-     * Decodes a chunk straight to PHP values using the prepare-time schema.
+     * Decodes a chunk straight to PHP values.
      *
-     * The chunk's own type list is consumed without allocating LogicalType
-     * objects. It is validated against the supplied types, which are reused as
-     * the decoded chunk's type metadata.
-     *
-     * @param list<string>      $resultNames
+     * The chunk carries its own type list, so no prepare-time schema is
+     * needed.
      */
-    public static function decodeDataChunkToPhp(BinaryReader $reader, array $resultNames = []): DataChunk
+    public static function decodeDataChunkToPhp(BinaryReader $reader): DataChunk
     {
-        return $reader->readObject(function (BinaryReader $object) use ($resultNames): DataChunk {
+        return $reader->readObject(function (BinaryReader $object): DataChunk {
             $rowCount = $object->readRequiredField(100, static fn (BinaryReader $r) => $r->readUlebUsize());
 
             $decodedTypes = $object->readRequiredField(
@@ -74,91 +60,24 @@ final class DataChunkCodec
                 ),
             );
             /** @var list<LogicalType> $decodedTypes */
-            return self::decodeColumns($object, $rowCount, $decodedTypes, $resultNames);
-        });
-    }
-
-    /**
-     * @param list<LogicalType> $types
-     * @param list<string>      $resultNames
-     */
-    private static function decodeColumns(
-        BinaryReader $object,
-        int $rowCount,
-        array $types,
-        array $resultNames,
-    ): DataChunk {
-        $columns = $object->readRequiredField(
-            102,
-            static fn (BinaryReader $r) => $r->readList(
-                static function (BinaryReader $rr, int $index) use ($types, $rowCount): DecodedVector {
-                    $logicalType = $types[$index] ?? null;
-                    if ($logicalType === null) {
-                        throw new ProtocolException("column vector {$index} has no matching logical type");
-                    }
-                    return self::decodeVector($rr, $logicalType, $rowCount);
-                },
-            ),
-        );
-        if (count($columns) !== count($types)) {
-            throw new ProtocolException('DataChunk declared ' . count($types) . ' types but serialized ' . count($columns) . ' columns');
-        }
-        return new DataChunk($rowCount, $types, $columns, $resultNames);
-    }
-
-    /**
-     * Encoding still operates on Value objects; decoded chunks contain PHP
-     * values, so reject them rather than failing deep inside the encoder.
-     *
-     * @param list<mixed> $values
-     * @return list<Value>
-     */
-    private static function valueList(array $values, int $columnIndex): array
-    {
-        $result = [];
-        foreach ($values as $value) {
-            if (!$value instanceof Value) {
-                throw new ProtocolException("column {$columnIndex} contains a decoded PHP value and cannot be re-encoded");
-            }
-            $result[] = $value;
-        }
-
-        return $result;
-    }
-
-    public static function encodeDataChunk(BinaryWriter $writer, DataChunk $chunk): void
-    {
-        if (count($chunk->types) !== count($chunk->columns)) {
-            throw new ProtocolException('DataChunk type count must match column count');
-        }
-        $writer->writeObject(function (BinaryWriter $object) use ($chunk): void {
-            $object->writeField(100, static fn (BinaryWriter $w) => $w->writeUleb($chunk->rowCount));
-            $object->writeField(101, static function (BinaryWriter $w) use ($chunk): void {
-                $w->writeList(
-                    $chunk->types,
-                    static fn (BinaryWriter $ww, LogicalType $type) => LogicalTypeCodec::encodeLogicalType($ww, $type),
-                );
-            });
-            $object->writeField(102, static function (BinaryWriter $w) use ($chunk): void {
-                $w->writeList(
-                    $chunk->columns,
-                    static function (BinaryWriter $ww, DecodedVector $column, int $index) use ($chunk): void {
-                        $logicalType = $chunk->types[$index] ?? null;
+            $columns = $object->readRequiredField(
+                102,
+                static fn (BinaryReader $r) => $r->readList(
+                    static function (BinaryReader $rr, int $index) use ($decodedTypes, $rowCount): DecodedVector {
+                        $logicalType = $decodedTypes[$index] ?? null;
                         if ($logicalType === null) {
-                            throw new ProtocolException("column {$index} has no logical type");
+                            throw new ProtocolException("column vector {$index} has no matching logical type");
                         }
-                        if (count($column->values) !== $chunk->rowCount) {
-                            throw new ProtocolException("column {$index} has " . count($column->values) . " values, expected {$chunk->rowCount}");
-                        }
-                        self::encodeVector(
-                            $ww,
-                            $logicalType,
-                            self::valueList($column->values, $index),
-                            $chunk->rowCount,
-                        );
+
+                        return self::decodeVector($rr, $logicalType, $rowCount);
                     },
-                );
-            });
+                ),
+            );
+            if (count($columns) !== count($decodedTypes)) {
+                throw new ProtocolException('DataChunk declared ' . count($decodedTypes) . ' types but serialized ' . count($columns) . ' columns');
+            }
+
+            return new DataChunk($rowCount, $columns, [], []);
         });
     }
 
@@ -169,20 +88,6 @@ final class DataChunkCodec
     ): DecodedVector {
         return $reader->readObject(
             static fn (BinaryReader $object) => self::decodeVectorBody($object, $logicalType, $count),
-        );
-    }
-
-    /**
-     * @param list<Value> $values
-     */
-    public static function encodeVector(
-        BinaryWriter $writer,
-        LogicalType $logicalType,
-        array $values,
-        int $count,
-    ): void {
-        $writer->writeObject(
-            static fn (BinaryWriter $object) => self::encodeFlatVectorBody($object, $logicalType, $values, $count),
         );
     }
 
@@ -751,196 +656,6 @@ final class DataChunkCodec
     }
 
     /**
-     * @param list<Value> $values
-     */
-    private static function encodeFlatVectorBody(BinaryWriter $writer, LogicalType $logicalType, array $values, int $count): void
-    {
-        if (count($values) !== $count) {
-            throw new ProtocolException('vector value count ' . count($values) . " does not match row count {$count}");
-        }
-        if ($logicalType->id === LogicalTypeId::Geometry) {
-            $writer->writeField(99, static fn (BinaryWriter $w) => $w->writeUleb(1));
-        }
-        $validity = [];
-        foreach ($values as $value) {
-            $validity[] = !$value->isNull();
-        }
-        $hasValidityMask = in_array(false, $validity, true);
-        $writer->writeField(100, static fn (BinaryWriter $w) => $w->writeBool($hasValidityMask));
-        if ($hasValidityMask) {
-            $mask = str_repeat("\0", intdiv(count($validity) + 63, 64) * 8);
-            foreach ($validity as $index => $valid) {
-                if ($valid) {
-                    $byteIndex = intdiv($index, 8);
-                    $mask[$byteIndex] = chr((ord($mask[$byteIndex]) | (1 << ($index % 8))) & 0xff);
-                }
-            }
-            $writer->writeField(101, static fn (BinaryWriter $w) => $w->writeBlob($mask));
-        }
-
-        $physicalType = LogicalTypeCodec::getPhysicalType($logicalType);
-        if (LogicalTypeCodec::isConstantSizePhysicalType($physicalType)) {
-            $data = BinaryWriter::new();
-            foreach ($values as $value) {
-                self::encodeFixedValue($data, $logicalType, $physicalType, $value);
-            }
-            $bytes = $data->intoBytes();
-            $writer->writeField(102, static fn (BinaryWriter $w) => $w->writeBlob($bytes));
-            return;
-        }
-
-        match ($physicalType) {
-            PhysicalType::Varchar => self::encodeStringVector($writer, $logicalType, $values),
-            PhysicalType::Struct => self::encodeStructVector($writer, $logicalType, $values, $count),
-            PhysicalType::List => self::encodeListVector($writer, $logicalType, $values),
-            PhysicalType::Array => self::encodeArrayVector($writer, $logicalType, $values),
-            default => throw new UnsupportedTypeException("cannot encode physical type {$physicalType->name}"),
-        };
-    }
-
-    /**
-     * Encodes a VARCHAR-like vector.
-     *
-     * DuckDB storage version 2.0 (Quack v3) packs the strings as a u32 length
-     * per row (field 108) and one contiguous byte blob (field 109), preceded by
-     * the blob length (field 107). GEOMETRY is the exception: DuckDB always
-     * serializes its WKB values as a list (field 102).
-     *
-     * @param list<Value> $values
-     */
-    private static function encodeStringVector(BinaryWriter $writer, LogicalType $logicalType, array $values): void
-    {
-        $encoded = [];
-        foreach ($values as $value) {
-            if ($value->isNull()) {
-                $encoded[] = '';
-            } elseif ($logicalType->id === LogicalTypeId::Blob && $value->kind === Value::BYTES) {
-                $encoded[] = $value->asBytes();
-            } elseif ($logicalType->id === LogicalTypeId::Bit) {
-                $encoded[] = BitString::toStorage(match ($value->kind) {
-                    Value::STRING => $value->asString(),
-                    Value::BYTES => $value->asBytes(),
-                    default => self::valueToDisplayString($value),
-                });
-            } elseif ($value->kind === Value::STRING) {
-                $encoded[] = $value->asString();
-            } elseif ($value->kind === Value::BYTES) {
-                $encoded[] = $value->asBytes();
-            } else {
-                $encoded[] = self::valueToDisplayString($value);
-            }
-        }
-
-        if ($logicalType->id === LogicalTypeId::Geometry) {
-            $writer->writeField(102, static function (BinaryWriter $w) use ($encoded): void {
-                $w->writeList($encoded, static fn (BinaryWriter $ww, string $bytes) => $ww->writeStringBytes($bytes));
-            });
-            return;
-        }
-
-        $lengths = '';
-        $bytes = '';
-        foreach ($encoded as $value) {
-            $length = strlen($value);
-            if ($length > 0xFFFFFFFF) {
-                throw new ProtocolException('string value is longer than u32::MAX bytes');
-            }
-            $lengths .= pack('V', $length);
-            $bytes .= $value;
-        }
-
-        $writer->writeField(107, static fn (BinaryWriter $w) => $w->writeUleb(strlen($bytes)));
-        $writer->writeField(108, static fn (BinaryWriter $w) => $w->writeBlob($lengths));
-        $writer->writeField(109, static fn (BinaryWriter $w) => $w->writeBlob($bytes));
-    }
-
-    /**
-     * @param list<Value> $values
-     */
-    private static function encodeStructVector(BinaryWriter $writer, LogicalType $logicalType, array $values, int $count): void
-    {
-        $children = LogicalTypeCodec::getStructChildren($logicalType);
-        $writer->writeField(103, static function (BinaryWriter $w) use ($children, $values, $count): void {
-            $w->writeList(
-                $children,
-                static function (BinaryWriter $ww, $child) use ($values, $count): void {
-                    $childValues = [];
-                    foreach ($values as $value) {
-                        $childValues[] = $value->kind === Value::STRUCT ? ($value->asStruct()[$child->name] ?? Value::null()) : Value::null();
-                    }
-                    self::encodeVector($ww, $child->logicalType, $childValues, $count);
-                },
-            );
-        });
-    }
-
-    /**
-     * @param list<Value> $values
-     */
-    private static function encodeListVector(BinaryWriter $writer, LogicalType $logicalType, array $values): void
-    {
-        $childType = LogicalTypeCodec::getChildType($logicalType);
-        $entries = [];
-        $childValues = [];
-        foreach ($values as $value) {
-            if ($value->kind === Value::NULL) {
-                $entries[] = [0, 0];
-                continue;
-            }
-            if ($value->kind !== Value::LIST) {
-                throw new ProtocolException('LIST/MAP values must be lists');
-            }
-            $items = $value->asList();
-            $entries[] = [count($childValues), count($items)];
-            foreach ($items as $item) {
-                $childValues[] = $item;
-            }
-        }
-        $writer->writeField(104, static fn (BinaryWriter $w) => $w->writeUleb(count($childValues)));
-        $writer->writeField(105, static function (BinaryWriter $w) use ($entries): void {
-            $w->writeList(
-                $entries,
-                static function (BinaryWriter $writer, array $entry): void {
-                    $writer->writeObject(static function (BinaryWriter $object) use ($entry): void {
-                        $object->writeField(100, static fn (BinaryWriter $field) => $field->writeUleb($entry[0]));
-                        $object->writeField(101, static fn (BinaryWriter $field) => $field->writeUleb($entry[1]));
-                    });
-                },
-            );
-        });
-        $writer->writeField(106, static fn (BinaryWriter $w) => self::encodeVector($w, $childType, $childValues, count($childValues)));
-    }
-
-    /**
-     * @param list<Value> $values
-     */
-    private static function encodeArrayVector(BinaryWriter $writer, LogicalType $logicalType, array $values): void
-    {
-        $childType = LogicalTypeCodec::getChildType($logicalType);
-        $arraySize = LogicalTypeCodec::getArraySize($logicalType);
-        $childValues = [];
-        foreach ($values as $value) {
-            if ($value->kind === Value::NULL) {
-                for ($index = 0; $index < $arraySize; $index++) {
-                    $childValues[] = Value::null();
-                }
-                continue;
-            }
-            if ($value->kind !== Value::LIST) {
-                throw new ProtocolException('ARRAY values must be lists');
-            }
-            if (count($value->asList()) !== $arraySize) {
-                throw new ProtocolException("ARRAY values must be lists of length {$arraySize}");
-            }
-            foreach ($value->asList() as $item) {
-                $childValues[] = $item;
-            }
-        }
-        $writer->writeField(103, static fn (BinaryWriter $w) => $w->writeUleb($arraySize));
-        $writer->writeField(104, static fn (BinaryWriter $w) => self::encodeVector($w, $childType, $childValues, count($childValues)));
-    }
-
-    /**
      * Reads a string-like vector payload.
      *
      * DuckDB storage version 2.0 sends the byte length (107), a little-endian
@@ -1099,283 +814,6 @@ final class DataChunkCodec
         return $values[$position];
     }
 
-    private static function encodeFixedValue(BinaryWriter $writer, LogicalType $logicalType, PhysicalType $physicalType, Value $value): void
-    {
-        if ($value->isNull()) {
-            $writer->writeBytes(str_repeat("\0", LogicalTypeCodec::physicalTypeSize($physicalType)));
-            return;
-        }
-        switch ($physicalType) {
-            case PhysicalType::Bool:
-                $writer->writeFixedU8($value->kind === Value::BOOL && $value->value === true ? 1 : 0);
-                return;
-            case PhysicalType::Int8:
-                $encoded = match ($value->kind) {
-                    Value::BOOL => BigInt::fromInt($value->asBool() ? 1 : 0),
-                    Value::INT => BigInt::fromInt($value->asInt()),
-                    Value::UINT, Value::HUGEINT, Value::UHUGEINT => BigInt::coerce($value->asIntOrString()),
-                    Value::STRING => BigInt::fromString($value->asString()),
-                    default => throw new ProtocolException("cannot convert value of kind {$value->kind} to integer"),
-                };
-                $writer->writeBytes($encoded->lowBits(8)->toBytesLE(1, false));
-                return;
-            case PhysicalType::UInt8:
-                $writer->writeBytes(self::encodeEnumOrNumber($logicalType, $value)->lowBits(8)->toBytesLE(1, false));
-                return;
-            case PhysicalType::Int16:
-                if ($logicalType->id === LogicalTypeId::Decimal) {
-                    if ($value->kind === Value::DECIMAL) {
-                        $encoded = BigInt::coerce($value->asDecimal()->value);
-                    } elseif ($value->kind === Value::STRING) {
-                        [, $scale] = LogicalTypeCodec::getDecimalWidthAndScale($logicalType);
-                        $trimmed = trim($value->asString());
-                        $negative = str_starts_with($trimmed, '-');
-                        $unsignedText = ltrim($trimmed, '+-');
-                        $decimalParts = explode('.', $unsignedText, 2);
-                        $integer = $decimalParts[0];
-                        $fraction = $decimalParts[1] ?? '';
-                        $fraction = substr(str_pad($fraction, $scale, '0'), 0, $scale);
-                        $text = ($integer === '' ? '0' : $integer) . $fraction;
-                        $parsed = BigInt::fromString($text);
-                        $encoded = $negative ? $parsed->neg() : $parsed;
-                    } else {
-                        $encoded = match ($value->kind) {
-                            Value::BOOL => BigInt::fromInt($value->asBool() ? 1 : 0),
-                            Value::INT => BigInt::fromInt($value->asInt()),
-                            Value::UINT, Value::HUGEINT, Value::UHUGEINT => BigInt::coerce($value->asIntOrString()),
-                            Value::STRING => BigInt::fromString($value->asString()),
-                            default => throw new ProtocolException("cannot convert value of kind {$value->kind} to integer"),
-                        };
-                    }
-                } else {
-                    $encoded = match ($value->kind) {
-                        Value::BOOL => BigInt::fromInt($value->asBool() ? 1 : 0),
-                        Value::INT => BigInt::fromInt($value->asInt()),
-                        Value::UINT, Value::HUGEINT, Value::UHUGEINT => BigInt::coerce($value->asIntOrString()),
-                        Value::STRING => BigInt::fromString($value->asString()),
-                        default => throw new ProtocolException("cannot convert value of kind {$value->kind} to integer"),
-                    };
-                }
-                $writer->writeBytes($encoded->lowBits(16)->toBytesLE(2, false));
-                return;
-            case PhysicalType::UInt16:
-                $writer->writeBytes(self::encodeEnumOrNumber($logicalType, $value)->lowBits(16)->toBytesLE(2, false));
-                return;
-            case PhysicalType::Int32:
-                if ($logicalType->id === LogicalTypeId::Date) {
-                    $encoded = $value->kind === Value::DATE
-                        ? BigInt::fromInt($value->asDate()->days)
-                        : (match ($value->kind) {
-                            Value::BOOL => BigInt::fromInt($value->asBool() ? 1 : 0),
-                            Value::INT => BigInt::fromInt($value->asInt()),
-                            Value::UINT, Value::HUGEINT, Value::UHUGEINT => BigInt::coerce($value->asIntOrString()),
-                            Value::STRING => BigInt::fromString($value->asString()),
-                            default => throw new ProtocolException("cannot convert value of kind {$value->kind} to integer"),
-                        });
-                } elseif ($logicalType->id === LogicalTypeId::Decimal) {
-                    if ($value->kind === Value::DECIMAL) {
-                        $encoded = BigInt::coerce($value->asDecimal()->value);
-                    } elseif ($value->kind === Value::STRING) {
-                        [, $scale] = LogicalTypeCodec::getDecimalWidthAndScale($logicalType);
-                        $trimmed = trim($value->asString());
-                        $negative = str_starts_with($trimmed, '-');
-                        $unsignedText = ltrim($trimmed, '+-');
-                        $decimalParts = explode('.', $unsignedText, 2);
-                        $integer = $decimalParts[0];
-                        $fraction = $decimalParts[1] ?? '';
-                        $fraction = substr(str_pad($fraction, $scale, '0'), 0, $scale);
-                        $text = ($integer === '' ? '0' : $integer) . $fraction;
-                        $parsed = BigInt::fromString($text);
-                        $encoded = $negative ? $parsed->neg() : $parsed;
-                    } else {
-                        $encoded = match ($value->kind) {
-                            Value::BOOL => BigInt::fromInt($value->asBool() ? 1 : 0),
-                            Value::INT => BigInt::fromInt($value->asInt()),
-                            Value::UINT, Value::HUGEINT, Value::UHUGEINT => BigInt::coerce($value->asIntOrString()),
-                            Value::STRING => BigInt::fromString($value->asString()),
-                            default => throw new ProtocolException("cannot convert value of kind {$value->kind} to integer"),
-                        };
-                    }
-                } else {
-                    $encoded = match ($value->kind) {
-                        Value::BOOL => BigInt::fromInt($value->asBool() ? 1 : 0),
-                        Value::INT => BigInt::fromInt($value->asInt()),
-                        Value::UINT, Value::HUGEINT, Value::UHUGEINT => BigInt::coerce($value->asIntOrString()),
-                        Value::STRING => BigInt::fromString($value->asString()),
-                        default => throw new ProtocolException("cannot convert value of kind {$value->kind} to integer"),
-                    };
-                }
-                $writer->writeBytes($encoded->lowBits(32)->toBytesLE(4, false));
-                return;
-            case PhysicalType::UInt32:
-                $writer->writeBytes(self::encodeEnumOrNumber($logicalType, $value)->lowBits(32)->toBytesLE(4, false));
-                return;
-            case PhysicalType::Int64:
-                if ($logicalType->id === LogicalTypeId::Decimal) {
-                    if ($value->kind === Value::DECIMAL) {
-                        $encoded = BigInt::coerce($value->asDecimal()->value);
-                    } elseif ($value->kind === Value::STRING) {
-                        [, $scale] = LogicalTypeCodec::getDecimalWidthAndScale($logicalType);
-                        $trimmed = trim($value->asString());
-                        $negative = str_starts_with($trimmed, '-');
-                        $unsignedText = ltrim($trimmed, '+-');
-                        $decimalParts = explode('.', $unsignedText, 2);
-                        $integer = $decimalParts[0];
-                        $fraction = $decimalParts[1] ?? '';
-                        $fraction = substr(str_pad($fraction, $scale, '0'), 0, $scale);
-                        $text = ($integer === '' ? '0' : $integer) . $fraction;
-                        $parsed = BigInt::fromString($text);
-                        $encoded = $negative ? $parsed->neg() : $parsed;
-                    } else {
-                        $encoded = match ($value->kind) {
-                            Value::BOOL => BigInt::fromInt($value->asBool() ? 1 : 0),
-                            Value::INT => BigInt::fromInt($value->asInt()),
-                            Value::UINT, Value::HUGEINT, Value::UHUGEINT => BigInt::coerce($value->asIntOrString()),
-                            Value::STRING => BigInt::fromString($value->asString()),
-                            default => throw new ProtocolException("cannot convert value of kind {$value->kind} to integer"),
-                        };
-                    }
-                } else {
-                    $encoded = match ($value->kind) {
-                        Value::TIME => BigInt::fromInt($value->asTime()->value),
-                        Value::TIMESTAMP => BigInt::fromInt($value->asTimestamp()->value),
-                        Value::TIME_TZ => BigInt::fromInt($value->asTimeTz()->bits),
-                        default => (match ($value->kind) {
-                            Value::BOOL => BigInt::fromInt($value->asBool() ? 1 : 0),
-                            Value::INT => BigInt::fromInt($value->asInt()),
-                            Value::UINT, Value::HUGEINT, Value::UHUGEINT => BigInt::coerce($value->asIntOrString()),
-                            Value::STRING => BigInt::fromString($value->asString()),
-                            default => throw new ProtocolException("cannot convert value of kind {$value->kind} to integer"),
-                        }),
-                    };
-                }
-                $writer->writeFixedI64($encoded);
-                return;
-            case PhysicalType::UInt64:
-                $unsigned = match ($value->kind) {
-                    Value::BOOL => BigInt::fromInt($value->asBool() ? 1 : 0),
-                    Value::INT => BigInt::fromInt($value->asInt()),
-                    Value::UINT, Value::HUGEINT, Value::UHUGEINT => BigInt::coerce($value->asIntOrString()),
-                    Value::STRING => BigInt::fromString($value->asString()),
-                    default => throw new ProtocolException("cannot convert value of kind {$value->kind} to unsigned integer"),
-                };
-                if ($unsigned->isNegative()) {
-                    throw new ProtocolException("cannot convert {$unsigned} to unsigned integer");
-                }
-                $writer->writeBytes($unsigned->lowBits(64)->toBytesLE(8, false));
-                return;
-            case PhysicalType::Float:
-                if ($value->kind === Value::FLOAT || $value->kind === Value::DOUBLE) {
-                    $float = $value->asFloat();
-                } elseif ($value->kind === Value::INT) {
-                    $float = (float) $value->asInt();
-                } elseif ($value->kind === Value::UINT) {
-                    $float = (float) $value->asIntOrString();
-                } elseif ($value->kind === Value::STRING) {
-                    $floatText = $value->asString();
-                    if (!is_numeric($floatText)) {
-                        throw new ProtocolException("cannot convert {$floatText} to float");
-                    }
-                    $float = (float) $floatText;
-                } else {
-                    throw new ProtocolException("cannot convert value of kind {$value->kind} to float");
-                }
-                $writer->writeFixedF32((float) $float);
-                return;
-            case PhysicalType::Double:
-                if ($value->kind === Value::FLOAT || $value->kind === Value::DOUBLE) {
-                    $float = $value->asFloat();
-                } elseif ($value->kind === Value::INT) {
-                    $float = (float) $value->asInt();
-                } elseif ($value->kind === Value::UINT) {
-                    $float = (float) $value->asIntOrString();
-                } elseif ($value->kind === Value::STRING) {
-                    $floatText = $value->asString();
-                    if (!is_numeric($floatText)) {
-                        throw new ProtocolException("cannot convert {$floatText} to float");
-                    }
-                    $float = (float) $floatText;
-                } else {
-                    throw new ProtocolException("cannot convert value of kind {$value->kind} to float");
-                }
-                $writer->writeFixedF64($float);
-                return;
-            case PhysicalType::Int128:
-                if ($logicalType->id === LogicalTypeId::Uuid) {
-                    if ($value->kind !== Value::STRING) {
-                        throw new ProtocolException('UUID values must be strings');
-                    }
-                    $parts = HugeIntParts::fromUuid($value->asString());
-                } else {
-                    if ($logicalType->id === LogicalTypeId::Decimal) {
-                        if ($value->kind === Value::DECIMAL) {
-                            $encoded = BigInt::coerce($value->asDecimal()->value);
-                        } elseif ($value->kind === Value::STRING) {
-                            [, $scale] = LogicalTypeCodec::getDecimalWidthAndScale($logicalType);
-                            $trimmed = trim($value->asString());
-                            $negative = str_starts_with($trimmed, '-');
-                            $unsignedText = ltrim($trimmed, '+-');
-                            $decimalParts = explode('.', $unsignedText, 2);
-                            $integer = $decimalParts[0];
-                            $fraction = $decimalParts[1] ?? '';
-                            $fraction = substr(str_pad($fraction, $scale, '0'), 0, $scale);
-                            $text = ($integer === '' ? '0' : $integer) . $fraction;
-                            $parsed = BigInt::fromString($text);
-                            $encoded = $negative ? $parsed->neg() : $parsed;
-                        } else {
-                            $encoded = match ($value->kind) {
-                                Value::BOOL => BigInt::fromInt($value->asBool() ? 1 : 0),
-                                Value::INT => BigInt::fromInt($value->asInt()),
-                                Value::UINT, Value::HUGEINT, Value::UHUGEINT => BigInt::coerce($value->asIntOrString()),
-                                Value::STRING => BigInt::fromString($value->asString()),
-                                default => throw new ProtocolException("cannot convert value of kind {$value->kind} to integer"),
-                            };
-                        }
-                    } else {
-                        $encoded = match ($value->kind) {
-                            Value::BOOL => BigInt::fromInt($value->asBool() ? 1 : 0),
-                            Value::INT => BigInt::fromInt($value->asInt()),
-                            Value::UINT, Value::HUGEINT, Value::UHUGEINT => BigInt::coerce($value->asIntOrString()),
-                            Value::STRING => BigInt::fromString($value->asString()),
-                            default => throw new ProtocolException("cannot convert value of kind {$value->kind} to integer"),
-                        };
-                    }
-                    $parts = HugeIntParts::fromSignedBigInt($encoded);
-                }
-                $writer->writeFixedU64(
-                    BigInt::coerce($parts->lower)->lowBits(64),
-                );
-                $writer->writeFixedI64($parts->upper);
-                return;
-            case PhysicalType::UInt128:
-                $unsigned = match ($value->kind) {
-                    Value::BOOL => BigInt::fromInt($value->asBool() ? 1 : 0),
-                    Value::INT => BigInt::fromInt($value->asInt()),
-                    Value::UINT, Value::HUGEINT, Value::UHUGEINT => BigInt::coerce($value->asIntOrString()),
-                    Value::STRING => BigInt::fromString($value->asString()),
-                    default => throw new ProtocolException("cannot convert value of kind {$value->kind} to unsigned integer"),
-                };
-                if ($unsigned->isNegative()) {
-                    throw new ProtocolException("cannot convert {$unsigned} to unsigned integer");
-                }
-                $bytes = $unsigned->toBytesLE(16, false);
-                $writer->writeBytes(substr($bytes, 0, 8));
-                $writer->writeBytes(substr($bytes, 8, 8));
-                return;
-            case PhysicalType::Interval:
-                if ($value->kind !== Value::INTERVAL) {
-                    throw new ProtocolException('INTERVAL values must be tagged intervals');
-                }
-                $interval = $value->asInterval();
-                $writer->writeFixedI32($interval->months);
-                $writer->writeFixedI32($interval->days);
-                $writer->writeFixedI64($interval->micros);
-                return;
-            default:
-                throw new UnsupportedTypeException("cannot encode fixed physical type {$physicalType->name}");
-        }
-    }
-
     private static function decodeStringLikeValueToPhp(LogicalType $logicalType, string $raw): mixed
     {
         if ($logicalType->id === LogicalTypeId::Blob) {
@@ -1496,73 +934,6 @@ final class DataChunkCodec
             LogicalTypeId::TimestampTz => TemporalFormatter::formatTimestamp($value, TimestampUnit::Micros, true),
             LogicalTypeId::TimestampTzNs => TemporalFormatter::formatTimestamp($value, TimestampUnit::Nanos, true),
             default => $value,
-        };
-    }
-
-    private static function encodeEnumOrNumber(LogicalType $logicalType, Value $value): BigInt
-    {
-        if ($logicalType->id !== LogicalTypeId::Enum) {
-            $result = match ($value->kind) {
-                Value::BOOL => BigInt::fromInt($value->asBool() ? 1 : 0),
-                Value::INT => BigInt::fromInt($value->asInt()),
-                Value::UINT, Value::HUGEINT, Value::UHUGEINT => BigInt::coerce($value->asIntOrString()),
-                Value::STRING => BigInt::fromString($value->asString()),
-                default => throw new ProtocolException("cannot convert value of kind {$value->kind} to unsigned integer"),
-            };
-            if ($result->isNegative()) {
-                throw new ProtocolException("cannot convert {$result} to unsigned integer");
-            }
-
-            return $result;
-        }
-
-        if ($value->kind === Value::UINT || $value->kind === Value::INT || $value->kind === Value::HUGEINT || $value->kind === Value::UHUGEINT) {
-            $result = BigInt::coerce($value->asIntOrString());
-            if ($result->isNegative()) {
-                throw new ProtocolException("cannot convert {$result} to unsigned integer");
-            }
-            return $result;
-        }
-
-        if ($value->kind === Value::STRING) {
-            $string = $value->asString();
-            foreach (LogicalTypeCodec::getEnumValues($logicalType) as $index => $candidate) {
-                if ($candidate === $string) {
-                    return BigInt::fromInt($index);
-                }
-            }
-            throw new ProtocolException("unknown ENUM value {$string}");
-        }
-
-        throw new ProtocolException('ENUM values must be strings or integers');
-    }
-
-    private static function valueToDisplayString(Value $value): string
-    {
-        if ($value->kind === Value::FLOAT || $value->kind === Value::DOUBLE) {
-            $float = $value->asFloat();
-            if (is_nan($float)) {
-                return 'NaN';
-            }
-            if (is_infinite($float)) {
-                return $float > 0 ? 'inf' : '-inf';
-            }
-            return (string) $float;
-        }
-
-        return match ($value->kind) {
-            Value::NULL => '',
-            Value::BOOL => $value->asBool() ? 'true' : 'false',
-            Value::INT, Value::UINT, Value::HUGEINT, Value::UHUGEINT => (string) $value->asIntOrString(),
-            Value::STRING => $value->asString(),
-            Value::BYTES => $value->asBytes(),
-            Value::DECIMAL => $value->asDecimal()->toString(),
-            Value::DATE => (string) $value->asDate()->days,
-            Value::TIME => (string) $value->asTime()->value,
-            Value::TIME_TZ => (string) $value->asTimeTz()->bits,
-            Value::TIMESTAMP => (string) $value->asTimestamp()->value,
-            Value::INTERVAL => $value->asInterval()->months . ' ' . $value->asInterval()->days . ' ' . $value->asInterval()->micros,
-            default => '',
         };
     }
 }
