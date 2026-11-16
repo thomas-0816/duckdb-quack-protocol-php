@@ -130,8 +130,7 @@ final class DataChunkCodec
             ),
         );
         if (count($columns) !== count($types)) {
-            throw new ProtocolException('DataChunk declared ' . count($types) . ' types but serialized ' . count($columns) . ' columns',
-            );
+            throw new ProtocolException('DataChunk declared ' . count($types) . ' types but serialized ' . count($columns) . ' columns');
         }
         return new DataChunk($rowCount, $types, $columns, $resultNames);
     }
@@ -1631,11 +1630,8 @@ final class DataChunkCodec
                 $value,
                 TimestampUnit::Nanos,
             ),
-            LogicalTypeId::TimestampTz => TemporalFormatter::formatTimestamp(
-                $value,
-                TimestampUnit::Micros,
-                true,
-            ),
+            LogicalTypeId::TimestampTz => TemporalFormatter::formatTimestamp($value, TimestampUnit::Micros, true),
+            LogicalTypeId::TimestampTzNs => TemporalFormatter::formatTimestamp($value, TimestampUnit::Nanos, true),
             default => $value,
         };
     }
@@ -1648,30 +1644,20 @@ final class DataChunkCodec
                 Value::INT => BigInt::fromInt($value->asInt()),
                 Value::UINT, Value::HUGEINT, Value::UHUGEINT => BigInt::coerce($value->asIntOrString()),
                 Value::STRING => BigInt::fromString($value->asString()),
-                default => throw new ProtocolException(
-                    "cannot convert value of kind {$value->kind} to unsigned integer",
-                ),
+                default => throw new ProtocolException("cannot convert value of kind {$value->kind} to unsigned integer"),
             };
             if ($result->isNegative()) {
-                throw new ProtocolException(
-                    "cannot convert {$result} to unsigned integer",
-                );
+                throw new ProtocolException("cannot convert {$result} to unsigned integer");
             }
 
             return $result;
         }
 
-        if ($value->kind === Value::UINT
-            || $value->kind === Value::INT
-            || $value->kind === Value::HUGEINT
-            || $value->kind === Value::UHUGEINT) {
+        if ($value->kind === Value::UINT || $value->kind === Value::INT || $value->kind === Value::HUGEINT || $value->kind === Value::UHUGEINT) {
             $result = BigInt::coerce($value->asIntOrString());
             if ($result->isNegative()) {
-                throw new ProtocolException(
-                    "cannot convert {$result} to unsigned integer",
-                );
+                throw new ProtocolException("cannot convert {$result} to unsigned integer");
             }
-
             return $result;
         }
 
@@ -1698,15 +1684,13 @@ final class DataChunkCodec
             if (is_infinite($float)) {
                 return $float > 0 ? 'inf' : '-inf';
             }
-
             return (string) $float;
         }
 
         return match ($value->kind) {
             Value::NULL => '',
             Value::BOOL => $value->asBool() ? 'true' : 'false',
-            Value::INT, Value::UINT, Value::HUGEINT, Value::UHUGEINT =>
-                (string) $value->asIntOrString(),
+            Value::INT, Value::UINT, Value::HUGEINT, Value::UHUGEINT => (string) $value->asIntOrString(),
             Value::STRING => $value->asString(),
             Value::BYTES => $value->asBytes(),
             Value::DECIMAL => $value->asDecimal()->toString(),
@@ -1714,8 +1698,7 @@ final class DataChunkCodec
             Value::TIME => (string) $value->asTime()->value,
             Value::TIME_TZ => (string) $value->asTimeTz()->bits,
             Value::TIMESTAMP => (string) $value->asTimestamp()->value,
-            Value::INTERVAL => $value->asInterval()->months . ' ' . $value->asInterval()->days
-                . ' ' . $value->asInterval()->micros,
+            Value::INTERVAL => $value->asInterval()->months . ' ' . $value->asInterval()->days . ' ' . $value->asInterval()->micros,
             default => '',
         };
     }

@@ -475,6 +475,17 @@ final class QuackClientTest extends TestCase
         );
     }
 
+    public function testTimestampTzNsType(): void
+    {
+        self::assertSame(
+            '1970-01-01 00:00:01.123456789+00',
+            $this->queryValue(
+                "SELECT TIMESTAMPTZ_NS '1970-01-01 00:00:01.123456789+00' AS v",
+                ['timezone' => 'UTC'],
+            ),
+        );
+    }
+
     public function testConnectConfigAppliesSessionSettings(): void
     {
         $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 10, ['timezone' => 'Europe/Berlin']);

@@ -6,7 +6,9 @@ use DuckDB\Quack\Chunk\Builders;
 use DuckDB\Quack\Chunk\DataChunkCodec;
 use DuckDB\Quack\Transport\BinaryReader;
 use DuckDB\Quack\Transport\BinaryWriter;
+use DuckDB\Quack\Types\LogicalType;
 use DuckDB\Quack\Types\LogicalTypeCodec;
+use DuckDB\Quack\Types\LogicalTypeId;
 use DuckDB\Quack\Types\LogicalTypes;
 use DuckDB\Quack\Types\Value;
 use DuckDB\Quack\Types\VectorType;
@@ -189,6 +191,28 @@ final class DataChunkCodecTest extends TestCase
         return $vector->readRequiredField(102, static fn (BinaryReader $r) => $r->readList(
             static fn (BinaryReader $rr) => $rr->readStringBytes(),
         ));
+    }
+
+    public function testDecodesTimestampTzNanosToUtcString(): void
+    {
+        $chunk = Builders::dataChunk([
+            Builders::column(
+                new LogicalType(LogicalTypeId::TimestampTzNs),
+                [Value::int(1_123_456_789)],
+                'v',
+            ),
+        ]);
+
+        $writer = BinaryWriter::new();
+        DataChunkCodec::encodeDataChunk($writer, $chunk);
+        $reader = new BinaryReader($writer->intoBytes());
+        $decoded = DataChunkCodec::decodeDataChunkToPhp($reader, []);
+        $reader->assertEof();
+
+        self::assertSame(
+            '1970-01-01 00:00:01.123456789+00',
+            $decoded->columns[0]->values[0],
+        );
     }
 
     public function testDecodesSequenceVectors(): void
