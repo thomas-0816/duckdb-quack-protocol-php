@@ -7,6 +7,11 @@
          failOnWarning="true"
          failOnRisky="true"
          beStrictAboutOutputDuringTests="true">
+    <extensions>
+        <bootstrap class="Ergebnis\PHPUnit\SlowTestDetector\Extension">
+            <parameter name="maximum-duration" value="50"/>
+        </bootstrap>
+    </extensions>
     <testsuites>
         <testsuite name="unit">
             <directory>tests/Unit</directory>

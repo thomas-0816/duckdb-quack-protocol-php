@@ -2,6 +2,7 @@
 
 namespace DuckDB\Quack;
 
+use Closure;
 use DuckDB\Quack\Chunk\DataChunk;
 use DuckDB\Quack\Connection\ClientConnection;
 use DuckDB\Quack\Error\QuackError;
@@ -11,8 +12,8 @@ use DuckDB\Quack\Messages\PrepareResponseMessage;
 use DuckDB\Quack\Sql\SqlFormatter;
 use DuckDB\Quack\Sql\SqlParameters;
 use DuckDB\Quack\Transport\Transport;
-use DuckDB\Quack\Types\Value;
 use Generator;
+use Throwable;
 
 /**
  * One session on a Quack server.
@@ -128,17 +129,17 @@ final class QuackClient
      * Runs the callback in a transaction, committing on success and rolling
      * back when it throws. The callback receives this client.
      *
-     * @param \Closure(self):mixed $callback
+     * @param Closure(self):mixed $callback
      */
-    public function transaction(\Closure $callback): mixed
+    public function transaction(Closure $callback): mixed
     {
         $this->execute('BEGIN TRANSACTION');
         try {
             $result = $callback($this);
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             try {
                 $this->execute('ROLLBACK');
-            } catch (\Throwable) {
+            } catch (Throwable) {
                 // Keep the callback failure; the connection may already be unusable.
             }
             throw $e;
@@ -148,7 +149,7 @@ final class QuackClient
     }
 
     /**
-     * Runs a statement and returns all rows.
+     * Runs a statement and returns all rows (associative).
      *
      * @param array<int|string,mixed> $params
      * @return list<array<string,mixed>>
@@ -175,7 +176,58 @@ final class QuackClient
     }
 
     /**
-     * Runs a statement and returns its first row, or null when it has no rows.
+     * Runs a statement and returns all rows (numeric).
+     *
+     * @param array<int|string,mixed> $params
+     * @return list<array<int,mixed>>
+     */
+    public function fetchAllNumeric(string $sql, array $params = []): array
+    {
+        if ($this->connection->isClosed()) {
+            throw new ProtocolException('Quack client is not connected');
+        }
+        $query = SqlFormatter::formatSql($sql, SqlParameters::coerce($params));
+        $rows = [];
+        foreach ($this->fetchChunks($this->connection, $query) as $chunk) {
+            for ($rowIndex = 0; $rowIndex < $chunk->rowCount; $rowIndex++) {
+                $row = [];
+                foreach ($chunk->columns as $columnIndex => $column) {
+                    $row[$columnIndex] = $column->values[$rowIndex] ?? null;
+                }
+                $rows[] = $row;
+            }
+        }
+        return $rows;
+    }
+
+    /**
+     * Runs a statement and returns its second column keyed by its first column.
+     *
+     * @param array<int|string,mixed> $params
+     * @return array<int|string,mixed>
+     */
+    public function fetchAllKeyValue(string $sql, array $params = []): array
+    {
+        if ($this->connection->isClosed()) {
+            throw new ProtocolException('Quack client is not connected');
+        }
+        $query = SqlFormatter::formatSql($sql, SqlParameters::coerce($params));
+        $result = [];
+        foreach ($this->fetchChunks($this->connection, $query) as $chunk) {
+            $keys = $chunk->columns[0]->values ?? [];
+            $values = $chunk->columns[1]->values ?? [];
+            foreach ($keys as $rowIndex => $phpKey) {
+                if (!is_int($phpKey) && !is_string($phpKey)) {
+                    throw new ProtocolException('key column must contain integers or strings');
+                }
+                $result[$phpKey] = $values[$rowIndex] ?? null;
+            }
+        }
+        return $result;
+    }
+
+    /**
+     * Runs a statement and returns its first row (associative), or null when it has no rows.
      *
      * @param array<int|string,mixed> $params
      * @return array<string,mixed>|null
@@ -201,12 +253,36 @@ final class QuackClient
     }
 
     /**
-     * Runs a statement and yields its rows.
+     * Runs a statement and returns its first row (numeric), or null when it has no rows.
      *
      * @param array<int|string,mixed> $params
-     * @return \Generator<int,array<string,mixed>>
+     * @return array<int,mixed>|null
      */
-    public function fetchIterator(string $sql, array $params = []): \Generator
+    public function fetchOneNumeric(string $sql, array $params = []): ?array
+    {
+        if ($this->connection->isClosed()) {
+            throw new ProtocolException('Quack client is not connected');
+        }
+        $query = SqlFormatter::formatSql($sql, SqlParameters::coerce($params));
+        foreach ($this->fetchChunks($this->connection, $query) as $chunk) {
+            for ($rowIndex = 0; $rowIndex < $chunk->rowCount; $rowIndex++) {
+                $row = [];
+                foreach ($chunk->columns as $columnIndex => $column) {
+                    $row[$columnIndex] = $column->values[$rowIndex] ?? null;
+                }
+                return $row;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Runs a statement and yields its rows (associative).
+     *
+     * @param array<int|string,mixed> $params
+     * @return Generator<int,array<string,mixed>>
+     */
+    public function fetchIterator(string $sql, array $params = []): Generator
     {
         if ($this->connection->isClosed()) {
             throw new ProtocolException('Quack client is not connected');
@@ -219,6 +295,29 @@ final class QuackClient
                 foreach ($chunk->columns as $columnIndex => $column) {
                     $name = $names[$columnIndex] ?? "column{$columnIndex}";
                     $row[$name] = $column->values[$rowIndex] ?? null;
+                }
+                yield $row;
+            }
+        }
+    }
+
+    /**
+     * Runs a statement and yields its rows (numeric).
+     *
+     * @param array<int|string,mixed> $params
+     * @return Generator<int,array<int,mixed>>
+     */
+    public function fetchIteratorNumeric(string $sql, array $params = []): Generator
+    {
+        if ($this->connection->isClosed()) {
+            throw new ProtocolException('Quack client is not connected');
+        }
+        $query = SqlFormatter::formatSql($sql, SqlParameters::coerce($params));
+        foreach ($this->fetchChunks($this->connection, $query) as $chunk) {
+            for ($rowIndex = 0; $rowIndex < $chunk->rowCount; $rowIndex++) {
+                $row = [];
+                foreach ($chunk->columns as $columnIndex => $column) {
+                    $row[$columnIndex] = $column->values[$rowIndex] ?? null;
                 }
                 yield $row;
             }
@@ -266,32 +365,6 @@ final class QuackClient
     }
 
     /**
-     * Runs a statement and returns its second column keyed by its first column.
-     *
-     * @param array<int|string,mixed> $params
-     * @return array<int|string,mixed>
-     */
-    public function fetchKeyValue(string $sql, array $params = []): array
-    {
-        if ($this->connection->isClosed()) {
-            throw new ProtocolException('Quack client is not connected');
-        }
-        $query = SqlFormatter::formatSql($sql, SqlParameters::coerce($params));
-        $result = [];
-        foreach ($this->fetchChunks($this->connection, $query) as $chunk) {
-            $keys = $chunk->columns[0]->values ?? [];
-            $values = $chunk->columns[1]->values ?? [];
-            foreach ($keys as $rowIndex => $phpKey) {
-                if (!is_int($phpKey) && !is_string($phpKey)) {
-                    throw new ProtocolException('key column must contain integers or strings');
-                }
-                $result[$phpKey] = $values[$rowIndex] ?? null;
-            }
-        }
-        return $result;
-    }
-
-    /**
      * Prepares a query and streams its result chunks.
      *
      * @return Generator<int,DataChunk>
@@ -305,6 +378,12 @@ final class QuackClient
 
         foreach ($response->results as $chunk) {
             $chunk->columnNames = $response->resultNames;
+            /* TODO add method to emulate getColumnMeta:
+                ["native_type"]=> "decimal"
+                ["php_type"]=> "string"
+                ["duckdb:decl_type"]=> "DECIMAL(10,2)"
+                ["name"]=> "foo"
+            */
             $chunk->columnTypes = $response->resultTypes;
             yield $chunk;
         }
