@@ -11,6 +11,7 @@ enum VectorType: int
     case Constant = 2;
     case Dictionary = 3;
     case Sequence = 4;
+    case Shredded = 5;
 
     public static function fromId(int $value): self
     {
