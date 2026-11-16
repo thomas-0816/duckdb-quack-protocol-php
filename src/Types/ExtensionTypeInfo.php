@@ -9,7 +9,7 @@ final class ExtensionTypeInfo
 {
     /**
      * @param list<LogicalTypeModifier> $modifiers
-     * @param array<string,DuckDBValue> $properties
+     * @param array<string,SerializedValue> $properties
      */
     public function __construct(
         public readonly array $modifiers = [],
