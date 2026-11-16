@@ -24,10 +24,7 @@ final class QuackVariantTest extends TestCase
 
     public function testVariantExtendedValues(): void
     {
-        date_default_timezone_set('Europe/Berlin');
-
-        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 10);
-        $client->execute("SET TimeZone = 'Europe/Berlin'");
+        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 10, ['timezone' => 'Europe/Berlin']);
         $client->beginTransaction();
         $client->execute('CREATE TEMP TABLE variant_values (v VARIANT)');
         $client->execute("CREATE TYPE mood2 AS ENUM ('sad', 'ok', 'happy')");
@@ -59,7 +56,7 @@ final class QuackVariantTest extends TestCase
             $rows[13]['v'] = '<nan>';
             $rows[18]['v'] = '<uuid>';
 
-            self::assertSame([
+            $expected = [
                 ['v' => 'hello'], ['v' => 42], ['v' => 42.21], ['v' => null],
                 ['v' => [1, 2]],
                 ['v' => ['foo', 'bar', true, null]],
@@ -85,23 +82,20 @@ final class QuackVariantTest extends TestCase
                 ['v' => '1992-09-20 11:30:00.123456789'],
                 ['v' => '1992-09-20 11:30:00.123'],
                 ['v' => '1992-09-20 11:30:00'],
-                ['v' => '1992-09-20 09:30:00.123456+00'], // TODO fix string(29) "1992-09-20 11:30:00.123456+02"
-                ['v' => '1992-09-20 11:30:00.123456+00'], // TODO fix string(29) "1992-09-20 13:30:00.123456+02"
-                ['v' => '2001-02-17 03:38:40+00']], // TODO fix string(22) "2001-02-17 04:38:40+01"
-                $rows,
-            );
+                ['v' => '1992-09-20 09:30:00.123456+00'],
+                ['v' => '1992-09-20 11:30:00.123456+00'],
+                ['v' => '2001-02-17 03:38:40+00'],
+            ];
+            self::assertSame($expected, $rows);
         } finally {
-            $client->execute("DROP TYPE mood2");
+            $client->execute('DROP TYPE mood2');
             $client->rollback();
         }
     }
 
     public function testVariantTimestampsInUtc(): void
     {
-        date_default_timezone_set('UTC');
-
-        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 10);
-        $client->execute("SET TimeZone = 'UTC'");
+        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 10, ['timezone' => 'UTC']);
         $client->execute('CREATE TEMP TABLE variant_values (v2 VARIANT)');
         $client->execute(
             "INSERT INTO variant_values VALUES (TIMESTAMPTZ '1992-09-20 11:30:00.123456789'), (TIMESTAMPTZ '1992-09-20 12:30:00.123456789+01:00'), (timezone('America/Denver', TIMESTAMP '2001-02-16 20:38:40'))",
@@ -117,22 +111,17 @@ final class QuackVariantTest extends TestCase
         );
     }
 
-    public function testVariantTimestampsUseUtcRegardlessOfSessionTimezone(): void
+    public function testVariantTimestampsUseConfiguredTimezone(): void
     {
-        date_default_timezone_set('Europe/Berlin');
-
-        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 10);
-        $client->execute("SET TimeZone = 'Europe/Berlin'");
+        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 10, ['timezone' => 'Europe/Berlin']);
         $client->execute('CREATE TEMP TABLE variant_values (v3 VARIANT)');
         $client->execute("INSERT INTO variant_values VALUES (TIMESTAMPTZ '1992-09-20 11:30:00.123456789'), (TIMESTAMPTZ '1992-09-20 12:30:00.123456789+01:00'), (timezone('America/Denver', TIMESTAMP '2001-02-16 20:38:40'))");
 
-        // PDO renders these values in the session timezone (+02 and +01).
-        // Quack always renders TIMESTAMPTZ variants in UTC.
         self::assertSame(
             [
-                ['v3' => '1992-09-20 09:30:00.123456+00'], // TODO fix string(29) "1992-09-20 11:30:00.123456+02"
-                ['v3' => '1992-09-20 11:30:00.123456+00'], // TODO fix string(29) "1992-09-20 13:30:00.123456+02"
-                ['v3' => '2001-02-17 03:38:40+00'], // TODO fix string(22) "2001-02-17 04:38:40+01"
+                ['v3' => '1992-09-20 09:30:00.123456+00'],
+                ['v3' => '1992-09-20 11:30:00.123456+00'],
+                ['v3' => '2001-02-17 03:38:40+00'],
             ],
             $client->fetchAll('SELECT * FROM variant_values'),
         );
@@ -145,12 +134,12 @@ final class QuackVariantTest extends TestCase
         $client->execute('INSERT INTO variant_structs VALUES (?)', [['v' => 'hello']]);
         $client->execute("INSERT INTO variant_structs VALUES ({'v': MAP {'key1': 10}}), ({'v': {'key1': 'value1'}})");
 
-        self::assertSame([
+        $expected = [
             ['s' => ['v' => 'hello']],
             ['s' => ['v' => [['key' => 'key1', 'value' => 10]]]],
-            ['s' => ['v' => ['key1' => 'value1']]]],
-            $client->fetchAll('SELECT * FROM variant_structs'),
-        );
+            ['s' => ['v' => ['key1' => 'value1']]],
+        ];
+        self::assertSame($expected, $client->fetchAll('SELECT * FROM variant_structs'));
     }
 
     public function testVariantStringifiedJson(): void

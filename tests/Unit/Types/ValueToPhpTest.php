@@ -11,6 +11,7 @@ use DuckDB\Quack\Types\IntervalValue;
 use DuckDB\Quack\Types\LogicalType;
 use DuckDB\Quack\Types\LogicalTypeId;
 use DuckDB\Quack\Types\LogicalTypes;
+use DuckDB\Quack\Types\TemporalFormatter;
 use DuckDB\Quack\Types\TimestampUnit;
 use DuckDB\Quack\Types\TimestampValue;
 use DuckDB\Quack\Types\TimeTzValue;
@@ -93,13 +94,41 @@ final class ValueToPhpTest extends TestCase
             '1969-12-31 23:59:59.999999',
             Value::timestamp(new TimestampValue(TimestampUnit::Micros, -1))->toPhp(),
         );
+        $defaultTimezone = date_default_timezone_get();
+        date_default_timezone_set('UTC');
+        try {
+            self::assertSame(
+                '1970-01-01 00:00:01+00',
+                Value::timestamp(new TimestampValue(TimestampUnit::Seconds, 1, true))->toPhp(),
+            );
+        } finally {
+            date_default_timezone_set($defaultTimezone);
+        }
+        self::assertSame(
+            'infinity',
+            Value::timestamp(new TimestampValue(TimestampUnit::Micros, PHP_INT_MAX))->toPhp(),
+        );
+    }
+
+    public function testTimestampsWithTimezoneRenderInPhpDefaultTimezone(): void
+    {
         self::assertSame(
             '1970-01-01 00:00:01+00',
             Value::timestamp(new TimestampValue(TimestampUnit::Seconds, 1, true))->toPhp(),
         );
         self::assertSame(
-            'infinity',
-            Value::timestamp(new TimestampValue(TimestampUnit::Micros, PHP_INT_MAX))->toPhp(),
+            '1970-01-01 00:00:01.000001+00',
+            Value::timestamp(new TimestampValue(TimestampUnit::Micros, 1_000_001, true))->toPhp(),
+        );
+
+        self::assertSame(
+            '1970-01-01 00:00:01+00',
+            Value::timestamp(new TimestampValue(TimestampUnit::Seconds, 1, true))->toPhp(),
+        );
+
+        self::assertSame(
+            '1970-01-01 00:00:27+00',
+            Value::timestamp(new TimestampValue(TimestampUnit::Seconds, 27, true))->toPhp(),
         );
     }
 

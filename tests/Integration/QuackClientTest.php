@@ -9,24 +9,13 @@ final class QuackClientTest extends TestCase
 {
     public function testConnectSsl(): void
     {
-        $client = QuackClient::connect(
-            'https://localhost:9495',
-            'secret',
-            10,
-            300,
-            sslCertificate: self::sslCertificate(),
-        );
+        $client = QuackClient::connect('https://localhost:9495', 'secret', 3, 10, [], self::sslCertificate());
         self::assertSame(3, $client->getConnection()->quackVersion());
     }
 
     public function testConnect(): void
     {
-        $client = QuackClient::connect(
-            'http://127.0.0.1:9494',
-            'secret',
-            10,
-            300,
-        );
+        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 10);
         self::assertSame(3, $client->getConnection()->quackVersion());
 
         self::assertSame(
@@ -527,7 +516,7 @@ final class QuackClientTest extends TestCase
 
     public function testConnectConfigAppliesSessionSettings(): void
     {
-        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 10, 300, ['timezone' => 'Europe/Berlin']);
+        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 10, ['timezone' => 'Europe/Berlin']);
 
         self::assertSame(
             'Europe/Berlin',
@@ -538,23 +527,20 @@ final class QuackClientTest extends TestCase
     public function testTimestampTzUsesConfiguredTimezone(): void
     {
         self::assertSame(
-            '1970-01-01 01:00:01+01',
-            $this->queryValue(
-                "SELECT TIMESTAMPTZ '1970-01-01 00:00:01+00' AS v",
-                ['timezone' => 'Europe/Berlin'],
-            ),
+            '1970-01-01 00:00:01+00',
+            $this->queryValue("SELECT TIMESTAMPTZ '1970-01-01 00:00:01+00' AS v", ['timezone' => 'Europe/Berlin']),
         );
     }
 
     public function testConfiguredTimezonesDoNotLeakBetweenClients(): void
     {
-        $berlin = QuackClient::connect('http://127.0.0.1:9494', 'secret', 10, 300, ['timezone' => 'Europe/Berlin']);
-        $utc = QuackClient::connect('http://127.0.0.1:9494', 'secret', 10, 300, ['timezone' => 'UTC']);
+        $berlin = QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 10, ['timezone' => 'Europe/Berlin']);
+        $utc = QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 10, ['timezone' => 'UTC']);
         $sql = "SELECT TIMESTAMPTZ '1970-01-01 00:00:01+00' AS v";
 
-        self::assertSame('1970-01-01 01:00:01+01', $berlin->fetchValue($sql));
+        self::assertSame('1970-01-01 00:00:01+00', $berlin->fetchValue($sql));
         self::assertSame('1970-01-01 00:00:01+00', $utc->fetchValue($sql));
-        self::assertSame('1970-01-01 01:00:01+01', $berlin->fetchValue($sql));
+        self::assertSame('1970-01-01 00:00:01+00', $berlin->fetchValue($sql));
     }
 
     public function testIntervalType(): void
@@ -752,14 +738,6 @@ final class QuackClientTest extends TestCase
      */
     private function queryValue(string $sql, array $config = []): mixed
     {
-        $client = QuackClient::connect(
-            'http://127.0.0.1:9494',
-            'secret',
-            10,
-            300,
-            configuration: $config,
-        );
-
-        return $client->fetchValue($sql);
+        return QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 10, $config)->fetchValue($sql);
     }
 }
