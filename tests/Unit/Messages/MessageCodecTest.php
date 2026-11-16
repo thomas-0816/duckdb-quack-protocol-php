@@ -50,10 +50,8 @@ final class MessageCodecTest extends TestCase
             10,
         );
 
-        $decoded = MessageCodec::decodeMessageForVersion(
-            MessageCodec::encodeMessageForVersion($message, 3),
-            3,
-        );
+        $encoded = MessageCodec::encodeMessageForVersion($message, 3);
+        $decoded = MessageCodec::decodeMessageForVersion($encoded, 3);
 
         self::assertInstanceOf(PrepareRequestMessage::class, $decoded);
         self::assertEquals($message, $decoded);
@@ -83,10 +81,8 @@ final class MessageCodecTest extends TestCase
         ];
 
         foreach ($messages as $message) {
-            $decoded = MessageCodec::decodeMessageForVersion(
-                MessageCodec::encodeMessageForVersion($message, 3),
-                3,
-            );
+            $encoded = MessageCodec::encodeMessageForVersion($message, 3);
+            $decoded = MessageCodec::decodeMessageForVersion($encoded, 3);
 
             self::assertEquals($message, $decoded);
         }

@@ -164,10 +164,6 @@ final class MessageCodec
             return;
         }
 
-        if ($message instanceof AppendRequestMessage) {
-            throw new ProtocolException('APPEND_REQUEST is not supported by Quack protocol v3');
-        }
-
         if ($message instanceof DisconnectMessage || $message instanceof HeartbeatRequestMessage) {
             $writer->writeObject(static function (BinaryWriter $_): void {});
             return;
