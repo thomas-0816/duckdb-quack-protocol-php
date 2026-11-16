@@ -2,6 +2,7 @@
 
 namespace DuckDB\Quack\Tests\Unit\Types;
 
+use DuckDB\Quack\Exceptions\UnsupportedTypeException;
 use DuckDB\Quack\Transport\BinaryReader;
 use DuckDB\Quack\Transport\BinaryWriter;
 use DuckDB\Quack\Types\ExtraTypeInfoType;
@@ -92,6 +93,89 @@ final class LogicalTypeCodecTest extends TestCase
         self::assertNull(self::decodeValue($null)->toPhp());
     }
 
+    public function testDecodesBitBignumAndGeometryValues(): void
+    {
+        $bit = BinaryWriter::new();
+        self::writeValue($bit, LogicalTypeId::Bit, static fn (BinaryWriter $w) => $w->writeStringBytes("\x05\xFD"));
+        self::assertSame('101', self::decodeValue($bit)->toPhp());
+
+        $bignum = BinaryWriter::new();
+        self::writeValue(
+            $bignum,
+            LogicalTypeId::BigNum,
+            static fn (BinaryWriter $w) => $w->writeStringBytes("\x80\x00\x01\x01"),
+        );
+        self::assertSame('1', self::decodeValue($bignum)->toPhp());
+
+        $negativeBignum = BinaryWriter::new();
+        self::writeValue(
+            $negativeBignum,
+            LogicalTypeId::BigNum,
+            static fn (BinaryWriter $w) => $w->writeStringBytes("\x7F\xFF\xFE\xFE"),
+        );
+        self::assertSame('-1', self::decodeValue($negativeBignum)->toPhp());
+
+        $geometry = BinaryWriter::new();
+        $geometry->writeObject(static function (BinaryWriter $value): void {
+            $value->writeField(100, static fn (BinaryWriter $w) => self::writeLogicalType($w, LogicalTypeId::Geometry));
+            $value->writeField(101, static fn (BinaryWriter $w) => $w->writeBool(false));
+            $value->writeField(
+                102,
+                static fn (BinaryWriter $w) => $w->writeStringBytes(
+                    (string) hex2bin('01010000000000000000003E400000000000002440'),
+                ),
+            );
+            $value->writeField(103, static fn (BinaryWriter $w) => $w->writeUleb(1));
+        });
+        self::assertSame('POINT (30 10)', self::decodeValue($geometry)->toPhp());
+    }
+
+    public function testDecodesEnumValueAsLabel(): void
+    {
+        $value = BinaryWriter::new();
+        $value->writeObject(static function (BinaryWriter $object): void {
+            $object->writeField(100, static fn (BinaryWriter $w) => self::writeEnumType($w, ['red', 'green']));
+            $object->writeField(101, static fn (BinaryWriter $w) => $w->writeBool(false));
+            $object->writeField(102, static fn (BinaryWriter $w) => $w->writeUleb(1));
+        });
+
+        self::assertSame('green', self::decodeValue($value)->toPhp());
+    }
+
+    public function testDecodesArrayValue(): void
+    {
+        $value = BinaryWriter::new();
+        $value->writeObject(static function (BinaryWriter $object): void {
+            $object->writeField(100, static fn (BinaryWriter $w) => self::writeArrayType($w, LogicalTypeId::Integer, 3));
+            $object->writeField(101, static fn (BinaryWriter $w) => $w->writeBool(false));
+            $object->writeField(102, static function (BinaryWriter $w): void {
+                $w->writeObject(static function (BinaryWriter $children): void {
+                    $children->writeField(100, static fn (BinaryWriter $list) => $list->writeList(
+                        [1, 2, 3],
+                        static fn (BinaryWriter $element, int $item) => $element->writeObject(
+                            static function (BinaryWriter $child) use ($item): void {
+                                $child->writeField(101, static fn (BinaryWriter $b) => $b->writeBool(false));
+                                $child->writeField(102, static fn (BinaryWriter $b) => $b->writeSleb($item));
+                            },
+                        ),
+                    ));
+                });
+            });
+        });
+
+        self::assertSame([1, 2, 3], self::decodeValue($value)->toPhp());
+    }
+
+    public function testRejectsUnsupportedLogicalTypeValues(): void
+    {
+        $value = BinaryWriter::new();
+        self::writeValue($value, LogicalTypeId::Unknown, static fn (BinaryWriter $w) => $w->writeUleb(7));
+
+        $this->expectException(UnsupportedTypeException::class);
+        $this->expectExceptionMessage('logical type Unknown (physical type Invalid) is not supported');
+        self::decodeValue($value);
+    }
+
     private static function decodeValue(BinaryWriter $writer): SerializedValue
     {
         $reader = new BinaryReader($writer->intoBytes());
@@ -179,6 +263,51 @@ final class LogicalTypeCodecTest extends TestCase
                     );
                 },
             );
+        });
+    }
+
+    /**
+     * @param list<string> $values
+     */
+    private static function writeEnumType(BinaryWriter $writer, array $values): void
+    {
+        $writer->writeObject(static function (BinaryWriter $type) use ($values): void {
+            $type->writeField(100, static fn (BinaryWriter $w) => $w->writeUleb(LogicalTypeId::Enum->value));
+            $type->writeField(101, static function (BinaryWriter $w) use ($values): void {
+                $w->writeBool(true);
+                $w->writeObject(static function (BinaryWriter $info) use ($values): void {
+                    $info->writeField(
+                        100,
+                        static fn (BinaryWriter $w) => $w->writeUleb(ExtraTypeInfoType::Enum->value),
+                    );
+                    $info->writeField(200, static fn (BinaryWriter $w) => $w->writeUleb(count($values)));
+                    $info->writeField(201, static fn (BinaryWriter $w) => $w->writeList(
+                        $values,
+                        static fn (BinaryWriter $list, string $value) => $list->writeString($value),
+                    ));
+                });
+            });
+        });
+    }
+
+    private static function writeArrayType(
+        BinaryWriter $writer,
+        LogicalTypeId $childType,
+        int $size,
+    ): void {
+        $writer->writeObject(static function (BinaryWriter $type) use ($childType, $size): void {
+            $type->writeField(100, static fn (BinaryWriter $w) => $w->writeUleb(LogicalTypeId::Array->value));
+            $type->writeField(101, static function (BinaryWriter $w) use ($childType, $size): void {
+                $w->writeBool(true);
+                $w->writeObject(static function (BinaryWriter $info) use ($childType, $size): void {
+                    $info->writeField(
+                        100,
+                        static fn (BinaryWriter $w) => $w->writeUleb(ExtraTypeInfoType::Array->value),
+                    );
+                    $info->writeField(200, static fn (BinaryWriter $w) => self::writeLogicalType($w, $childType));
+                    $info->writeField(201, static fn (BinaryWriter $w) => $w->writeUleb($size));
+                });
+            });
         });
     }
 
