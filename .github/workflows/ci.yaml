@@ -61,21 +61,23 @@ jobs:
           coverage: pcov
         env:
           phpts: ${{ matrix.thread-safety }}
-      - name: Test
+      - name: Tests
         shell: bash
         env:
           BOX_REQUIREMENT_CHECKER: false
         run: |
+          set -euo pipefail
+          case "$RUNNER_OS-$RUNNER_ARCH" in
+            Linux-X64)   arch=linux-amd64   ;;
+            Linux-ARM64) arch=linux-arm64   ;;
+            macOS-ARM64) arch=osx-arm64     ;;
+            Windows-X64) arch=windows-amd64 ;;
+            *) echo "unsupported platform: $RUNNER_OS-$RUNNER_ARCH" >&2; exit 1 ;;
+          esac
+          curl -fsSL "https://install.duckdb.org/v2.0.0/duckdb-cli-${arch}.tar.gz" | tar -xz -C "tests/"
+          ./tests/duckdb --version
           uname -a
           php -v
-          if [ "$RUNNER_OS" = "Windows" ]; then
-            powershell -NoExit -ExecutionPolicy Bypass -Command "irm https://install.duckdb.org/install.ps1 | iex"
-          else
-            curl https://install.duckdb.org | bash
-            export PATH="$HOME/.duckdb/cli/latest":$PATH
-          fi
-          duckdb -v
-          which duckdb
           php -m | grep curl
           composer check
 
