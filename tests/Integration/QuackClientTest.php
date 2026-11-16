@@ -74,12 +74,7 @@ final class QuackClientTest extends TestCase
 
     public function testResultFetchHelpers(): void
     {
-        $client = QuackClient::connect(
-            'http://127.0.0.1:9494',
-            'secret',
-            10,
-            300,
-        );
+        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 10);
 
         self::assertSame(
             [['n' => 1], ['n' => 2], ['n' => 3]],
@@ -116,12 +111,7 @@ final class QuackClientTest extends TestCase
 
     public function testFetchIterator(): void
     {
-        $client = QuackClient::connect(
-            'http://127.0.0.1:9494',
-            'secret',
-            10,
-            300,
-        );
+        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 10);
 
         self::assertSame(
             [['n' => 1], ['n' => 2], ['n' => 3]],
@@ -155,12 +145,7 @@ final class QuackClientTest extends TestCase
 
     public function testExecuteReturnsChangedRows(): void
     {
-        $client = QuackClient::connect(
-            'http://127.0.0.1:9494',
-            'secret',
-            10,
-            300,
-        );
+        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 10);
 
         self::assertSame(
             0,
@@ -186,12 +171,7 @@ final class QuackClientTest extends TestCase
 
     public function testTransactions(): void
     {
-        $client = QuackClient::connect(
-            'http://127.0.0.1:9494',
-            'secret',
-            10,
-            300,
-        );
+        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 10);
 
         $client->execute('CREATE TEMP TABLE transaction_rows(id INTEGER)');
         $client->beginTransaction();
@@ -209,32 +189,18 @@ final class QuackClientTest extends TestCase
 
     public function testRollbackDiscardsChanges(): void
     {
-        $client = QuackClient::connect(
-            'http://127.0.0.1:9494',
-            'secret',
-            10,
-            300,
-        );
-
+        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 10);
         $client->execute('CREATE TEMP TABLE transaction_discard(id INTEGER)');
         $client->beginTransaction();
         $client->execute('INSERT INTO transaction_discard VALUES (1), (2)');
         $client->rollback();
 
-        self::assertSame(
-            [],
-            $client->fetchColumn('SELECT id FROM transaction_discard'),
-        );
+        self::assertSame([], $client->fetchColumn('SELECT id FROM transaction_discard'));
     }
 
     public function testTransactionCallbackCommitsOnSuccess(): void
     {
-        $client = QuackClient::connect(
-            'http://127.0.0.1:9494',
-            'secret',
-            10,
-            300,
-        );
+        $client = QuackClient::connect( 'http://127.0.0.1:9494', 'secret', 3, 10);
 
         $client->execute('CREATE TEMP TABLE transaction_callback(id INTEGER)');
         $result = $client->transaction(function (QuackClient $client): string {
@@ -252,13 +218,7 @@ final class QuackClientTest extends TestCase
 
     public function testTransactionCallbackRollsBackOnFailure(): void
     {
-        $client = QuackClient::connect(
-            'http://127.0.0.1:9494',
-            'secret',
-            10,
-            300,
-        );
-
+        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 10);
         $client->execute('CREATE TEMP TABLE transaction_rollback(id INTEGER)');
         try {
             $client->transaction(function (QuackClient $client): void {
