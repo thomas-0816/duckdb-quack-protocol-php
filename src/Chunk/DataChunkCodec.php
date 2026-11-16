@@ -81,21 +81,15 @@ final class DataChunkCodec
         });
     }
 
-    public static function decodeVector(
-        BinaryReader $reader,
-        LogicalType $logicalType,
-        int $count,
-    ): DecodedVector {
+    public static function decodeVector(BinaryReader $reader, LogicalType $logicalType, int $count): DecodedVector
+    {
         return $reader->readObject(
             static fn (BinaryReader $object) => self::decodeVectorBody($object, $logicalType, $count),
         );
     }
 
-    private static function decodeVectorBody(
-        BinaryReader $reader,
-        LogicalType $logicalType,
-        int $count,
-    ): DecodedVector {
+    private static function decodeVectorBody(BinaryReader $reader, LogicalType $logicalType, int $count): DecodedVector
+    {
         $rawVectorType = $reader->readOptionalField(
             90,
             static fn (BinaryReader $r) => $r->readUlebU64(),
@@ -174,11 +168,8 @@ final class DataChunkCodec
         return $result;
     }
 
-    private static function decodeConstantVector(
-        BinaryReader $reader,
-        LogicalType $logicalType,
-        int $count,
-    ): DecodedVector {
+    private static function decodeConstantVector(BinaryReader $reader, LogicalType $logicalType, int $count): DecodedVector
+    {
         $decoded = self::decodeVectorBody($reader, $logicalType, $count > 0 ? 1 : 0);
         $value = $decoded->values[0] ?? null;
         return new DecodedVector(
@@ -187,11 +178,8 @@ final class DataChunkCodec
         );
     }
 
-    private static function decodeDictionaryVector(
-        BinaryReader $reader,
-        LogicalType $logicalType,
-        int $count,
-    ): DecodedVector {
+    private static function decodeDictionaryVector(BinaryReader $reader, LogicalType $logicalType, int $count): DecodedVector
+    {
         $selection = $reader->readRequiredField(
             91,
             static function (BinaryReader $r) use ($count): array {
@@ -228,11 +216,8 @@ final class DataChunkCodec
         return new DecodedVector(VectorType::Dictionary, $values);
     }
 
-    private static function decodeSequenceVector(
-        BinaryReader $reader,
-        LogicalType $logicalType,
-        int $count,
-    ): DecodedVector {
+    private static function decodeSequenceVector(BinaryReader $reader, LogicalType $logicalType, int $count): DecodedVector
+    {
         $start = $reader->readRequiredField(
             91,
             static fn (BinaryReader $r) => $r->readSleb(),
