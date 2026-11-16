@@ -186,15 +186,15 @@ final class QuackVariantTest extends TestCase
             );
             $client->execute('CHECKPOINT');
 
-            self::assertSame(['SHREDDED_VECTOR'], $client->fetchColumn("SELECT DISTINCT vector_type(v) FROM shredded"));
-            self::assertSame(5_000, $client->fetchValue("SELECT count(*) FROM shredded"));
+            self::assertSame(['SHREDDED_VECTOR'], $client->fetchColumn('SELECT DISTINCT vector_type(v) FROM shredded'));
+            self::assertSame(5_000, $client->fetchValue('SELECT count(*) FROM shredded'));
             self::assertSame(
                 [['v' => ['id' => 1, 'nested' => ['v' => 2], 'tags' => ['a1']]]],
-                $client->fetchAll("SELECT v FROM shredded WHERE id = 1"),
+                $client->fetchAll('SELECT v FROM shredded WHERE id = 1'),
             );
             self::assertSame(
                 ['v' => ['id' => 5_000, 'nested' => ['v' => 10_000], 'tags' => ['a5000']]],
-                $client->fetchOne("SELECT v FROM shredded ORDER BY id DESC LIMIT 1"),
+                $client->fetchOne('SELECT v FROM shredded ORDER BY id DESC LIMIT 1'),
             );
         } finally {
             $client->execute('DROP TABLE IF EXISTS shredded');
