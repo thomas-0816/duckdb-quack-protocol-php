@@ -11,7 +11,6 @@ use DuckDB\Quack\Types\IntervalValue;
 use DuckDB\Quack\Types\LogicalType;
 use DuckDB\Quack\Types\LogicalTypeId;
 use DuckDB\Quack\Types\LogicalTypes;
-use DuckDB\Quack\Types\TemporalFormatter;
 use DuckDB\Quack\Types\TimestampUnit;
 use DuckDB\Quack\Types\TimestampValue;
 use DuckDB\Quack\Types\TimeTzValue;

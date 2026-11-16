@@ -52,7 +52,7 @@ final class QuackClient
         $settings = [];
         foreach ($configuration as $name => $value) {
             if (!is_scalar($value) && $value !== null) {
-                throw new ProtocolException("config setting {$name} must be a scalar or null");
+                continue;
             }
             $literal = match (true) {
                 $value === null => Value::null(),
