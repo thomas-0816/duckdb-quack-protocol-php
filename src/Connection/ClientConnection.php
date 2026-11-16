@@ -14,7 +14,6 @@ use DuckDB\Quack\Messages\PrepareRequestMessage;
 use DuckDB\Quack\Messages\QuackMessage;
 use DuckDB\Quack\Transport\Transport;
 use DuckDB\Quack\Types\HugeIntParts;
-use DuckDB\Quack\Types\LogicalType;
 
 /**
  * One negotiated Quack session, minus the public client facade.
@@ -106,12 +105,10 @@ final class ClientConnection
     }
 
     /**
-     * @param list<LogicalType> $resultTypes schema for decoding result chunks
      * @param list<string>      $resultNames column names for decoding result chunks
      */
     public function send(
         QuackMessage $message,
-        array $resultTypes = [],
         array $resultNames = [],
     ): QuackMessage {
         if ($this->closed) {
@@ -121,7 +118,6 @@ final class ClientConnection
             return $this->transport->send(
                 $message,
                 $this->quackVersion,
-                $resultTypes,
                 $resultNames,
             );
         } catch (QuackError $error) {
@@ -149,14 +145,12 @@ final class ClientConnection
     }
 
     /**
-     * @param list<LogicalType> $resultTypes schema for decoding result chunks
      * @param list<string>      $resultNames column names for decoding result chunks
      */
     public function fetch(
         HugeIntParts $resultUuid,
         int $batchIndex,
         int $ackIndex,
-        array $resultTypes = [],
         array $resultNames = [],
     ): QuackMessage {
         if ($this->closed) {
@@ -169,7 +163,7 @@ final class ClientConnection
             resultUuid: $resultUuid,
             batchIndex: $batchIndex,
             ackIndex: $ackIndex,
-        ), $resultTypes, $resultNames);
+        ), $resultNames);
     }
 
     /**

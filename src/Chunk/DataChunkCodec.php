@@ -41,15 +41,14 @@ final class DataChunkCodec
     }
 
     /**
-     * @param list<LogicalType> $types
      * @param list<string>      $resultNames
      */
-    public static function decodeDataChunkWrapperToPhp(BinaryReader $reader, array $types, array $resultNames = []): DataChunk
+    public static function decodeDataChunkWrapperToPhp(BinaryReader $reader, array $resultNames = []): DataChunk
     {
         return $reader->readObject(
             static fn (BinaryReader $object) => $object->readRequiredField(
                 300,
-                static fn (BinaryReader $r) => self::decodeDataChunkToPhp($r, $types, $resultNames),
+                static fn (BinaryReader $r) => self::decodeDataChunkToPhp($r, $resultNames),
             ),
         );
     }
@@ -61,36 +60,21 @@ final class DataChunkCodec
      * objects. It is validated against the supplied types, which are reused as
      * the decoded chunk's type metadata.
      *
-     * @param list<LogicalType> $types
      * @param list<string>      $resultNames
      */
-    public static function decodeDataChunkToPhp(BinaryReader $reader, array $types, array $resultNames = []): DataChunk
+    public static function decodeDataChunkToPhp(BinaryReader $reader, array $resultNames = []): DataChunk
     {
-        return $reader->readObject(function (BinaryReader $object) use ($types, $resultNames): DataChunk {
+        return $reader->readObject(function (BinaryReader $object) use ($resultNames): DataChunk {
             $rowCount = $object->readRequiredField(100, static fn (BinaryReader $r) => $r->readUlebUsize());
 
-            if ($types === []) {
-                $decodedTypes = $object->readRequiredField(
-                    101,
-                    static fn (BinaryReader $r) => $r->readList(
-                        static fn (BinaryReader $rr) => LogicalTypeCodec::decodeLogicalType($rr),
-                    ),
-                );
-                /** @var list<LogicalType> $decodedTypes */
-                return self::decodeColumns($object, $rowCount, $decodedTypes, $resultNames);
-            }
-
-            $chunkTypeIds = $object->readRequiredField(101, static fn (BinaryReader $r) => LogicalTypeCodec::skipLogicalTypeList($r));
-            if (count($chunkTypeIds) !== count($types)) {
-                throw new ProtocolException('DataChunk declared ' . count($chunkTypeIds) . ' types but the prepared result has ' . count($types));
-            }
-            foreach ($types as $index => $type) {
-                if (($chunkTypeIds[$index] ?? null) !== $type->id->value) {
-                    throw new ProtocolException("DataChunk type {$index} does not match the prepared result type");
-                }
-            }
-
-            return self::decodeColumns($object, $rowCount, $types, $resultNames);
+            $decodedTypes = $object->readRequiredField(
+                101,
+                static fn (BinaryReader $r) => $r->readList(
+                    static fn (BinaryReader $rr) => LogicalTypeCodec::decodeLogicalType($rr),
+                ),
+            );
+            /** @var list<LogicalType> $decodedTypes */
+            return self::decodeColumns($object, $rowCount, $decodedTypes, $resultNames);
         });
     }
 
@@ -102,7 +86,7 @@ final class DataChunkCodec
         BinaryReader $object,
         int $rowCount,
         array $types,
-        array $resultNames = [],
+        array $resultNames,
     ): DataChunk {
         $columns = $object->readRequiredField(
             102,
