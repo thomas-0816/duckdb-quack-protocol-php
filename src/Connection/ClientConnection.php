@@ -12,6 +12,7 @@ use DuckDB\Quack\Messages\MessageHeader;
 use DuckDB\Quack\Messages\MessageType;
 use DuckDB\Quack\Messages\PrepareRequestMessage;
 use DuckDB\Quack\Messages\QuackMessage;
+use DuckDB\Quack\Messages\SuccessResponseMessage;
 use DuckDB\Quack\Transport\Transport;
 use DuckDB\Quack\Types\HugeIntParts;
 
@@ -167,8 +168,8 @@ final class ClientConnection
                 ->withClientQueryId($this->queryCounter++),
         );
         try {
-            $this->transport->withTimeout(10)->send($message, $this->quackVersion);
-        } catch (QuackError) {
+            $this->transport->withTimeout(3)->send($message, $this->quackVersion);
+        } catch (QuackError $e) {
             // The caller is gone; nothing useful can be reported.
         } finally {
             $this->closed = true;
