@@ -127,10 +127,7 @@ final class ClientConnection
         }
     }
 
-    /**
-     * @param list<string> $resultNames column names for decoding result chunks
-     */
-    public function fetch(HugeIntParts $resultUuid, int $batchIndex, int $ackIndex, array $resultNames = []): QuackMessage
+    public function fetch(HugeIntParts $resultUuid, int $batchIndex, int $ackIndex): QuackMessage
     {
         if ($this->closed) {
             throw new ProtocolException('Quack client is not connected');
@@ -144,7 +141,7 @@ final class ClientConnection
             ackIndex: $ackIndex,
         );
         try {
-            return $this->transport->send($message, $this->quackVersion, $resultNames);
+            return $this->transport->send($message, $this->quackVersion);
         } catch (QuackError $error) {
             if ($error->isConnectionFatal()) {
                 $this->closed = true;
