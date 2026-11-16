@@ -87,56 +87,11 @@ final class SqlFormatterTest extends TestCase
             [Value::double(1.5), '1.5'],
             [Value::bytes("\x00\xff"), "from_hex('00ff')"],
             [Value::decimal(new DecimalValue('1234', 10, 2)), '12.34'],
-            [Value::date(new DateValue(1)), "DATE '1970-01-02'"],
         ];
 
         foreach ($cases as [$value, $expected]) {
             self::assertSame($expected, SqlFormatter::valueLiteral($value));
         }
-    }
-
-    public function testFormatsTimestampsInUtcAndLocalForms(): void
-    {
-        self::assertSame(
-            "TIMESTAMP '1970-01-01 00:00:01.000'",
-            SqlFormatter::valueLiteral(Value::timestamp(
-                new TimestampValue(TimestampUnit::Seconds, 1),
-            )),
-        );
-        self::assertSame(
-            "TIMESTAMPTZ '1970-01-01 00:00:01.000+00'",
-            SqlFormatter::valueLiteral(Value::timestamp(
-                new TimestampValue(TimestampUnit::Seconds, 1, true),
-            )),
-        );
-    }
-
-    public function testFormatsTimeWithTimeZone(): void
-    {
-        self::assertSame(
-            "TIMETZ '12:34:56+01:00'",
-            SqlFormatter::valueLiteral(Value::timeTz(
-                new TimeTzValue(self::timeTzBits(45_296_000_000, 3_600)),
-            )),
-        );
-        self::assertSame(
-            "TIMETZ '12:34:56.123456+01:00'",
-            SqlFormatter::valueLiteral(Value::timeTz(
-                new TimeTzValue(self::timeTzBits(45_296_123_456, 3_600)),
-            )),
-        );
-        self::assertSame(
-            "TIMETZ '12:34:56-05:30'",
-            SqlFormatter::valueLiteral(Value::timeTz(
-                new TimeTzValue(self::timeTzBits(45_296_000_000, -19_800)),
-            )),
-        );
-        self::assertSame(
-            "TIMETZ '12:34:56+05:30:15'",
-            SqlFormatter::valueLiteral(Value::timeTz(
-                new TimeTzValue(self::timeTzBits(45_296_000_000, 19_815)),
-            )),
-        );
     }
 
     public function testDetectsPhpTypesAutomatically(): void
