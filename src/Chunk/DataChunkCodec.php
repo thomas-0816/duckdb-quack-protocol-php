@@ -11,13 +11,16 @@ use DuckDB\Quack\Transport\BinaryWriter;
 use DuckDB\Quack\Types\BigInt;
 use DuckDB\Quack\Types\Bignum;
 use DuckDB\Quack\Types\BitString;
+use DuckDB\Quack\Types\ChildType;
 use DuckDB\Quack\Types\DecimalValue;
 use DuckDB\Quack\Types\HugeIntParts;
 use DuckDB\Quack\Types\IntervalValue;
 use DuckDB\Quack\Types\LogicalType;
 use DuckDB\Quack\Types\LogicalTypeCodec;
 use DuckDB\Quack\Types\LogicalTypeId;
+use DuckDB\Quack\Types\LogicalTypes;
 use DuckDB\Quack\Types\PhysicalType;
+use DuckDB\Quack\Types\ShreddedVariantDecoder;
 use DuckDB\Quack\Types\TemporalFormatter;
 use DuckDB\Quack\Types\TimestampUnit;
 use DuckDB\Quack\Types\TimeUnit;
@@ -45,11 +48,8 @@ final class DataChunkCodec
      * @param list<LogicalType> $types
      * @param list<string>      $resultNames
      */
-    public static function decodeDataChunkWrapperToPhp(
-        BinaryReader $reader,
-        array $types,
-        array $resultNames = [],
-    ): DataChunk {
+    public static function decodeDataChunkWrapperToPhp(BinaryReader $reader, array $types, array $resultNames = []): DataChunk
+    {
         return $reader->readObject(
             static fn (BinaryReader $object) => $object->readRequiredField(
                 300,
@@ -68,16 +68,10 @@ final class DataChunkCodec
      * @param list<LogicalType> $types
      * @param list<string>      $resultNames
      */
-    public static function decodeDataChunkToPhp(
-        BinaryReader $reader,
-        array $types,
-        array $resultNames = [],
-    ): DataChunk {
+    public static function decodeDataChunkToPhp(BinaryReader $reader, array $types, array $resultNames = []): DataChunk
+    {
         return $reader->readObject(function (BinaryReader $object) use ($types, $resultNames): DataChunk {
-            $rowCount = $object->readRequiredField(
-                100,
-                static fn (BinaryReader $r) => $r->readUlebUsize(),
-            );
+            $rowCount = $object->readRequiredField(100, static fn (BinaryReader $r) => $r->readUlebUsize());
 
             if ($types === []) {
                 $decodedTypes = $object->readRequiredField(
@@ -90,10 +84,7 @@ final class DataChunkCodec
                 return self::decodeColumns($object, $rowCount, $decodedTypes, $resultNames);
             }
 
-            $chunkTypeIds = $object->readRequiredField(
-                101,
-                static fn (BinaryReader $r) => LogicalTypeCodec::skipLogicalTypeList($r),
-            );
+            $chunkTypeIds = $object->readRequiredField(101, static fn (BinaryReader $r) => LogicalTypeCodec::skipLogicalTypeList($r));
             if (count($chunkTypeIds) !== count($types)) {
                 throw new ProtocolException('DataChunk declared ' . count($chunkTypeIds) . ' types but the prepared result has ' . count($types));
             }
@@ -233,7 +224,73 @@ final class DataChunkCodec
             VectorType::Constant => self::decodeConstantVector($reader, $logicalType, $count),
             VectorType::Dictionary => self::decodeDictionaryVector($reader, $logicalType, $count),
             VectorType::Sequence => self::decodeSequenceVector($reader, $logicalType, $count),
+            VectorType::Shredded => self::decodeShreddedVector($reader, $logicalType, $count),
         };
+    }
+
+    /**
+     * Decodes a SHREDDED_VECTOR, which serializes a
+     * STRUCT(unshredded VARIANT, shredded <typed>) payload.
+     *
+     * The unshredded component is kept in its canonical array form so typed
+     * nodes can resolve their untyped_value_index fallbacks; only the final
+     * merged value is converted to native PHP.
+     */
+    private static function decodeShreddedVector(BinaryReader $reader, LogicalType $logicalType, int $count): DecodedVector
+    {
+        if ($logicalType->id !== LogicalTypeId::Variant) {
+            throw new ProtocolException('shredded vectors can only decode VARIANT columns');
+        }
+        $shreddedType = $reader->readRequiredField(91, static fn (BinaryReader $r) => LogicalTypeCodec::decodeLogicalType($r));
+        if ($shreddedType->id !== LogicalTypeId::Struct) {
+            throw new ProtocolException('shredded vector data must be a struct');
+        }
+        $children = LogicalTypeCodec::getStructChildren($shreddedType);
+        if (count($children) !== 2) {
+            throw new ProtocolException('shredded vector data must have two children');
+        }
+        [$unshreddedChild, $shreddedChild] = $children;
+        $unshreddedType = LogicalTypes::struct(
+            LogicalTypeCodec::getStructChildren($unshreddedChild->logicalType),
+        );
+        $rawOuterType = LogicalTypes::struct([
+            new ChildType($unshreddedChild->name, $unshreddedType),
+            new ChildType($shreddedChild->name, $shreddedChild->logicalType),
+        ]);
+        $shreddedData = $reader->readRequiredField(92, static fn (BinaryReader $r) => self::decodeVector($r, $rawOuterType, $count));
+
+        $values = [];
+        foreach ($shreddedData->values as $row) {
+            if (!is_array($row)) {
+                $values[] = null;
+                continue;
+            }
+            $unshreddedRow = $row[$unshreddedChild->name] ?? null;
+            $unshredded = is_array($unshreddedRow) ? VariantDecoder::fromPhp(self::stringKeyedRow($unshreddedRow)) : null;
+            $values[] = ShreddedVariantDecoder::decode(
+                $shreddedChild->logicalType,
+                $row[$shreddedChild->name] ?? null,
+                $unshredded,
+            );
+        }
+        return new DecodedVector(VectorType::Shredded, $values);
+    }
+
+    /**
+     * @param array<mixed,mixed> $row
+     * @return array<string,mixed>
+     */
+    private static function stringKeyedRow(array $row): array
+    {
+        $result = [];
+        foreach ($row as $key => $value) {
+            if (!is_string($key)) {
+                throw new ProtocolException('shredded VARIANT unshredded component is not a struct');
+            }
+            $result[$key] = $value;
+        }
+
+        return $result;
     }
 
     private static function decodeConstantVector(
