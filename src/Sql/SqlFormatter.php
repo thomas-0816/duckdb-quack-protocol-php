@@ -45,44 +45,13 @@ final class SqlFormatter
         return match ($value->kind) {
             Value::NULL => 'NULL',
             Value::BOOL => $value->asBool() ? 'TRUE' : 'FALSE',
-            Value::INT, Value::UINT, Value::HUGEINT, Value::UHUGEINT =>
-                (string) $value->asIntOrString(),
+            Value::INT, Value::UINT, Value::HUGEINT, Value::UHUGEINT => (string) $value->asIntOrString(),
             Value::FLOAT, Value::DOUBLE => self::floatLiteral($value->asFloat()),
             Value::STRING => "'" . str_replace("'", "''", $value->asString()) . "'",
             Value::BYTES => "from_hex('" . bin2hex($value->asBytes()) . "')",
             Value::DECIMAL => $value->asDecimal()->toString(),
-            Value::DATE => "DATE '" . self::dateFromDays($value->asDate()->days) . "'",
-            Value::TIME => "TIME '" . self::formatTime($value->asTime()->value, $value->asTime()->unit) . "'",
-            Value::TIME_TZ => "TIMETZ '" . TemporalFormatter::formatTimeTz($value->asTimeTz()->bits) . "'",
-            Value::TIMESTAMP => (
-                $value->asTimestamp()->timezoneUtc ? 'TIMESTAMPTZ' : 'TIMESTAMP'
-            ) . " '" . self::formatTimestamp(
-                $value->asTimestamp()->value,
-                $value->asTimestamp()->unit,
-                $value->asTimestamp()->timezoneUtc,
-            ) . "'",
-            Value::INTERVAL => "INTERVAL '{$value->asInterval()->months} months "
-                . "{$value->asInterval()->days} days {$value->asInterval()->micros} microseconds'",
-            Value::LIST => '[' . implode(', ', array_map(
-                static fn (Value $item): string => self::valueLiteral($item),
-                $value->asList(),
-            )) . ']',
-            Value::STRUCT => self::structLiteral($value),
-            default => throw new ProtocolException(
-                "cannot format SQL parameter of kind {$value->kind}",
-            ),
+            default => throw new ProtocolException("cannot format SQL parameter of kind {$value->kind}"),
         };
-    }
-
-    private static function structLiteral(Value $value): string
-    {
-        $fields = [];
-        foreach ($value->asStruct() as $name => $item) {
-            $fields[] = "'" . str_replace("'", "''", $name) . "': "
-                . self::valueLiteral($item);
-        }
-
-        return '{' . implode(', ', $fields) . '}';
     }
 
     /**
@@ -102,18 +71,13 @@ final class SqlFormatter
             }
             $value = $params[$index] ?? null;
             if ($value === null) {
-                throw new ProtocolException(
-                    'SQL has more positional placeholders than parameters',
-                );
+                throw new ProtocolException('SQL has more positional placeholders than parameters');
             }
             $index++;
             return self::sqlLiteral($value);
         });
         if ($index !== count($params)) {
-            throw new ProtocolException(
-                "SQL has {$index} positional placeholders but "
-                . count($params) . ' parameters were provided',
-            );
+            throw new ProtocolException("SQL has {$index} positional placeholders but " . count($params) . ' parameters were provided');
         }
         return $formatted;
     }
@@ -257,23 +221,5 @@ final class SqlFormatter
             throw new ProtocolException("cannot encode non-finite SQL number {$value}");
         }
         return (string) $value;
-    }
-
-    private static function dateFromDays(int $days): string
-    {
-        return TemporalFormatter::formatDate($days);
-    }
-
-    private static function formatTimestamp(
-        int $value,
-        TimestampUnit $unit,
-        bool $timezoneUtc,
-    ): string {
-        return TemporalFormatter::formatTimestampLiteral($value, $unit, $timezoneUtc);
-    }
-
-    private static function formatTime(int $value, TimeUnit $unit): string
-    {
-        return TemporalFormatter::formatTime($value, $unit);
     }
 }

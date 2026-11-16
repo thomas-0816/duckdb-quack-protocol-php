@@ -20,7 +20,7 @@ final class TemporalFormatter
         if ($days === 2_147_483_647) {
             return 'infinity';
         }
-        if ($days === -2_147_483_648) {
+        if ($days === -2_147_483_647) {
             return '-infinity';
         }
 
@@ -44,20 +44,29 @@ final class TemporalFormatter
         $offset = $maxOffset - ($bits & $offsetMask);
         $micros = $bits >> 24;
         $nanos = BigInt::fromInt($micros)->mul(BigInt::fromInt(self::NANOS_PER_MICRO));
+
+        return self::formatTimeOfDay($nanos) . self::formatUtcOffset($offset);
+    }
+
+    /**
+     * Formats a UTC offset the way DuckDB displays it, omitting zero minutes.
+     */
+    public static function formatUtcOffset(int $offset): string
+    {
         $sign = $offset < 0 ? '-' : '+';
         $absoluteOffset = abs($offset);
-        $offsetText = sprintf(
-            '%s%02d:%02d',
-            $sign,
-            intdiv($absoluteOffset, 3_600),
-            intdiv($absoluteOffset % 3_600, 60),
-        );
+        $hours = intdiv($absoluteOffset, 3_600);
+        $minutes = intdiv($absoluteOffset % 3_600, 60);
         $seconds = $absoluteOffset % 60;
+        $text = sprintf('%s%02d', $sign, $hours);
+        if ($minutes !== 0 || $seconds !== 0) {
+            $text .= sprintf(':%02d', $minutes);
+        }
         if ($seconds !== 0) {
-            $offsetText .= sprintf(':%02d', $seconds);
+            $text .= sprintf(':%02d', $seconds);
         }
 
-        return self::formatTimeOfDay($nanos) . $offsetText;
+        return $text;
     }
 
     /**
@@ -72,7 +81,7 @@ final class TemporalFormatter
         if ($value === PHP_INT_MAX) {
             return 'infinity';
         }
-        if ($value === PHP_INT_MIN) {
+        if ($value === PHP_INT_MIN + 1) {
             return '-infinity';
         }
 
@@ -103,7 +112,7 @@ final class TemporalFormatter
         if ($value === PHP_INT_MAX) {
             return 'infinity';
         }
-        if ($value === PHP_INT_MIN) {
+        if ($value === PHP_INT_MIN + 1) {
             return '-infinity';
         }
 
