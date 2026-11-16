@@ -175,7 +175,7 @@ final class ClientConnection
                 ->withClientQueryId($this->queryCounter++),
         );
         try {
-            $this->transport->withTimeout(10.0)->send($message, $this->quackVersion);
+            $this->transport->withTimeout(10)->send($message, $this->quackVersion);
         } catch (QuackError) {
             // The caller is gone; nothing useful can be reported.
         } finally {
