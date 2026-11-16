@@ -13,11 +13,9 @@ enum MessageType: int
     case PrepareResponse = 4;
     case FetchRequest = 7;
     case FetchResponse = 8;
-    case SendDataRequest = 9;
     case SuccessResponse = 10;
     case DisconnectMessage = 11;
     case CancelRequest = 12;
-    case SendDataResponse = 14;
     case Acknowledgement = 15;
     case HeartbeatRequest = 16;
     case ErrorResponse = 100;
