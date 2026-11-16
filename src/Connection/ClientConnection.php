@@ -107,7 +107,7 @@ final class ClientConnection
     /**
      * @param list<string>      $resultNames column names for decoding result chunks
      */
-    public function send(
+    private function send(// TODO inline method
         QuackMessage $message,
         array $resultNames = [],
     ): QuackMessage {
