@@ -8,6 +8,7 @@ use DuckDB\Quack\Error\ServerError;
 use DuckDB\Quack\Exceptions\ProtocolException;
 use DuckDB\Quack\Transport\BinaryReader;
 use DuckDB\Quack\Transport\BinaryWriter;
+use DuckDB\Quack\Types\HugeIntParts;
 use DuckDB\Quack\Types\LogicalType;
 use DuckDB\Quack\Types\LogicalTypeCodec;
 
@@ -231,6 +232,18 @@ final class MessageCodec
             return;
         }
 
+        if ($message instanceof AcknowledgementMessage) {
+            $writer->writeObject(static function (BinaryWriter $object) use ($message): void {
+                if ($message->queryUuid->upper !== 0 || (string) $message->queryUuid->lower !== '0') {
+                    $object->writeField(
+                        1,
+                        static fn (BinaryWriter $w) => $w->writeHugeIntParts($message->queryUuid),
+                    );
+                }
+            });
+            return;
+        }
+
         if ($message instanceof ErrorMessage) {
             $writer->writeObject(
                 static fn (BinaryWriter $object) => self::writeErrorFields(
@@ -401,6 +414,16 @@ final class MessageCodec
                     $object->readRequiredField(
                         1,
                         static fn (BinaryReader $r) => $r->readHugeIntParts(),
+                    ),
+                ),
+            ),
+            MessageType::Acknowledgement => $reader->readObject(
+                static fn (BinaryReader $object) => new AcknowledgementMessage(
+                    $header,
+                    $object->readOptionalField(
+                        1,
+                        static fn (BinaryReader $r) => $r->readHugeIntParts(),
+                        new HugeIntParts(0, 0),
                     ),
                 ),
             ),
