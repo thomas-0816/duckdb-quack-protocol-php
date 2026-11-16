@@ -80,6 +80,7 @@ jobs:
           uname -a
           php -v
           php -m | grep curl
+          rm composer.lock
           composer install
           composer check
 
