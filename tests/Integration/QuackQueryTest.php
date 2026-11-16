@@ -625,17 +625,25 @@ final class QuackQueryTest extends TestCase
             $client->fetchAll('SELECT i::TINYINT FROM range(1000) as t(i)');
             self::fail('expected the tinyint overflow to be rejected');
         } catch (ServerException $error) {
-            self::assertStringContainsString(
-                "Type INT64 with value 128 can't be cast because the value is out of range for the destination type INT8",
-                $error->getMessage(),
-            );
+            self::assertStringContainsString("Type INT64 with value 128 can't be cast because the value is out of range for the destination type INT8", $error->getMessage());
         }
 
         try {
-            $client->fetchAll(
-                'SELECT ?::integer, ?::integer, ?::integer',
-                [42, 'invalid', '42foo'],
-            );
+            $client->fetchAll('SELECT i::SMALLINT FROM range(33000) as t(i)');
+            self::fail('expected the smallint overflow to be rejected');
+        } catch (ServerException $error) {
+            self::assertStringContainsString("Type INT64 with value 32768 can't be cast because the value is out of range for the destination type INT16", $error->getMessage());
+        }
+
+        try {
+            iterator_to_array($client->fetchIterator('SELECT i::SMALLINT FROM range(33000) as t(i)'));
+            self::fail('expected the smallint overflow to be rejected');
+        } catch (ServerException $error) {
+            self::assertStringContainsString("Type INT64 with value 32768 can't be cast because the value is out of range for the destination type INT16", $error->getMessage());
+        }
+
+        try {
+            $client->fetchAll('SELECT ?::integer, ?::integer, ?::integer', [42, 'invalid', '42foo']);
             self::fail('expected the invalid integer parameter to be rejected');
         } catch (ServerException $error) {
             self::assertStringContainsString("Could not convert string 'invalid' to INT32", $error->getMessage());
