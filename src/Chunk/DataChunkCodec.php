@@ -696,27 +696,15 @@ final class DataChunkCodec
     /**
      * @param list<bool>|null $validity
      */
-    private static function decodeArrayVector(
-        BinaryReader $reader,
-        LogicalType $logicalType,
-        int $count,
-        ?array $validity,
-        VectorType $vectorType,
-    ): DecodedVector {
-        $arraySize = $reader->readRequiredField(
-            103,
-            static fn (BinaryReader $r) => $r->readUlebUsize(),
-        );
+    private static function decodeArrayVector(BinaryReader $reader, LogicalType $logicalType, int $count, ?array $validity, VectorType $vectorType): DecodedVector
+    {
+        $arraySize = $reader->readRequiredField(103, static fn (BinaryReader $r) => $r->readUlebUsize());
         $expected = LogicalTypeCodec::getArraySize($logicalType);
         if ($arraySize !== $expected) {
             throw new ProtocolException("ARRAY vector serialized size {$arraySize}, expected {$expected}");
         }
         $childType = LogicalTypeCodec::getChildType($logicalType);
-        $childVector = $reader->readRequiredField(
-            104,
-            static fn (BinaryReader $r) => self::decodeVector($r, $childType, $arraySize * $count),
-        );
-
+        $childVector = $reader->readRequiredField(104, static fn (BinaryReader $r) => self::decodeVector($r, $childType, $arraySize * $count));
         $values = [];
         for ($rowIndex = 0; $rowIndex < $count; $rowIndex++) {
             if ($validity !== null && !($validity[$rowIndex] ?? false)) {
@@ -732,19 +720,14 @@ final class DataChunkCodec
     /**
      * @param list<Value> $values
      */
-    private static function encodeFlatVectorBody(
-        BinaryWriter $writer,
-        LogicalType $logicalType,
-        array $values,
-        int $count,
-    ): void {
+    private static function encodeFlatVectorBody(BinaryWriter $writer, LogicalType $logicalType, array $values, int $count): void
+    {
         if (count($values) !== $count) {
             throw new ProtocolException('vector value count ' . count($values) . " does not match row count {$count}");
         }
         if ($logicalType->id === LogicalTypeId::Geometry) {
             $writer->writeField(99, static fn (BinaryWriter $w) => $w->writeUleb(1));
         }
-
         $validity = [];
         foreach ($values as $value) {
             $validity[] = !$value->isNull();
@@ -792,11 +775,8 @@ final class DataChunkCodec
      *
      * @param list<Value> $values
      */
-    private static function encodeStringVector(
-        BinaryWriter $writer,
-        LogicalType $logicalType,
-        array $values,
-    ): void {
+    private static function encodeStringVector(BinaryWriter $writer, LogicalType $logicalType, array $values): void
+    {
         $encoded = [];
         foreach ($values as $value) {
             if ($value->isNull()) {
@@ -844,12 +824,8 @@ final class DataChunkCodec
     /**
      * @param list<Value> $values
      */
-    private static function encodeStructVector(
-        BinaryWriter $writer,
-        LogicalType $logicalType,
-        array $values,
-        int $count,
-    ): void {
+    private static function encodeStructVector(BinaryWriter $writer, LogicalType $logicalType, array $values, int $count): void
+    {
         $children = LogicalTypeCodec::getStructChildren($logicalType);
         $writer->writeField(103, static function (BinaryWriter $w) use ($children, $values, $count): void {
             $w->writeList(
@@ -857,9 +833,7 @@ final class DataChunkCodec
                 static function (BinaryWriter $ww, $child) use ($values, $count): void {
                     $childValues = [];
                     foreach ($values as $value) {
-                        $childValues[] = $value->kind === Value::STRUCT
-                            ? ($value->asStruct()[$child->name] ?? Value::null())
-                            : Value::null();
+                        $childValues[] = $value->kind === Value::STRUCT ? ($value->asStruct()[$child->name] ?? Value::null()) : Value::null();
                     }
                     self::encodeVector($ww, $child->logicalType, $childValues, $count);
                 },
@@ -870,11 +844,8 @@ final class DataChunkCodec
     /**
      * @param list<Value> $values
      */
-    private static function encodeListVector(
-        BinaryWriter $writer,
-        LogicalType $logicalType,
-        array $values,
-    ): void {
+    private static function encodeListVector(BinaryWriter $writer, LogicalType $logicalType, array $values): void
+    {
         $childType = LogicalTypeCodec::getChildType($logicalType);
         $entries = [];
         $childValues = [];
