@@ -5,6 +5,7 @@ namespace DuckDB\Quack\Tests\Unit\Messages;
 use DuckDB\Quack\Chunk\DataChunk;
 use DuckDB\Quack\Chunk\DecodedVector;
 use DuckDB\Quack\Error\ServerError;
+use DuckDB\Quack\Messages\AcknowledgementMessage;
 use DuckDB\Quack\Messages\CancelMessage;
 use DuckDB\Quack\Messages\ConnectionRequestMessage;
 use DuckDB\Quack\Messages\DisconnectMessage;
@@ -101,6 +102,14 @@ final class MessageCodecTest extends TestCase
             new CancelMessage(
                 new MessageHeader(MessageType::CancelRequest, 'conn-1'),
                 new HugeIntParts(1, 2),
+            ),
+            new AcknowledgementMessage(
+                new MessageHeader(MessageType::Acknowledgement, 'conn-1'),
+                new HugeIntParts(1, 2),
+            ),
+            new AcknowledgementMessage(
+                new MessageHeader(MessageType::Acknowledgement, 'conn-1'),
+                new HugeIntParts(0, 0),
             ),
             new DisconnectMessage(
                 new MessageHeader(MessageType::DisconnectMessage, 'conn-1'),

@@ -6,6 +6,7 @@ use DuckDB\Quack\Chunk\Builders;
 use DuckDB\Quack\Chunk\DataChunkCodec;
 use DuckDB\Quack\Transport\BinaryReader;
 use DuckDB\Quack\Transport\BinaryWriter;
+use DuckDB\Quack\Types\LogicalTypeCodec;
 use DuckDB\Quack\Types\LogicalTypes;
 use DuckDB\Quack\Types\Value;
 use DuckDB\Quack\Types\VectorType;
@@ -86,6 +87,108 @@ final class DataChunkCodecTest extends TestCase
             ],
             $decoded->columns[0]->values,
         );
+    }
+
+    public function testStringVectorsUseTheV3Layout(): void
+    {
+        $chunk = Builders::dataChunk([
+            Builders::column(
+                LogicalTypes::varchar(),
+                [Value::string('a'), Value::null(), Value::string('bc')],
+                'label',
+            ),
+        ]);
+
+        $writer = BinaryWriter::new();
+        DataChunkCodec::encodeDataChunk($writer, $chunk);
+        $reader = new BinaryReader($writer->intoBytes());
+
+        $columns = $reader->readObject(
+            static fn (BinaryReader $chunkReader) => self::readChunkColumns(
+                $chunkReader,
+                self::readV3StringVector(...),
+            ),
+        );
+        $reader->assertEof();
+
+        [$byteLength, $lengths, $bytes] = $columns[0];
+        self::assertSame(3, $byteLength);
+        self::assertSame(pack('V', 1) . pack('V', 0) . pack('V', 2), $lengths);
+        self::assertSame('abc', $bytes);
+    }
+
+    public function testGeometryVectorsKeepTheWkbListLayout(): void
+    {
+        $wkb = "\x01\x02\x00\x00\x00";
+        $chunk = Builders::dataChunk([
+            Builders::column(LogicalTypes::geometry(), [Value::bytes($wkb)], 'geom'),
+        ]);
+
+        $writer = BinaryWriter::new();
+        DataChunkCodec::encodeDataChunk($writer, $chunk);
+        $reader = new BinaryReader($writer->intoBytes());
+
+        $columns = $reader->readObject(
+            static fn (BinaryReader $chunkReader) => self::readChunkColumns(
+                $chunkReader,
+                self::readGeometryVector(...),
+            ),
+        );
+        $reader->assertEof();
+
+        self::assertSame([$wkb], $columns[0]);
+    }
+
+    /**
+     * @template T
+     * @param callable(BinaryReader):T $readColumn
+     * @return list<T>
+     */
+    private static function readChunkColumns(BinaryReader $chunkReader, callable $readColumn): array
+    {
+        $chunkReader->readRequiredField(
+            100,
+            static fn (BinaryReader $r) => $r->readUlebU64(),
+        );
+        $chunkReader->readRequiredField(101, static fn (BinaryReader $r) => $r->readList(
+            static fn (BinaryReader $rr) => LogicalTypeCodec::decodeLogicalType($rr),
+        ));
+
+        return $chunkReader->readRequiredField(102, static fn (BinaryReader $r) => $r->readList(
+            static fn (BinaryReader $rr) => $r->readObject(
+                static fn (BinaryReader $vector) => $readColumn($vector),
+            ),
+        ));
+    }
+
+    /**
+     * @return array{int|string, string, string}
+     */
+    private static function readV3StringVector(BinaryReader $vector): array
+    {
+        $vector->readRequiredField(100, static fn (BinaryReader $r) => $r->readBool());
+        $vector->readOptionalField(101, static fn (BinaryReader $r) => $r->readBlob(), null);
+
+        return [
+            $vector->readRequiredField(107, static fn (BinaryReader $r) => $r->readUlebU64()),
+            $vector->readRequiredField(108, static fn (BinaryReader $r) => $r->readBlob()),
+            $vector->readRequiredField(109, static fn (BinaryReader $r) => $r->readBlob()),
+        ];
+    }
+
+    /**
+     * @return list<string>
+     */
+    private static function readGeometryVector(BinaryReader $vector): array
+    {
+        $vector->readRequiredField(99, static fn (BinaryReader $r) => $r->readUlebU64());
+        $vector->readRequiredField(100, static fn (BinaryReader $r) => $r->readBool());
+        $vector->readOptionalField(101, static fn (BinaryReader $r) => $r->readBlob(), null);
+        self::assertSame(102, $vector->peekFieldId());
+
+        return $vector->readRequiredField(102, static fn (BinaryReader $r) => $r->readList(
+            static fn (BinaryReader $rr) => $rr->readStringBytes(),
+        ));
     }
 
     public function testDecodesSequenceVectors(): void
