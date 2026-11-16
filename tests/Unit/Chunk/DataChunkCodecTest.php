@@ -271,14 +271,14 @@ final class DataChunkCodecTest extends TestCase
         $writer = BinaryWriter::new();
         DataChunkCodec::encodeDataChunkWrapper($writer, $chunk);
         $reader = new BinaryReader($writer->intoBytes());
-        $decoded = DataChunkCodec::decodeDataChunkWrapperToPhp($reader, $types, ['id', 'label', 'items']);
+        $decoded = DataChunkCodec::decodeDataChunkWrapperToPhp($reader, ['id', 'label', 'items']);
         $reader->assertEof();
 
         self::assertSame(2, $decoded->rowCount);
         self::assertSame([1, null], $decoded->columns[0]->values);
         self::assertSame(['a', 'bc'], $decoded->columns[1]->values);
         self::assertSame([[1, 2], []], $decoded->columns[2]->values);
-        self::assertSame($types, $decoded->types);
+        self::assertEquals($types, $decoded->types);
         self::assertSame(['id', 'label', 'items'], $decoded->resultNames);
     }
 
