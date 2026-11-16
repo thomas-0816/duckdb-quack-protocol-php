@@ -128,14 +128,8 @@ final class Transport
         return $this->curl = $curl;
     }
 
-    /**
-     * @param list<string>      $resultNames column names for decoding result chunks
-     */
-    public function send(
-        QuackMessage $message,
-        int $version,
-        array $resultNames = [],
-    ): QuackMessage {
+    public function send(QuackMessage $message, int $version): QuackMessage
+    {
         $curl = $this->curl();
 
         $options = [
@@ -186,7 +180,7 @@ final class Transport
             throw new HttpStatusException($status, $raw);
         }
 
-        $decoded = MessageCodec::decodeMessageForVersion((string) $body, $version, $resultNames);
+        $decoded = MessageCodec::decodeMessageForVersion((string) $body, $version);
         if ($decoded instanceof ErrorMessage) {
             throw new ServerException($decoded->error);
         }
