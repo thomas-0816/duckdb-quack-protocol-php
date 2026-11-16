@@ -6,6 +6,8 @@ use DuckDB\Quack\Chunk\Builders;
 use DuckDB\Quack\Chunk\DataChunkCodec;
 use DuckDB\Quack\Transport\BinaryReader;
 use DuckDB\Quack\Transport\BinaryWriter;
+use DuckDB\Quack\Types\ChildType;
+use DuckDB\Quack\Types\Info\StructTypeInfo;
 use DuckDB\Quack\Types\LogicalType;
 use DuckDB\Quack\Types\LogicalTypeCodec;
 use DuckDB\Quack\Types\LogicalTypeId;
@@ -278,5 +280,163 @@ final class DataChunkCodecTest extends TestCase
         self::assertSame([[1, 2], []], $decoded->columns[2]->values);
         self::assertSame($types, $decoded->types);
         self::assertSame(['id', 'label', 'items'], $decoded->resultNames);
+    }
+
+    public function testDecodesFlattenedShreddedVariant(): void
+    {
+        $reader = self::shreddedVector(
+            self::shreddedStructType(LogicalTypes::integer()),
+            Value::null(),
+            Value::int(42),
+        );
+        $decoded = DataChunkCodec::decodeVector($reader, self::variantType(), 1);
+        $reader->assertEof();
+
+        self::assertSame(VectorType::Shredded, $decoded->vectorType);
+        self::assertSame([42], $decoded->values);
+    }
+
+    public function testDecodesShreddedVariantFallbackToUnshreddedValue(): void
+    {
+        $reader = self::shreddedVector(
+            self::shreddedStructType(LogicalTypes::struct([
+                new ChildType('typed_value', LogicalTypes::integer()),
+                new ChildType('untyped_value_index', LogicalTypes::uinteger()),
+            ])),
+            self::canonicalVariantInt32(7),
+            Value::struct([
+                'typed_value' => Value::null(),
+                'untyped_value_index' => Value::uint(1),
+            ]),
+        );
+        $decoded = DataChunkCodec::decodeVector($reader, self::variantType(), 1);
+        $reader->assertEof();
+
+        self::assertSame([7], $decoded->values);
+    }
+
+    public function testDecodesShreddedVariantObjectOverlay(): void
+    {
+        $reader = self::shreddedVector(
+            self::shreddedStructType(LogicalTypes::struct([
+                new ChildType('typed_value', LogicalTypes::struct([
+                    new ChildType('a', LogicalTypes::integer()),
+                ])),
+                new ChildType('untyped_value_index', LogicalTypes::uinteger()),
+            ])),
+            self::canonicalVariantObjectString('b', 6),
+            Value::struct([
+                'typed_value' => Value::struct(['a' => Value::int(5)]),
+                'untyped_value_index' => Value::uint(1),
+            ]),
+        );
+        $decoded = DataChunkCodec::decodeVector($reader, self::variantType(), 1);
+        $reader->assertEof();
+
+        self::assertSame([['a' => 5, 'b' => 6]], $decoded->values);
+    }
+
+    public function testDecodesNullShreddedVariant(): void
+    {
+        $reader = self::shreddedVector(
+            self::shreddedStructType(LogicalTypes::integer()),
+            Value::null(),
+            Value::null(),
+        );
+        $decoded = DataChunkCodec::decodeVector($reader, self::variantType(), 1);
+        $reader->assertEof();
+
+        self::assertSame([null], $decoded->values);
+    }
+
+    private static function shreddedStructType(LogicalType $typedType): LogicalType
+    {
+        return LogicalTypes::struct([
+            new ChildType('unshredded', self::variantType()),
+            new ChildType('shredded', $typedType),
+        ]);
+    }
+
+    private static function shreddedVector(LogicalType $outerType, Value $unshredded, Value $shredded): BinaryReader
+    {
+        $writer = BinaryWriter::new();
+        $writer->writeObject(static function (BinaryWriter $object) use ($outerType, $unshredded, $shredded): void {
+            $object->writeField(90, static fn (BinaryWriter $w) => $w->writeUleb(VectorType::Shredded->value));
+            $object->writeField(91, static fn (BinaryWriter $w) => LogicalTypeCodec::encodeLogicalType($w, $outerType));
+            $object->writeField(92, static function (BinaryWriter $w) use ($outerType, $unshredded, $shredded): void {
+                DataChunkCodec::encodeVector($w, $outerType, [Value::struct(['unshredded' => $unshredded, 'shredded' => $shredded])], 1);
+            });
+        });
+
+        return new BinaryReader($writer->intoBytes());
+    }
+
+    private static function variantType(): LogicalType
+    {
+        return LogicalTypes::variant(new StructTypeInfo(null, self::variantChildren()));
+    }
+
+    /**
+     * @return list<ChildType>
+     */
+    private static function variantChildren(): array
+    {
+        return [
+            new ChildType('keys', LogicalTypes::list(LogicalTypes::varchar())),
+            new ChildType('children', LogicalTypes::list(LogicalTypes::struct([
+                new ChildType('keys_index', LogicalTypes::uinteger()),
+                new ChildType('values_index', LogicalTypes::uinteger()),
+            ]))),
+            new ChildType('values', LogicalTypes::list(LogicalTypes::struct([
+                new ChildType('type_id', LogicalTypes::utinyint()),
+                new ChildType('byte_offset', LogicalTypes::uinteger()),
+            ]))),
+            new ChildType('data', LogicalTypes::blob()),
+        ];
+    }
+
+    private static function canonicalVariantInt32(int $value): Value
+    {
+        return self::canonicalVariant([], [], [['type_id' => 5, 'byte_offset' => 0]], pack('V', $value));
+    }
+
+    private static function canonicalVariantObjectString(string $key, int $value): Value
+    {
+        return self::canonicalVariant(
+            [$key],
+            [['keys_index' => 0, 'values_index' => 1]],
+            [
+                ['type_id' => 29, 'byte_offset' => 0],
+                ['type_id' => 5, 'byte_offset' => 2],
+            ],
+            "\x01\x00" . pack('V', $value),
+        );
+    }
+
+    /**
+     * @param list<string>                                    $keys
+     * @param list<array{keys_index:int,values_index:int}>    $children
+     * @param list<array{type_id:int,byte_offset:int}>        $values
+     */
+    private static function canonicalVariant(array $keys, array $children, array $values, string $data): Value
+    {
+        return Value::struct([
+            'keys' => Value::list(array_map(static fn (string $key) => Value::string($key), $keys)),
+            'children' => Value::list(array_map(
+                static fn (array $child) => Value::struct([
+                    'keys_index' => Value::uint($child['keys_index']),
+                    'values_index' => Value::uint($child['values_index']),
+                ]),
+                $children,
+            )),
+            'values' => Value::list(array_map(
+                static fn (array $entry) => Value::struct([
+                    'type_id' => Value::uint($entry['type_id']),
+                    'byte_offset' => Value::uint($entry['byte_offset']),
+                ]),
+                $values,
+            )),
+            'data' => Value::bytes($data),
+        ]);
     }
 }
