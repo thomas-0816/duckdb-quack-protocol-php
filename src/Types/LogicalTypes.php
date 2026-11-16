@@ -173,8 +173,7 @@ final class LogicalTypes
     }
 
     /**
-     * MAP is encoded as LIST<STRUCT<key, value>>, matching DuckDB and the Rust
-     * SDK.
+     * MAP is encoded as LIST<STRUCT<key, value>>
      */
     public static function map(LogicalType $keyType, LogicalType $valueType): LogicalType
     {

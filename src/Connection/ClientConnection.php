@@ -27,7 +27,10 @@ use DuckDB\Quack\Types\HugeIntParts;
  */
 final class ClientConnection
 {
-    private const QUACK_VERSION = 3;
+    /**
+     * @var list<int>
+     */
+    private const QUACK_VERSIONS = [3];
 
     private int $queryCounter = 1;
 
@@ -51,13 +54,12 @@ final class ClientConnection
                 header: MessageHeader::new(MessageType::ConnectionRequest),
                 authString: $transport->authToken(),
                 clientPlatform: 'quack-php',
-                minSupportedQuackVersion: self::QUACK_VERSION,
-                maxSupportedQuackVersion: self::QUACK_VERSION,
+                minSupportedQuackVersion: min(self::QUACK_VERSIONS),
+                maxSupportedQuackVersion: max(self::QUACK_VERSIONS),
                 heartbeatTimeoutSeconds: 90,
             ),
-            self::QUACK_VERSION,
+            max(self::QUACK_VERSIONS),
         );
-
         if (!$response instanceof ConnectionResponseMessage) {
             throw new ProtocolException('expected CONNECTION_RESPONSE, got ' . $response->messageType()->name);
         }
@@ -65,9 +67,10 @@ final class ClientConnection
         if ($connectionId === null || $connectionId === '') {
             throw new ProtocolException('CONNECTION_RESPONSE did not include a connection id');
         }
-        if ($response->quackVersion !== self::QUACK_VERSION) {
-            $selected = $response->quackVersion === null ? 'none' : (string) $response->quackVersion;
-            throw new ProtocolException("server selected Quack protocol version {$selected}, expected " . self::QUACK_VERSION);
+        $selectedVersion = (int) $response->quackVersion;
+        if (!in_array($selectedVersion, self::QUACK_VERSIONS, true)) {
+            $selected = (string) $response->quackVersion;
+            throw new ProtocolException("server selected Quack protocol version {$selected}, expected " . implode(' or ', self::QUACK_VERSIONS));
         }
 
         return new self(
@@ -75,7 +78,7 @@ final class ClientConnection
             $connectionId,
             $response->serverDuckdbVersion,
             $response->serverPlatform,
-            self::QUACK_VERSION,
+            $selectedVersion,
         );
     }
 
