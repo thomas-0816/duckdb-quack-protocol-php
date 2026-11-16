@@ -104,22 +104,21 @@ final class ClientConnection
         return $this->connectionId;
     }
 
-    /**
-     * @param list<string>      $resultNames column names for decoding result chunks
-     */
-    private function send(// TODO inline method
-        QuackMessage $message,
-        array $resultNames = [],
-    ): QuackMessage {
+    public function prepare(string $sql): QuackMessage
+    {
         if ($this->closed) {
             throw new ProtocolException('Quack client is not connected');
         }
+        $message = new PrepareRequestMessage(
+            header: MessageHeader::new(MessageType::PrepareRequest)
+                ->withConnection($this->connectionId)
+                ->withClientQueryId($this->queryCounter++),
+            sql: $sql,
+            queryUuid: new HugeIntParts(0, $this->queryUuidCounter++),
+            inlineRows: null,
+        );
         try {
-            return $this->transport->send(
-                $message,
-                $this->quackVersion,
-                $resultNames,
-            );
+            return $this->transport->send($message, $this->quackVersion);
         } catch (QuackError $error) {
             if ($error->isConnectionFatal()) {
                 $this->closed = true;
@@ -128,42 +127,30 @@ final class ClientConnection
         }
     }
 
-    public function prepare(string $sql): QuackMessage
+    /**
+     * @param list<string> $resultNames column names for decoding result chunks
+     */
+    public function fetch(HugeIntParts $resultUuid, int $batchIndex, int $ackIndex, array $resultNames = []): QuackMessage
     {
         if ($this->closed) {
             throw new ProtocolException('Quack client is not connected');
         }
-        $queryUuid = new HugeIntParts(0, $this->queryUuidCounter++);
-        return $this->send(new PrepareRequestMessage(
-            header: MessageHeader::new(MessageType::PrepareRequest)
-                ->withConnection($this->connectionId)
-                ->withClientQueryId($this->queryCounter++),
-            sql: $sql,
-            queryUuid: $queryUuid,
-            inlineRows: null,
-        ));
-    }
-
-    /**
-     * @param list<string>      $resultNames column names for decoding result chunks
-     */
-    public function fetch(
-        HugeIntParts $resultUuid,
-        int $batchIndex,
-        int $ackIndex,
-        array $resultNames = [],
-    ): QuackMessage {
-        if ($this->closed) {
-            throw new ProtocolException('Quack client is not connected');
-        }
-        return $this->send(new FetchRequestMessage(
+        $message = new FetchRequestMessage(
             header: MessageHeader::new(MessageType::FetchRequest)
                 ->withConnection($this->connectionId)
                 ->withClientQueryId($this->queryCounter++),
             resultUuid: $resultUuid,
             batchIndex: $batchIndex,
             ackIndex: $ackIndex,
-        ), $resultNames);
+        );
+        try {
+            return $this->transport->send($message, $this->quackVersion, $resultNames);
+        } catch (QuackError $error) {
+            if ($error->isConnectionFatal()) {
+                $this->closed = true;
+            }
+            throw $error;
+        }
     }
 
     /**
