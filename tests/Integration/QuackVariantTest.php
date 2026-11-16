@@ -151,7 +151,7 @@ final class QuackVariantTest extends TestCase
         self::assertSame([['v' => '[1, 2, 3]']], $client->fetchAll('SELECT * FROM variant_values'));
     }
 
-    public function testLargeVariantResultUsesShreddedVectors(): void
+    public function testLargeVariantResultWithMixedTypesDecodes(): void
     {
         $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 30);
         $sql = <<<'SQL'
@@ -170,5 +170,36 @@ final class QuackVariantTest extends TestCase
         self::assertSame('value-2', $rows[2]['v']);
         self::assertSame(['id' => 4998, 'tags' => ['a4998'], 'nested' => ['v' => 9996]], $rows[4998]['v']);
         self::assertSame([4999, 5000], $rows[4999]['v']);
+    }
+
+    public function testShreddedVariantSelectDecodes(): void
+    {
+        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 10);
+
+        $client->beginTransaction();
+        try {
+            $client->execute('SET variant_minimum_shredding_size = 0');
+            $client->execute("CREATE TABLE shredded (id INTEGER, v VARIANT)");
+            $client->execute(
+                "INSERT INTO shredded
+                    SELECT i, {'id': i, 'tags': ['a' || i], 'nested': {'v': i * 2}}
+                    FROM generate_series(1, 5_000) t(i)",
+            );
+            $client->execute('CHECKPOINT');
+
+            self::assertSame(['SHREDDED_VECTOR'], $client->fetchColumn("SELECT DISTINCT vector_type(v) FROM shredded"));
+            self::assertSame(5_000, $client->fetchValue("SELECT count(*) FROM shredded"));
+            self::assertSame(
+                [['v' => ['id' => 1, 'nested' => ['v' => 2], 'tags' => ['a1']]]],
+                $client->fetchAll("SELECT v FROM shredded WHERE id = 1"),
+            );
+            self::assertSame(
+                ['v' => ['id' => 5_000, 'nested' => ['v' => 10_000], 'tags' => ['a5000']]],
+                $client->fetchOne("SELECT v FROM shredded ORDER BY id DESC LIMIT 1"),
+            );
+        } finally {
+            $client->rollback();
+            $client->execute('SET variant_minimum_shredding_size = 30000');
+        }
     }
 }
