@@ -150,4 +150,25 @@ final class QuackVariantTest extends TestCase
 
         self::assertSame([['v' => '[1, 2, 3]']], $client->fetchAll('SELECT * FROM variant_values'));
     }
+
+    public function testLargeVariantResultUsesShreddedVectors(): void
+    {
+        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 30);
+        $sql = <<<'SQL'
+            SELECT i AS i, CASE i % 3
+                WHEN 0 THEN ({'id': i, 'tags': ['a' || i], 'nested': {'v': i * 2}})::VARIANT
+                WHEN 1 THEN ([i, i + 1])::VARIANT
+                ELSE ('value-' || i)::VARIANT
+            END AS v
+            FROM range(5000) t(i)
+            SQL;
+        $rows = $client->fetchAll($sql);
+
+        self::assertCount(5000, $rows);
+        self::assertSame(['id' => 0, 'tags' => ['a0'], 'nested' => ['v' => 0]], $rows[0]['v']);
+        self::assertSame([1, 2], $rows[1]['v']);
+        self::assertSame('value-2', $rows[2]['v']);
+        self::assertSame(['id' => 4998, 'tags' => ['a4998'], 'nested' => ['v' => 9996]], $rows[4998]['v']);
+        self::assertSame([4999, 5000], $rows[4999]['v']);
+    }
 }
