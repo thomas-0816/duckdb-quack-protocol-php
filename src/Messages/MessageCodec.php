@@ -13,7 +13,7 @@ use DuckDB\Quack\Types\LogicalType;
 use DuckDB\Quack\Types\LogicalTypeCodec;
 
 /**
- * Encodes and decodes Quack protocol messages for protocol versions 1 and 3.
+ * Encodes and decodes Quack protocol version 3 messages.
  */
 final class MessageCodec
 {
