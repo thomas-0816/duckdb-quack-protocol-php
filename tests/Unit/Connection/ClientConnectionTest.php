@@ -23,7 +23,7 @@ final class ClientConnectionTest extends TestCase
         $this->expectException(ProtocolException::class);
         $this->expectExceptionMessage('Quack client is not connected');
 
-        $connection->prepare('SELECT 1');
+        $connection->prepare('SELECT 1', null);
     }
 
     public function testRetiredConnectionRejectsFetch(): void
