@@ -191,27 +191,17 @@ final class QuackDateTest extends TestCase
         $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 10);
 
         $client->execute("SET TimeZone='UTC'");
+        $result = $client->fetchOne("SELECT TIMESTAMPTZ '2026-01-23 12:34:56.789123+02:30', TIMESTAMPTZ '2026-01-23 12:34:56.789123+02:30'::varchar, TIMESTAMPTZ '2026-01-23 12:34:56.789123+02:30'::json");
         self::assertSame(
-            [
-                '2026-01-23 10:04:56.789123+00',
-                '2026-01-23 10:04:56.789123+00',
-                '2026-01-23 10:04:56.789123+00',
-            ],
-            array_values($client->fetchOne(
-                "SELECT TIMESTAMPTZ '2026-01-23 12:34:56.789123+02:30', TIMESTAMPTZ '2026-01-23 12:34:56.789123+02:30'::varchar, TIMESTAMPTZ '2026-01-23 12:34:56.789123+02:30'::json") ?? []
-            ),
+            ['2026-01-23 10:04:56.789123+00', '2026-01-23 10:04:56.789123+00', '2026-01-23 10:04:56.789123+00'],
+            array_values($result ?? []),
         );
 
         $client->execute("SET TimeZone='Europe/Berlin'");
+        $result = $client->fetchOne("SELECT TIMESTAMPTZ '2026-01-23 12:34:56.789123+02:30', TIMESTAMPTZ '2026-01-23 12:34:56.789123+02:30'::varchar, TIMESTAMPTZ '2026-01-23 12:34:56.789123+02:30'::json");
         self::assertSame(
-            [
-                '2026-01-23 10:04:56.789123+00',
-                '2026-01-23 11:04:56.789123+01',
-                '2026-01-23 11:04:56.789123+01',
-            ],
-            array_values($client->fetchOne(
-                "SELECT TIMESTAMPTZ '2026-01-23 12:34:56.789123+02:30', TIMESTAMPTZ '2026-01-23 12:34:56.789123+02:30'::varchar, TIMESTAMPTZ '2026-01-23 12:34:56.789123+02:30'::json") ?? []
-            ),
+            ['2026-01-23 10:04:56.789123+00', '2026-01-23 11:04:56.789123+01', '2026-01-23 11:04:56.789123+01'],
+            array_values($result ?? []),
         );
     }
 

@@ -3,9 +3,6 @@
 namespace DuckDB\Quack\Sql;
 
 use DuckDB\Quack\Exceptions\ProtocolException;
-use DuckDB\Quack\Types\TemporalFormatter;
-use DuckDB\Quack\Types\TimestampUnit;
-use DuckDB\Quack\Types\TimeUnit;
 use DuckDB\Quack\Types\Value;
 
 /**
