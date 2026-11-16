@@ -52,13 +52,13 @@ final class QuackClient
         $settings = [];
         foreach ($configuration as $name => $value) {
             $literal = match (true) {
-                $value === null => Value::null(),
-                is_bool($value) => Value::bool($value),
-                is_int($value) => Value::int($value),
-                is_float($value) => Value::double($value),
-                default => Value::string($value),
+                $value === null => 'NULL',
+                is_bool($value) => $value ? 'TRUE' : 'FALSE',
+                is_int($value) => $value,
+                is_float($value) => (string) $value,
+                default => "'" . str_replace("'", "''", $value) . "'",
             };
-            $settings[] = 'SET ' . $name . ' = ' . SqlFormatter::valueLiteral($literal) . ';';
+            $settings[] = 'SET ' . $name . ' = ' . $literal . ';';
         }
         $transport = Transport::new($uri, $authToken, $connectTimeout, $queryTimeout, $sslCertificate);
         $connection = ClientConnection::connect($transport);
