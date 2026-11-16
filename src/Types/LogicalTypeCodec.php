@@ -5,7 +5,6 @@ namespace DuckDB\Quack\Types;
 use DuckDB\Quack\Exceptions\ProtocolException;
 use DuckDB\Quack\Exceptions\UnsupportedTypeException;
 use DuckDB\Quack\Transport\BinaryReader;
-use DuckDB\Quack\Transport\BinaryWriter;
 use DuckDB\Quack\Types\Info\{
     AggregateStateTypeInfo,
     AnyTypeInfo,
@@ -25,27 +24,11 @@ use DuckDB\Quack\Types\Info\{
 };
 
 /**
- * Encodes and decodes DuckDB logical types, and answers the structural
- * questions the vector codec needs.
+ * Decodes DuckDB logical types, and answers the structural questions the
+ * vector codec needs.
  */
 final class LogicalTypeCodec
 {
-    public static function encodeLogicalType(BinaryWriter $writer, LogicalType $logicalType): void
-    {
-        $writer->writeObject(function (BinaryWriter $object) use ($logicalType): void {
-            $object->writeField(100, fn (BinaryWriter $w) => $w->writeUleb($logicalType->id->value));
-            if ($logicalType->typeInfo !== null) {
-                $object->writeField(
-                    101,
-                    fn (BinaryWriter $w) => $w->writeNullable(
-                        $logicalType->typeInfo,
-                        self::encodeExtraTypeInfo(...),
-                    ),
-                );
-            }
-        });
-    }
-
     public static function decodeLogicalType(BinaryReader $reader): LogicalType
     {
         return $reader->readObject(function (BinaryReader $object): LogicalType {
@@ -63,95 +46,6 @@ final class LogicalTypeCodec
         });
     }
 
-    public static function encodeExtraTypeInfo(BinaryWriter $writer, ExtraTypeInfo $info): void
-    {
-        $writer->writeObject(function (BinaryWriter $object) use ($info): void {
-            $object->writeField(100, fn (BinaryWriter $w) => $w->writeUleb($info->typeId()->value));
-            if ($info->alias !== null && $info->alias !== '') {
-                $object->writeField(101, fn (BinaryWriter $w) => $w->writeString($info->alias));
-            }
-
-            if ($info instanceof DecimalTypeInfo) {
-                $object->writeField(200, fn (BinaryWriter $w) => $w->writeUleb($info->width));
-                $object->writeField(201, fn (BinaryWriter $w) => $w->writeUleb($info->scale));
-            } elseif ($info instanceof StringTypeInfo) {
-                $object->writeField(200, fn (BinaryWriter $w) => $w->writeString($info->collation));
-            } elseif ($info instanceof ListTypeInfo) {
-                $object->writeField(
-                    200,
-                    fn (BinaryWriter $w) => self::encodeLogicalType($w, $info->childType),
-                );
-            } elseif ($info instanceof StructTypeInfo) {
-                $object->writeField(
-                    200,
-                    fn (BinaryWriter $w) => self::encodeChildTypes($w, $info->childTypes),
-                );
-            } elseif ($info instanceof EnumTypeInfo) {
-                $object->writeField(200, fn (BinaryWriter $w) => $w->writeUleb(count($info->values)));
-                $object->writeField(
-                    201,
-                    fn (BinaryWriter $w) => $w->writeList(
-                        $info->values,
-                        static fn (BinaryWriter $ww, string $value) => $ww->writeString($value),
-                    ),
-                );
-            } elseif ($info instanceof AggregateStateTypeInfo) {
-                $object->writeField(
-                    200,
-                    fn (BinaryWriter $w) => $w->writeString($info->functionName),
-                );
-                $object->writeField(
-                    201,
-                    fn (BinaryWriter $w) => self::encodeLogicalType($w, $info->returnType),
-                );
-                $object->writeField(
-                    202,
-                    fn (BinaryWriter $w) => $w->writeList(
-                        $info->boundArgumentTypes,
-                        static fn (BinaryWriter $ww, LogicalType $type) => self::encodeLogicalType($ww, $type),
-                    ),
-                );
-            } elseif ($info instanceof ArrayTypeInfo) {
-                $object->writeField(
-                    200,
-                    fn (BinaryWriter $w) => self::encodeLogicalType($w, $info->childType),
-                );
-                $object->writeField(201, fn (BinaryWriter $w) => $w->writeUleb($info->size));
-            } elseif ($info instanceof AnyTypeInfo) {
-                $object->writeField(
-                    200,
-                    fn (BinaryWriter $w) => self::encodeLogicalType($w, $info->targetType),
-                );
-                $object->writeField(201, fn (BinaryWriter $w) => $w->writeUleb($info->castScore));
-            } elseif ($info instanceof TemplateTypeInfo) {
-                $object->writeField(200, fn (BinaryWriter $w) => $w->writeString($info->name));
-            } elseif ($info instanceof IntegerLiteralTypeInfo) {
-                throw new UnsupportedTypeException(
-                    'encoding INTEGER_LITERAL type metadata is not supported',
-                );
-            } elseif ($info instanceof GeoTypeInfo) {
-                $object->writeField(
-                    200,
-                    fn (BinaryWriter $w) => self::encodeCoordinateReferenceSystem($w, $info->crs),
-                );
-            } elseif ($info instanceof UnboundTypeInfo) {
-                if ($info->name !== null) {
-                    $object->writeField(200, fn (BinaryWriter $w) => $w->writeString($info->name));
-                }
-                if ($info->catalog !== null) {
-                    $object->writeField(201, fn (BinaryWriter $w) => $w->writeString($info->catalog));
-                }
-                if ($info->schema !== null) {
-                    $object->writeField(202, fn (BinaryWriter $w) => $w->writeString($info->schema));
-                }
-            } elseif (!$info instanceof InvalidTypeInfo && !$info instanceof GenericTypeInfo) {
-                throw new UnsupportedTypeException(
-                    'unknown extra type metadata ' . $info::class,
-                );
-            }
-        });
-    }
-
     public static function decodeExtraTypeInfo(BinaryReader $reader): ExtraTypeInfo
     {
         return $reader->readObject(function (BinaryReader $object): ExtraTypeInfo {
@@ -163,11 +57,13 @@ final class LogicalTypeCodec
                 static fn (BinaryReader $r) => $r->readString(),
                 null,
             );
-            if ($object->peekFieldId() === 103) {
-                throw new UnsupportedTypeException('extension type metadata is not supported');
-            }
+            $extensionInfo = $object->readOptionalField(
+                103,
+                static fn (BinaryReader $r) => $r->readNullable(self::decodeExtensionTypeInfo(...)),
+                null,
+            );
 
-            return match ($typeId) {
+            $info = match ($typeId) {
                 ExtraTypeInfoType::Invalid => new InvalidTypeInfo($alias),
                 ExtraTypeInfoType::Generic => new GenericTypeInfo($alias),
                 ExtraTypeInfoType::Decimal => new DecimalTypeInfo(
@@ -224,7 +120,61 @@ final class LogicalTypeCodec
                 ),
                 ExtraTypeInfoType::Unbound => self::decodeUnbound($object, $alias),
             };
+
+            return $extensionInfo === null ? $info : $info->withExtensionInfo($extensionInfo);
         });
+    }
+
+    private static function decodeExtensionTypeInfo(BinaryReader $reader): ExtensionTypeInfo
+    {
+        return $reader->readObject(static function (BinaryReader $object): ExtensionTypeInfo {
+            $modifiers = $object->readOptionalField(
+                100,
+                static fn (BinaryReader $r) => $r->readList(
+                    static fn (BinaryReader $modifier) => self::decodeLogicalTypeModifier($modifier),
+                ),
+                [],
+            );
+            $entries = $object->readOptionalField(
+                101,
+                static fn (BinaryReader $r) => $r->readList(
+                    static fn (BinaryReader $pair) => self::decodeExtensionProperty($pair),
+                ),
+                [],
+            );
+
+            $properties = [];
+            foreach ($entries as [$key, $value]) {
+                $properties[$key] = $value;
+            }
+
+            return new ExtensionTypeInfo($modifiers, $properties);
+        });
+    }
+
+    /**
+     * @return array{0:string,1:DuckDBValue}
+     */
+    private static function decodeExtensionProperty(BinaryReader $reader): array
+    {
+        return $reader->readObject(static fn (BinaryReader $pair): array => [
+            $pair->readRequiredField(0, static fn (BinaryReader $k) => $k->readString()),
+            $pair->readRequiredField(
+                1,
+                static fn (BinaryReader $value) => ValueCodec::decode($value),
+            ),
+        ]);
+    }
+
+    private static function decodeLogicalTypeModifier(BinaryReader $reader): LogicalTypeModifier
+    {
+        return $reader->readObject(static fn (BinaryReader $object) => new LogicalTypeModifier(
+            $object->readRequiredField(
+                100,
+                static fn (BinaryReader $value) => ValueCodec::decode($value),
+            ),
+            $object->readOptionalField(101, static fn (BinaryReader $r) => $r->readString(), ''),
+        ));
     }
 
     public static function getPhysicalType(LogicalType $logicalType): PhysicalType
@@ -378,22 +328,6 @@ final class LogicalTypeCodec
     }
 
     /**
-     * @param list<ChildType> $children
-     */
-    private static function encodeChildTypes(BinaryWriter $writer, array $children): void
-    {
-        $writer->writeList($children, static function (BinaryWriter $w, ChildType $child): void {
-            $w->writeObject(function (BinaryWriter $pair) use ($child): void {
-                $pair->writeField(0, fn (BinaryWriter $ww) => $ww->writeString($child->name));
-                $pair->writeField(
-                    1,
-                    fn (BinaryWriter $ww) => self::encodeLogicalType($ww, $child->logicalType),
-                );
-            });
-        });
-    }
-
-    /**
      * @return list<ChildType>
      */
     private static function decodeChildTypes(BinaryReader $reader): array
@@ -406,17 +340,6 @@ final class LogicalTypeCodec
                 ),
             ),
         );
-    }
-
-    private static function encodeCoordinateReferenceSystem(
-        BinaryWriter $writer,
-        CoordinateReferenceSystem $crs,
-    ): void {
-        $writer->writeObject(function (BinaryWriter $object) use ($crs): void {
-            if ($crs->definition !== null) {
-                $object->writeField(100, fn (BinaryWriter $w) => $w->writeString($crs->definition));
-            }
-        });
     }
 
     private static function decodeCoordinateReferenceSystem(
