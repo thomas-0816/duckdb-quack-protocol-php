@@ -91,7 +91,7 @@ final class QuackClient
         // value matters. Returning early is safe because the next PREPARE
         // resets the server's result cursor.
         foreach ($this->fetchChunks($this->connection, $query) as $chunk) {
-            if (($chunk->resultNames[0] ?? null) !== 'Count') {
+            if (($chunk->columnNames[0] ?? null) !== 'Count') {
                 return 0;
             }
             $count = $chunk->columns[0]->values[0] ?? 0;
@@ -161,7 +161,7 @@ final class QuackClient
         $query = SqlFormatter::formatSql($sql, SqlParameters::coerce($params));
         $rows = [];
         foreach ($this->fetchChunks($this->connection, $query) as $chunk) {
-            $names = $chunk->resultNames;
+            $names = $chunk->columnNames;
             for ($rowIndex = 0; $rowIndex < $chunk->rowCount; $rowIndex++) {
                 $row = [];
                 foreach ($chunk->columns as $columnIndex => $column) {
@@ -187,7 +187,7 @@ final class QuackClient
         }
         $query = SqlFormatter::formatSql($sql, SqlParameters::coerce($params));
         foreach ($this->fetchChunks($this->connection, $query) as $chunk) {
-            $names = $chunk->resultNames;
+            $names = $chunk->columnNames;
             for ($rowIndex = 0; $rowIndex < $chunk->rowCount; $rowIndex++) {
                 $row = [];
                 foreach ($chunk->columns as $columnIndex => $column) {
@@ -213,7 +213,7 @@ final class QuackClient
         }
         $query = SqlFormatter::formatSql($sql, SqlParameters::coerce($params));
         foreach ($this->fetchChunks($this->connection, $query) as $chunk) {
-            $names = $chunk->resultNames;
+            $names = $chunk->columnNames;
             for ($rowIndex = 0; $rowIndex < $chunk->rowCount; $rowIndex++) {
                 $row = [];
                 foreach ($chunk->columns as $columnIndex => $column) {
@@ -303,22 +303,18 @@ final class QuackClient
             throw new ProtocolException('expected PREPARE_RESPONSE, got ' . $response->messageType()->name);
         }
 
-        $needsMoreFetch = $response->needsMoreFetch;
-        $nextBatchIndex = 1;
-        $ackIndex = 0;
-        $resultNames = $response->resultNames;
-
         foreach ($response->results as $chunk) {
+            $chunk->columnNames = $response->resultNames;
+            $chunk->columnTypes = $response->resultTypes;
             yield $chunk;
         }
 
+        $needsMoreFetch = $response->needsMoreFetch;
+        $nextBatchIndex = 1;
+        $ackIndex = 0;
+
         while ($needsMoreFetch) {
-            $fetchResponse = $connection->fetch(
-                $response->resultUuid,
-                $nextBatchIndex,
-                $ackIndex,
-                $resultNames,
-            );
+            $fetchResponse = $connection->fetch($response->resultUuid, $nextBatchIndex, $ackIndex);
             if (!$fetchResponse instanceof FetchResponseMessage) {
                 throw new ProtocolException('expected FETCH_RESPONSE, got ' . $fetchResponse->messageType()->name);
             }
@@ -342,9 +338,11 @@ final class QuackClient
             } else {
                 throw new ProtocolException('FETCH_RESPONSE with chunks did not include a batch index');
             }
-            $needsMoreFetch = $batchIndex !== null;
+            $needsMoreFetch = ($batchIndex !== null);
 
             foreach ($results as $chunk) {
+                $chunk->columnNames = $response->resultNames;
+                $chunk->columnTypes = $response->resultTypes;
                 yield $chunk;
             }
         }
