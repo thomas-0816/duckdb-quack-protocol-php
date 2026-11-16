@@ -79,9 +79,6 @@ $explicit = \DuckDB\Quack\Sql\SqlParameters::fromArray([
 echo PHP_EOL, 'explicit parameter: ',
 SqlFormatter::formatSql('SELECT ? AS author', $explicit), PHP_EOL;
 
-echo 'scalar literal: ',
-SqlFormatter::sqlLiteral(SqlParameter::fromPhp("O'Reilly")), PHP_EOL;
-
 try {
     SqlFormatter::formatSql('SELECT ?', []);
 } catch (\DuckDB\Quack\Exceptions\ProtocolException $error) {
