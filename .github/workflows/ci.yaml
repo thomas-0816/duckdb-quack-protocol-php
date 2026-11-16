@@ -72,6 +72,7 @@ jobs:
             curl https://install.duckdb.org | bash
           else
             curl https://install.duckdb.org | bash
+            export PATH="$HOME/.duckdb/cli/latest":$PATH
           fi
           duckdb -v
           which duckdb
