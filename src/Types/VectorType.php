@@ -7,7 +7,6 @@ use DuckDB\Quack\Exceptions\ProtocolException;
 enum VectorType: int
 {
     case Flat = 0;
-    case Fsst = 1;
     case Constant = 2;
     case Dictionary = 3;
     case Sequence = 4;
