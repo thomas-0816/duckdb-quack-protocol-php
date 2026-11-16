@@ -253,9 +253,7 @@ final class LogicalTypeCodec
             PhysicalType::UInt32, PhysicalType::Int32, PhysicalType::Float => 4,
             PhysicalType::UInt64, PhysicalType::Int64, PhysicalType::Double => 8,
             PhysicalType::Interval, PhysicalType::UInt128, PhysicalType::Int128 => 16,
-            default => throw new ProtocolException(
-                "physical type {$physicalType->name} is not fixed size",
-            ),
+            default => throw new ProtocolException("physical type {$physicalType->name} is not fixed size"),
         };
     }
 
@@ -265,9 +263,7 @@ final class LogicalTypeCodec
         if ($info instanceof ListTypeInfo || $info instanceof ArrayTypeInfo) {
             return $info->childType;
         }
-        throw new ProtocolException(
-            "logical type {$logicalType->id->name} does not have a child type",
-        );
+        throw new ProtocolException("logical type {$logicalType->id->name} does not have a child type");
     }
 
     /**
@@ -280,14 +276,9 @@ final class LogicalTypeCodec
             return $info->childTypes;
         }
         if ($logicalType->id === LogicalTypeId::Variant || $logicalType->id === LogicalTypeId::Union) {
-            throw new ProtocolException(
-                "logical type {$logicalType->id->name} is missing StructTypeInfo; "
-                . 'child field names cannot be decoded without it',
-            );
+            throw new ProtocolException("logical type {$logicalType->id->name} is missing StructTypeInfo; child field names cannot be decoded without it");
         }
-        throw new ProtocolException(
-            "logical type {$logicalType->id->name} does not have struct children",
-        );
+        throw new ProtocolException("logical type {$logicalType->id->name} does not have struct children");
     }
 
     public static function getArraySize(LogicalType $logicalType): int
@@ -296,9 +287,7 @@ final class LogicalTypeCodec
         if ($info instanceof ArrayTypeInfo) {
             return $info->size;
         }
-        throw new ProtocolException(
-            "logical type {$logicalType->id->name} is not an ARRAY",
-        );
+        throw new ProtocolException("logical type {$logicalType->id->name} is not an ARRAY");
     }
 
     /**
@@ -322,9 +311,7 @@ final class LogicalTypeCodec
         if ($info instanceof EnumTypeInfo) {
             return $info->values;
         }
-        throw new ProtocolException(
-            "logical type {$logicalType->id->name} is not an ENUM",
-        );
+        throw new ProtocolException("logical type {$logicalType->id->name} is not an ENUM");
     }
 
     /**
@@ -388,21 +375,15 @@ final class LogicalTypeCodec
             ),
         );
         if (count($values) !== $count) {
-            throw new ProtocolException(
-                "ENUM metadata declared {$count} values but serialized " . count($values),
-            );
+            throw new ProtocolException("ENUM metadata declared {$count} values but serialized " . count($values));
         }
         return new EnumTypeInfo($alias, $values);
     }
 
-    private static function decodeIntegerLiteral(
-        BinaryReader $object,
-        ?string $alias,
-    ): IntegerLiteralTypeInfo {
+    private static function decodeIntegerLiteral(BinaryReader $object, ?string $alias): IntegerLiteralTypeInfo
+    {
         if ($object->peekFieldId() === 200) {
-            throw new UnsupportedTypeException(
-                'INTEGER_LITERAL type metadata contains a DuckDB Value, which is not supported',
-            );
+            throw new UnsupportedTypeException('INTEGER_LITERAL type metadata contains a DuckDB Value, which is not supported');
         }
         return new IntegerLiteralTypeInfo($alias);
     }
@@ -410,9 +391,7 @@ final class LogicalTypeCodec
     private static function decodeUnbound(BinaryReader $object, ?string $alias): UnboundTypeInfo
     {
         if ($object->peekFieldId() === 204) {
-            throw new UnsupportedTypeException(
-                'UNBOUND type metadata contains a ParsedExpression, which is not supported',
-            );
+            throw new UnsupportedTypeException('UNBOUND type metadata contains a ParsedExpression, which is not supported');
         }
         return new UnboundTypeInfo(
             $alias,
