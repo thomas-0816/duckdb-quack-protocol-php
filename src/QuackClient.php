@@ -376,53 +376,69 @@ final class QuackClient
             throw new ProtocolException('expected PREPARE_RESPONSE, got ' . $response->messageType()->name);
         }
 
-        foreach ($response->results as $chunk) {
-            $chunk->columnNames = $response->resultNames;
-            /* TODO add method to emulate getColumnMeta:
-                ["native_type"]=> "decimal"
-                ["php_type"]=> "string"
-                ["duckdb:decl_type"]=> "DECIMAL(10,2)"
-                ["name"]=> "foo"
-            */
-            $chunk->columnTypes = $response->resultTypes;
-            yield $chunk;
-        }
-
         $needsMoreFetch = $response->needsMoreFetch;
-        $nextBatchIndex = 1;
-        $ackIndex = 0;
+        $completed = false;
 
-        while ($needsMoreFetch) {
-            $fetchResponse = $connection->fetch($response->resultUuid, $nextBatchIndex, $ackIndex);
-            if (!$fetchResponse instanceof FetchResponseMessage) {
-                throw new ProtocolException('expected FETCH_RESPONSE, got ' . $fetchResponse->messageType()->name);
-            }
-
-            $results = $fetchResponse->results;
-            $batchIndex = $fetchResponse->batchIndex;
-            if ($batchIndex !== null) {
-                if ($batchIndex !== $nextBatchIndex) {
-                    throw new ProtocolException("expected FETCH_RESPONSE batch {$nextBatchIndex}, got {$batchIndex}");
-                }
-                if ($results === []) {
-                    throw new ProtocolException('FETCH_RESPONSE batch did not include any chunks');
-                }
-                $ackIndex = $batchIndex;
-                $nextBatchIndex++;
-            } elseif ($results === []) {
-                $totalBatches = $fetchResponse->totalBatches;
-                if ($totalBatches !== null && $totalBatches !== $ackIndex) {
-                    throw new ProtocolException("FETCH_RESPONSE ended after {$ackIndex} batches but announced {$totalBatches}");
-                }
-            } else {
-                throw new ProtocolException('FETCH_RESPONSE with chunks did not include a batch index');
-            }
-            $needsMoreFetch = ($batchIndex !== null);
-
-            foreach ($results as $chunk) {
+        try {
+            foreach ($response->results as $chunk) {
                 $chunk->columnNames = $response->resultNames;
+                /* TODO add method to emulate getColumnMeta:
+                    ["native_type"]=> "decimal"
+                    ["php_type"]=> "string"
+                    ["duckdb:decl_type"]=> "DECIMAL(10,2)"
+                    ["name"]=> "foo"
+                */
                 $chunk->columnTypes = $response->resultTypes;
                 yield $chunk;
+            }
+
+            $nextBatchIndex = 1;
+            $ackIndex = 0;
+
+            while ($needsMoreFetch) {
+                $fetchResponse = $connection->fetch($response->resultUuid, $nextBatchIndex, $ackIndex);
+                if (!$fetchResponse instanceof FetchResponseMessage) {
+                    throw new ProtocolException('expected FETCH_RESPONSE, got ' . $fetchResponse->messageType()->name);
+                }
+
+                $results = $fetchResponse->results;
+                $batchIndex = $fetchResponse->batchIndex;
+                if ($batchIndex !== null) {
+                    if ($batchIndex !== $nextBatchIndex) {
+                        throw new ProtocolException("expected FETCH_RESPONSE batch {$nextBatchIndex}, got {$batchIndex}");
+                    }
+                    if ($results === []) {
+                        throw new ProtocolException('FETCH_RESPONSE batch did not include any chunks');
+                    }
+                    $ackIndex = $batchIndex;
+                    $nextBatchIndex++;
+                } elseif ($results === []) {
+                    $totalBatches = $fetchResponse->totalBatches;
+                    if ($totalBatches !== null && $totalBatches !== $ackIndex) {
+                        throw new ProtocolException("FETCH_RESPONSE ended after {$ackIndex} batches but announced {$totalBatches}");
+                    }
+                } else {
+                    throw new ProtocolException('FETCH_RESPONSE with chunks did not include a batch index');
+                }
+                $needsMoreFetch = ($batchIndex !== null);
+
+                foreach ($results as $chunk) {
+                    $chunk->columnNames = $response->resultNames;
+                    $chunk->columnTypes = $response->resultTypes;
+                    yield $chunk;
+                }
+            }
+            $completed = true;
+        } finally {
+            // A generator's finally also runs when its consumer abandons it
+            // (an early return or break), so stop the server-side producer.
+            if (!$completed && $needsMoreFetch && !$connection->isClosed()) {
+                try {
+                    $connection->cancel($response->resultUuid);
+                } catch (Throwable) {
+                    // The caller abandoned the stream; a failed cancel must not
+                    // hide its result or the exception that ended the stream.
+                }
             }
         }
     }
