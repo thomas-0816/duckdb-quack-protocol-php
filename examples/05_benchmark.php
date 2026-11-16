@@ -26,18 +26,4 @@ var_dump([$result[0], $result[999999]]);
 $result = $client->fetchAll('select s from range(5) t(s)');
 var_dump([$result[0], $result[4]]);
 
-$client->execute('SET quack_prepare_inline_rows = 1');
-$result = $client->fetchAll('select s from range(1_000_000) t(s)');
-var_dump([$result[0], $result[999999]]);
-$result = $client->fetchAll('select s from range(5) t(s)');
-var_dump([$result[0], $result[4]]);
-
-$client->execute('SET quack_prepare_inline_rows = 0');
-$result = $client->fetchAll('select s from range(1_000_000) t(s)');
-var_dump([$result[0], $result[999999]]);
-$result = $client->fetchAll('select s from range(5) t(s)');
-var_dump([$result[0], $result[4]]);
-
-$client->execute('SET quack_prepare_inline_rows = 24576');
-
 echo memory_get_peak_usage(true) / (1024 * 1024), PHP_EOL;
