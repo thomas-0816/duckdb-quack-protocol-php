@@ -247,14 +247,7 @@ final class WktFormatter
         if ($value === 0.0) {
             return fdiv(1.0, $value) < 0.0 ? '-0' : '0';
         }
-        $previousPrecision = ini_set('serialize_precision', '-1');
-        try {
-            $repr = json_encode($value, JSON_THROW_ON_ERROR);
-        } finally {
-            if ($previousPrecision !== false) {
-                ini_set('serialize_precision', $previousPrecision);
-            }
-        }
+        $repr = json_encode($value, JSON_THROW_ON_ERROR);
         $negative = str_starts_with($repr, '-');
         if ($negative) {
             $repr = substr($repr, 1);
