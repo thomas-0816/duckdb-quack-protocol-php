@@ -3,6 +3,7 @@
 namespace DuckDB\Quack\Tests\Unit\Chunk;
 
 use DuckDB\Quack\Chunk\DataChunkCodec;
+use DuckDB\Quack\Exceptions\ProtocolException;
 use DuckDB\Quack\Transport\BinaryReader;
 use DuckDB\Quack\Transport\BinaryWriter;
 use DuckDB\Quack\Types\LogicalTypes;
@@ -25,6 +26,20 @@ final class DataChunkCodecTest extends TestCase
             ['1970-01-02', '1970-01-04', '1970-01-06'],
             $decoded->values,
         );
+    }
+
+    public function testRejectsUnknownVectorTypes(): void
+    {
+        $writer = BinaryWriter::new();
+        $writer->writeObject(static function (BinaryWriter $writer): void {
+            // Tag 1 used to mean FSST, which is no longer supported.
+            $writer->writeField(90, static fn (BinaryWriter $w) => $w->writeUleb(1));
+        });
+        $reader = new BinaryReader($writer->intoBytes());
+
+        $this->expectException(ProtocolException::class);
+        $this->expectExceptionMessage('unknown vector type 1');
+        DataChunkCodec::decodeVector($reader, LogicalTypes::varchar(), 1);
     }
 
     private static function sequenceVector(int $start, int $increment): BinaryReader
