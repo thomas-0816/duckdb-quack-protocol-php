@@ -9,7 +9,6 @@ use DuckDB\Quack\Exceptions\ProtocolException;
 use DuckDB\Quack\Transport\BinaryReader;
 use DuckDB\Quack\Transport\BinaryWriter;
 use DuckDB\Quack\Types\HugeIntParts;
-use DuckDB\Quack\Types\LogicalType;
 use DuckDB\Quack\Types\LogicalTypeCodec;
 
 /**
@@ -35,18 +34,14 @@ final class MessageCodec
         return $writer->intoBytes();
     }
 
-    /**
-     * @param list<string>      $resultNames column names for FETCH_RESPONSE chunks
-     */
     public static function decodeMessageForVersion(
         string $bytes,
         int $version,
-        array $resultNames = [],
     ): QuackMessage {
         $reader = new BinaryReader($bytes);
         $header = self::decodeHeader($reader);
         $message = match ($version) {
-            3 => self::decodeBodyV3($reader, $header, $resultNames),
+            3 => self::decodeBodyV3($reader, $header),
             default => throw new ProtocolException("unsupported Quack protocol version {$version}"),
         };
         $reader->assertEof();
@@ -130,28 +125,6 @@ final class MessageCodec
             return;
         }
 
-        if ($message instanceof ConnectionResponseMessage) {
-            $writer->writeObject(static function (BinaryWriter $object) use ($message): void {
-                self::writeOptionalString($object, 1, $message->serverDuckdbVersion);
-                self::writeOptionalString($object, 2, $message->serverPlatform);
-                if ($message->quackVersion !== null) {
-                    $object->writeField(
-                        3,
-                        static fn (BinaryWriter $w) => $w->writeUleb($message->quackVersion),
-                    );
-                }
-                if ($message->heartbeatTimeoutSeconds !== null) {
-                    $object->writeField(
-                        4,
-                        static fn (BinaryWriter $w) => $w->writeUleb(
-                            $message->heartbeatTimeoutSeconds,
-                        ),
-                    );
-                }
-            });
-            return;
-        }
-
         if ($message instanceof PrepareRequestMessage) {
             if ($message->queryUuid === null) {
                 throw new ProtocolException('protocol v3 PREPARE_REQUEST requires query_uuid');
@@ -169,11 +142,6 @@ final class MessageCodec
                     );
                 }
             });
-            return;
-        }
-
-        if ($message instanceof PrepareResponseMessage) {
-            self::encodePrepareResponse($writer, $message);
             return;
         }
 
@@ -196,27 +164,12 @@ final class MessageCodec
             return;
         }
 
-        if ($message instanceof FetchResponseMessage) {
-            $writer->writeObject(static function (BinaryWriter $object) use ($message): void {
-                self::writeOptionalIndexDefaultZero($object, 1, count($message->results));
-                self::writeOptionalIndex($object, 2, $message->totalBatches);
-                self::writeOptionalIndex($object, 3, $message->batchIndex);
-            });
-            foreach ($message->results as $result) {
-                DataChunkCodec::encodeDataChunk($writer, $result);
-            }
-            return;
-        }
-
         if ($message instanceof AppendRequestMessage) {
             throw new ProtocolException('APPEND_REQUEST is not supported by Quack protocol v3');
         }
 
-        if ($message instanceof SuccessResponseMessage
-            || $message instanceof DisconnectMessage
-            || $message instanceof HeartbeatRequestMessage) {
-            $writer->writeObject(static function (BinaryWriter $_): void {
-            });
+        if ($message instanceof DisconnectMessage || $message instanceof HeartbeatRequestMessage) {
+            $writer->writeObject(static function (BinaryWriter $_): void {});
             return;
         }
 
@@ -255,60 +208,8 @@ final class MessageCodec
         throw new ProtocolException('unsupported Quack message ' . $message::class);
     }
 
-    private static function encodePrepareResponse(
-        BinaryWriter $writer,
-        PrepareResponseMessage $message,
-    ): void {
-        $firstChunk = $message->results[0] ?? null;
-        $resultTypes = $firstChunk->types ?? [];
-        $resultNames = $message->resultNames !== [] ? $message->resultNames : ($firstChunk->resultNames ?? []);
-        $writer->writeObject(static function (BinaryWriter $object) use ($message, $resultTypes, $resultNames): void {
-            if ($resultTypes !== []) {
-                $object->writeField(1, static function (BinaryWriter $w) use ($resultTypes): void {
-                    $w->writeList(
-                        $resultTypes,
-                        static fn (BinaryWriter $ww, LogicalType $type) => LogicalTypeCodec::encodeLogicalType($ww, $type),
-                    );
-                });
-            }
-            if ($resultNames !== []) {
-                $object->writeField(2, static function (BinaryWriter $w) use ($resultNames): void {
-                    $w->writeList(
-                        $resultNames,
-                        static fn (BinaryWriter $ww, string $name) => $ww->writeString($name),
-                    );
-                });
-            }
-            if ($message->needsMoreFetch) {
-                $object->writeField(
-                    3,
-                    static fn (BinaryWriter $w) => $w->writeBool(true),
-                );
-            }
-            if ($message->results !== []) {
-                $object->writeField(
-                    4,
-                    static fn (BinaryWriter $w) => self::writeChunkPointerList(
-                        $w,
-                        $message->results,
-                    ),
-                );
-            }
-            $object->writeField(
-                5,
-                static fn (BinaryWriter $w) => $w->writeHugeIntParts($message->resultUuid),
-            );
-        });
-    }
-
-    /**
-     * @param list<string>      $resultNames
-     */
-    private static function decodeBodyV3(
-        BinaryReader $reader,
-        MessageHeader $header,
-        array $resultNames = [],
-    ): QuackMessage {
+    private static function decodeBodyV3(BinaryReader $reader, MessageHeader $header): QuackMessage
+    {
         return match ($header->messageType) {
             MessageType::ConnectionRequest => $reader->readObject(
                 static function (BinaryReader $object) use ($header): ConnectionRequestMessage {
@@ -392,7 +293,7 @@ final class MessageCodec
                     );
                 },
             ),
-            MessageType::FetchResponse => self::decodeFetchResponseV3($reader, $header, $resultNames),
+            MessageType::FetchResponse => self::decodeFetchResponseV3($reader, $header),
             MessageType::SuccessResponse => $reader->readObject(
                 static fn (): SuccessResponseMessage => new SuccessResponseMessage($header),
             ),
@@ -427,9 +328,7 @@ final class MessageCodec
                     self::readErrorFields($object),
                 ),
             ),
-            default => throw new ProtocolException(
-                "cannot decode unsupported message type {$header->messageType->name}",
-            ),
+            default => throw new ProtocolException("cannot decode unsupported message type {$header->messageType->name}"),
         };
     }
 
@@ -458,7 +357,7 @@ final class MessageCodec
         );
         $results = $object->readOptionalField(
             4,
-            static fn (BinaryReader $r) => self::readChunkPointerList($r, $resultNames),
+            static fn (BinaryReader $r) => self::readChunkPointerList($r),
             [],
         );
         $resultUuid = $object->readRequiredField(
@@ -470,18 +369,13 @@ final class MessageCodec
             $needsMoreFetch,
             $results,
             $resultUuid,
+            $resultTypes,
             $resultNames,
         );
     }
 
-    /**
-     * @param list<string>      $resultNames
-     */
-    private static function decodeFetchResponseV3(
-        BinaryReader $reader,
-        MessageHeader $header,
-        array $resultNames = [],
-    ): FetchResponseMessage {
+    private static function decodeFetchResponseV3(BinaryReader $reader, MessageHeader $header): FetchResponseMessage
+    {
         [$chunkCount, $totalBatches, $batchIndex] = $reader->readObject(
             static function (BinaryReader $object): array {
                 return [
@@ -501,24 +395,20 @@ final class MessageCodec
         }
         $results = [];
         for ($index = 0; $index < $count; $index++) {
-            $results[] = DataChunkCodec::decodeDataChunkToPhp($reader, $resultNames);
+            $results[] = DataChunkCodec::decodeDataChunkToPhp($reader);
         }
         return new FetchResponseMessage($header, $results, $totalBatches, $batchIndex);
     }
 
     /**
-     * @param list<string>      $resultNames
      * @return list<DataChunk>
      */
-    private static function readChunkPointerList(BinaryReader $reader, array $resultNames = []): array
+    private static function readChunkPointerList(BinaryReader $reader): array
     {
         return $reader->readList(
-            static function (BinaryReader $r) use ($resultNames): DataChunk {
+            static function (BinaryReader $r): DataChunk {
                 $chunk = $r->readNullable(
-                    static fn (BinaryReader $rr) => DataChunkCodec::decodeDataChunkWrapperToPhp(
-                        $rr,
-                        $resultNames,
-                    ),
+                    static fn (BinaryReader $rr) => DataChunkCodec::decodeDataChunkWrapperToPhp($rr),
                 );
                 if ($chunk === null) {
                     throw new ProtocolException(
@@ -526,25 +416,6 @@ final class MessageCodec
                     );
                 }
                 return $chunk;
-            },
-        );
-    }
-
-    /**
-     * @param list<DataChunk> $chunks
-     */
-    private static function writeChunkPointerList(BinaryWriter $writer, array $chunks): void
-    {
-        $writer->writeList(
-            $chunks,
-            static function (BinaryWriter $w, DataChunk $chunk): void {
-                $w->writeNullable(
-                    $chunk,
-                    static fn (BinaryWriter $ww) => DataChunkCodec::encodeDataChunkWrapper(
-                        $ww,
-                        $chunk,
-                    ),
-                );
             },
         );
     }
@@ -568,19 +439,6 @@ final class MessageCodec
         int|string $value,
     ): void {
         if ((string) $value !== '0') {
-            $writer->writeField(
-                $fieldId,
-                static fn (BinaryWriter $w) => $w->writeUleb($value),
-            );
-        }
-    }
-
-    private static function writeOptionalIndex(
-        BinaryWriter $writer,
-        int $fieldId,
-        int|string|null $value,
-    ): void {
-        if ($value !== null) {
             $writer->writeField(
                 $fieldId,
                 static fn (BinaryWriter $w) => $w->writeUleb($value),
