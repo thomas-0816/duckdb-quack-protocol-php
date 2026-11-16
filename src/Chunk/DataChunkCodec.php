@@ -20,7 +20,6 @@ use DuckDB\Quack\Types\LogicalTypeCodec;
 use DuckDB\Quack\Types\LogicalTypeId;
 use DuckDB\Quack\Types\LogicalTypes;
 use DuckDB\Quack\Types\PhysicalType;
-use DuckDB\Quack\Types\ShreddedVariantDecoder;
 use DuckDB\Quack\Types\TemporalFormatter;
 use DuckDB\Quack\Types\TimestampUnit;
 use DuckDB\Quack\Types\TimeUnit;
@@ -267,7 +266,7 @@ final class DataChunkCodec
             }
             $unshreddedRow = $row[$unshreddedChild->name] ?? null;
             $unshredded = is_array($unshreddedRow) ? VariantDecoder::fromPhp(self::stringKeyedRow($unshreddedRow)) : null;
-            $values[] = ShreddedVariantDecoder::decode(
+            $values[] = VariantDecoder::decodeShredded(
                 $shreddedChild->logicalType,
                 $row[$shreddedChild->name] ?? null,
                 $unshredded,
