@@ -103,7 +103,6 @@ final class DataChunkCodec
             VectorType::Dictionary => self::decodeDictionaryVector($reader, $logicalType, $count),
             VectorType::Sequence => self::decodeSequenceVector($reader, $logicalType, $count),
             VectorType::Shredded => self::decodeShreddedVector($reader, $logicalType, $count),
-            default => throw new ProtocolException("unknown vector type {$vectorType->value}"),
         };
     }
 
