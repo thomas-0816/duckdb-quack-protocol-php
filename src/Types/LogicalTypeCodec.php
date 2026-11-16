@@ -121,7 +121,11 @@ final class LogicalTypeCodec
                 ExtraTypeInfoType::Unbound => self::decodeUnbound($object, $alias),
             };
 
-            return $extensionInfo === null ? $info : $info->withExtensionInfo($extensionInfo);
+            if ($extensionInfo !== null) {
+                $info->extensionInfo = $extensionInfo;
+            }
+
+            return $info;
         });
     }
 

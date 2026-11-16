@@ -2,6 +2,7 @@
 
 namespace DuckDB\Quack\Types\Info;
 
+use DuckDB\Quack\Types\ExtensionTypeInfo;
 use DuckDB\Quack\Types\ExtraTypeInfoType;
 
 /**
@@ -10,8 +11,11 @@ use DuckDB\Quack\Types\ExtraTypeInfoType;
  */
 abstract class ExtraTypeInfo
 {
-    public function __construct(public readonly ?string $alias = null)
-    {
+    public ?ExtensionTypeInfo $extensionInfo = null;
+
+    public function __construct(
+        public readonly ?string $alias = null,
+    ) {
     }
 
     abstract public function typeId(): ExtraTypeInfoType;

@@ -26,7 +26,7 @@ final class LogicalTypeCodecTest extends TestCase
         self::assertSame('value', $children[0]->name);
         self::assertSame(LogicalTypeId::BigInt, $children[0]->logicalType->id);
 
-        $extensionInfo = $type->typeInfo?->extensionInfo();
+        $extensionInfo = $type->typeInfo?->extensionInfo;
         self::assertNotNull($extensionInfo);
 
         self::assertCount(1, $extensionInfo->modifiers);
