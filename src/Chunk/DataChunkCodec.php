@@ -892,10 +892,7 @@ final class DataChunkCodec
                 $childValues[] = $item;
             }
         }
-        $writer->writeField(
-            104,
-            static fn (BinaryWriter $w) => $w->writeUleb(count($childValues)),
-        );
+        $writer->writeField(104, static fn (BinaryWriter $w) => $w->writeUleb(count($childValues)));
         $writer->writeField(105, static function (BinaryWriter $w) use ($entries): void {
             $w->writeList(
                 $entries,
@@ -907,20 +904,14 @@ final class DataChunkCodec
                 },
             );
         });
-        $writer->writeField(
-            106,
-            static fn (BinaryWriter $w) => self::encodeVector($w, $childType, $childValues, count($childValues)),
-        );
+        $writer->writeField(106, static fn (BinaryWriter $w) => self::encodeVector($w, $childType, $childValues, count($childValues)));
     }
 
     /**
      * @param list<Value> $values
      */
-    private static function encodeArrayVector(
-        BinaryWriter $writer,
-        LogicalType $logicalType,
-        array $values,
-    ): void {
+    private static function encodeArrayVector(BinaryWriter $writer, LogicalType $logicalType, array $values): void
+    {
         $childType = LogicalTypeCodec::getChildType($logicalType);
         $arraySize = LogicalTypeCodec::getArraySize($logicalType);
         $childValues = [];
@@ -955,16 +946,9 @@ final class DataChunkCodec
      * @param list<bool>|null $validity
      * @return list<string>
      */
-    private static function readStringVectorData(
-        BinaryReader $reader,
-        int $count,
-        ?array $validity,
-    ): array {
-        $byteDataLength = $reader->readOptionalField(
-            107,
-            static fn (BinaryReader $r) => $r->readUlebU64(),
-            null,
-        );
+    private static function readStringVectorData(BinaryReader $reader, int $count, ?array $validity): array
+    {
+        $byteDataLength = $reader->readOptionalField(107, static fn (BinaryReader $r) => $r->readUlebU64(), null);
         if ($byteDataLength !== null && (string) $byteDataLength === MessageCodec::OPTIONAL_INDEX_INVALID) {
             $byteDataLength = null;
         }
@@ -977,14 +961,8 @@ final class DataChunkCodec
             );
         }
 
-        $lengthData = $reader->readRequiredField(
-            108,
-            static fn (BinaryReader $r) => $r->readBlob(),
-        );
-        $byteData = $reader->readRequiredField(
-            109,
-            static fn (BinaryReader $r) => $r->readBlob(),
-        );
+        $lengthData = $reader->readRequiredField(108, static fn (BinaryReader $r) => $r->readBlob());
+        $byteData = $reader->readRequiredField(109, static fn (BinaryReader $r) => $r->readBlob());
         if (strlen($lengthData) !== $count * 4) {
             throw new ProtocolException('string vector has ' . strlen($lengthData) . ' bytes of lengths, expected ' . ($count * 4) . " for {$count} rows");
         }
@@ -1002,18 +980,13 @@ final class DataChunkCodec
                 continue;
             }
             if ($offset + $length > strlen($byteData)) {
-                throw new ProtocolException(
-                    "string {$index} of {$length} bytes overruns the vector's "
-                    . strlen($byteData) . ' bytes of data',
-                );
+                throw new ProtocolException("string {$index} of {$length} bytes overruns the vector's " . strlen($byteData) . ' bytes of data');
             }
             $values[] = substr($byteData, $offset, $length);
             $offset += $length;
         }
         if ($offset !== strlen($byteData)) {
-            throw new ProtocolException(
-                "string vector uses {$offset} of its " . strlen($byteData) . ' bytes of data',
-            );
+            throw new ProtocolException("string vector uses {$offset} of its " . strlen($byteData) . ' bytes of data');
         }
         return $values;
     }
@@ -1022,13 +995,8 @@ final class DataChunkCodec
      * @param list<bool>|null $validity
      * @return list<mixed>
      */
-    private static function decodeFixedValuesToPhp(
-        LogicalType $logicalType,
-        PhysicalType $physicalType,
-        string $bytes,
-        int $count,
-        ?array $validity,
-    ): array {
+    private static function decodeFixedValuesToPhp(LogicalType $logicalType, PhysicalType $physicalType, string $bytes, int $count, ?array $validity): array
+    {
         $reader = new BinaryReader($bytes);
         $values = [];
         $size = LogicalTypeCodec::physicalTypeSize($physicalType);
@@ -1046,83 +1014,52 @@ final class DataChunkCodec
         return $values;
     }
 
-    private static function decodeFixedValueToPhp(
-        BinaryReader $reader,
-        LogicalType $logicalType,
-        PhysicalType $physicalType,
-    ): mixed {
+    private static function decodeFixedValueToPhp(BinaryReader $reader, LogicalType $logicalType, PhysicalType $physicalType): mixed
+    {
         return match ($physicalType) {
             PhysicalType::Bool => $reader->readFixedU8() !== 0,
             PhysicalType::Int8 => $reader->readFixedI8(),
-            PhysicalType::UInt8 => self::decodeEnumOrNumberToPhp(
-                $logicalType,
-                $reader->readFixedU8(),
-            ),
+            PhysicalType::UInt8 => self::decodeEnumOrNumberToPhp($logicalType, $reader->readFixedU8()),
             PhysicalType::Int16 => self::decodeInt16OrDecimalToPhp($reader, $logicalType),
-            PhysicalType::UInt16 => self::decodeEnumOrNumberToPhp(
-                $logicalType,
-                $reader->readFixedU16(),
-            ),
+            PhysicalType::UInt16 => self::decodeEnumOrNumberToPhp($logicalType, $reader->readFixedU16()),
             PhysicalType::Int32 => self::decodeInt32LogicalValueToPhp($reader, $logicalType),
-            PhysicalType::UInt32 => self::decodeEnumOrNumberToPhp(
-                $logicalType,
-                $reader->readFixedU32(),
-            ),
-            PhysicalType::Int64 => self::decodeInt64LogicalValueToPhp(
-                $logicalType,
-                $reader->readFixedI64(),
-            ),
+            PhysicalType::UInt32 => self::decodeEnumOrNumberToPhp($logicalType, $reader->readFixedU32()),
+            PhysicalType::Int64 => self::decodeInt64LogicalValueToPhp($logicalType, $reader->readFixedI64()),
             PhysicalType::UInt64 => $reader->readFixedU64(),
             PhysicalType::Float => $reader->readFixedF32(),
             PhysicalType::Double => $reader->readFixedF64(),
             PhysicalType::Int128 => self::decodeInt128ValueToPhp($reader, $logicalType),
             PhysicalType::UInt128 => self::decodeUInt128ValueToPhp($reader),
-            PhysicalType::Interval => TemporalFormatter::formatInterval(
-                new IntervalValue(
-                    $reader->readFixedI32(),
-                    $reader->readFixedI32(),
-                    $reader->readFixedI64(),
-                ),
-            ),
-            default => throw new UnsupportedTypeException(
-                "cannot decode fixed physical type {$physicalType->name}",
-            ),
+            PhysicalType::Interval => TemporalFormatter::formatInterval(new IntervalValue($reader->readFixedI32(), $reader->readFixedI32(), $reader->readFixedI64())),
+            default => throw new UnsupportedTypeException("cannot decode fixed physical type {$physicalType->name}"),
         };
     }
 
-    private static function decodeInt16OrDecimalToPhp(
-        BinaryReader $reader,
-        LogicalType $logicalType,
-    ): int|float|string {
+    private static function decodeInt16OrDecimalToPhp(BinaryReader $reader, LogicalType $logicalType): int|float|string
+    {
         $value = $reader->readFixedI16();
         if ($logicalType->id === LogicalTypeId::Decimal) {
             [$width, $scale] = LogicalTypeCodec::getDecimalWidthAndScale($logicalType);
-
             return (new DecimalValue($value, $width, $scale))->toPhp();
         }
         return $value;
     }
 
-    private static function decodeInt32LogicalValueToPhp(
-        BinaryReader $reader,
-        LogicalType $logicalType,
-    ): int|float|string {
+    private static function decodeInt32LogicalValueToPhp(BinaryReader $reader, LogicalType $logicalType): int|float|string
+    {
         $value = $reader->readFixedI32();
         if ($logicalType->id === LogicalTypeId::Date) {
             return TemporalFormatter::formatDate($value);
         }
         if ($logicalType->id === LogicalTypeId::Decimal) {
             [$width, $scale] = LogicalTypeCodec::getDecimalWidthAndScale($logicalType);
-
             return (new DecimalValue($value, $width, $scale))->toPhp();
         }
         return $value;
     }
 
-    private static function decodeInt128ValueToPhp(
-        BinaryReader $reader,
-        LogicalType $logicalType,
-    ): int|float|string {
+    private static function decodeInt128ValueToPhp(BinaryReader $reader, LogicalType $logicalType): int|float|string
+    {
         $lower = $reader->readFixedU64();
         $upper = $reader->readFixedI64();
         $parts = new HugeIntParts($upper, $lower);
@@ -1132,7 +1069,6 @@ final class DataChunkCodec
         $value = $parts->toSignedBigInt();
         if ($logicalType->id === LogicalTypeId::Decimal) {
             [$width, $scale] = LogicalTypeCodec::getDecimalWidthAndScale($logicalType);
-
             return (new DecimalValue($value->toIntOrString(), $width, $scale))->toPhp();
         }
         return $value->toIntOrString();
@@ -1146,10 +1082,8 @@ final class DataChunkCodec
         return $parts->toUnsignedBigInt()->toIntOrString();
     }
 
-    private static function decodeEnumOrNumberToPhp(
-        LogicalType $logicalType,
-        int|string $index,
-    ): int|string {
+    private static function decodeEnumOrNumberToPhp(LogicalType $logicalType, int|string $index): int|string
+    {
         if ($logicalType->id !== LogicalTypeId::Enum) {
             return $index;
         }
@@ -1161,22 +1095,15 @@ final class DataChunkCodec
         return $values[$position];
     }
 
-    private static function encodeFixedValue(
-        BinaryWriter $writer,
-        LogicalType $logicalType,
-        PhysicalType $physicalType,
-        Value $value,
-    ): void {
+    private static function encodeFixedValue(BinaryWriter $writer, LogicalType $logicalType, PhysicalType $physicalType, Value $value): void
+    {
         if ($value->isNull()) {
             $writer->writeBytes(str_repeat("\0", LogicalTypeCodec::physicalTypeSize($physicalType)));
             return;
         }
-
         switch ($physicalType) {
             case PhysicalType::Bool:
-                $writer->writeFixedU8(
-                    $value->kind === Value::BOOL && $value->value === true ? 1 : 0,
-                );
+                $writer->writeFixedU8($value->kind === Value::BOOL && $value->value === true ? 1 : 0);
                 return;
             case PhysicalType::Int8:
                 $encoded = match ($value->kind) {
@@ -1184,18 +1111,12 @@ final class DataChunkCodec
                     Value::INT => BigInt::fromInt($value->asInt()),
                     Value::UINT, Value::HUGEINT, Value::UHUGEINT => BigInt::coerce($value->asIntOrString()),
                     Value::STRING => BigInt::fromString($value->asString()),
-                    default => throw new ProtocolException(
-                        "cannot convert value of kind {$value->kind} to integer",
-                    ),
+                    default => throw new ProtocolException("cannot convert value of kind {$value->kind} to integer"),
                 };
                 $writer->writeBytes($encoded->lowBits(8)->toBytesLE(1, false));
                 return;
             case PhysicalType::UInt8:
-                $writer->writeBytes(
-                    self::encodeEnumOrNumber($logicalType, $value)
-                        ->lowBits(8)
-                        ->toBytesLE(1, false),
-                );
+                $writer->writeBytes(self::encodeEnumOrNumber($logicalType, $value)->lowBits(8)->toBytesLE(1, false));
                 return;
             case PhysicalType::Int16:
                 if ($logicalType->id === LogicalTypeId::Decimal) {
@@ -1219,9 +1140,7 @@ final class DataChunkCodec
                             Value::INT => BigInt::fromInt($value->asInt()),
                             Value::UINT, Value::HUGEINT, Value::UHUGEINT => BigInt::coerce($value->asIntOrString()),
                             Value::STRING => BigInt::fromString($value->asString()),
-                            default => throw new ProtocolException(
-                                "cannot convert value of kind {$value->kind} to integer",
-                            ),
+                            default => throw new ProtocolException("cannot convert value of kind {$value->kind} to integer"),
                         };
                     }
                 } else {
@@ -1230,19 +1149,13 @@ final class DataChunkCodec
                         Value::INT => BigInt::fromInt($value->asInt()),
                         Value::UINT, Value::HUGEINT, Value::UHUGEINT => BigInt::coerce($value->asIntOrString()),
                         Value::STRING => BigInt::fromString($value->asString()),
-                        default => throw new ProtocolException(
-                            "cannot convert value of kind {$value->kind} to integer",
-                        ),
+                        default => throw new ProtocolException("cannot convert value of kind {$value->kind} to integer"),
                     };
                 }
                 $writer->writeBytes($encoded->lowBits(16)->toBytesLE(2, false));
                 return;
             case PhysicalType::UInt16:
-                $writer->writeBytes(
-                    self::encodeEnumOrNumber($logicalType, $value)
-                        ->lowBits(16)
-                        ->toBytesLE(2, false),
-                );
+                $writer->writeBytes(self::encodeEnumOrNumber($logicalType, $value)->lowBits(16)->toBytesLE(2, false));
                 return;
             case PhysicalType::Int32:
                 if ($logicalType->id === LogicalTypeId::Date) {
@@ -1253,9 +1166,7 @@ final class DataChunkCodec
                             Value::INT => BigInt::fromInt($value->asInt()),
                             Value::UINT, Value::HUGEINT, Value::UHUGEINT => BigInt::coerce($value->asIntOrString()),
                             Value::STRING => BigInt::fromString($value->asString()),
-                            default => throw new ProtocolException(
-                                "cannot convert value of kind {$value->kind} to integer",
-                            ),
+                            default => throw new ProtocolException("cannot convert value of kind {$value->kind} to integer"),
                         });
                 } elseif ($logicalType->id === LogicalTypeId::Decimal) {
                     if ($value->kind === Value::DECIMAL) {
@@ -1278,9 +1189,7 @@ final class DataChunkCodec
                             Value::INT => BigInt::fromInt($value->asInt()),
                             Value::UINT, Value::HUGEINT, Value::UHUGEINT => BigInt::coerce($value->asIntOrString()),
                             Value::STRING => BigInt::fromString($value->asString()),
-                            default => throw new ProtocolException(
-                                "cannot convert value of kind {$value->kind} to integer",
-                            ),
+                            default => throw new ProtocolException("cannot convert value of kind {$value->kind} to integer"),
                         };
                     }
                 } else {
@@ -1289,19 +1198,13 @@ final class DataChunkCodec
                         Value::INT => BigInt::fromInt($value->asInt()),
                         Value::UINT, Value::HUGEINT, Value::UHUGEINT => BigInt::coerce($value->asIntOrString()),
                         Value::STRING => BigInt::fromString($value->asString()),
-                        default => throw new ProtocolException(
-                            "cannot convert value of kind {$value->kind} to integer",
-                        ),
+                        default => throw new ProtocolException("cannot convert value of kind {$value->kind} to integer"),
                     };
                 }
                 $writer->writeBytes($encoded->lowBits(32)->toBytesLE(4, false));
                 return;
             case PhysicalType::UInt32:
-                $writer->writeBytes(
-                    self::encodeEnumOrNumber($logicalType, $value)
-                        ->lowBits(32)
-                        ->toBytesLE(4, false),
-                );
+                $writer->writeBytes(self::encodeEnumOrNumber($logicalType, $value)->lowBits(32)->toBytesLE(4, false));
                 return;
             case PhysicalType::Int64:
                 if ($logicalType->id === LogicalTypeId::Decimal) {
@@ -1325,9 +1228,7 @@ final class DataChunkCodec
                             Value::INT => BigInt::fromInt($value->asInt()),
                             Value::UINT, Value::HUGEINT, Value::UHUGEINT => BigInt::coerce($value->asIntOrString()),
                             Value::STRING => BigInt::fromString($value->asString()),
-                            default => throw new ProtocolException(
-                                "cannot convert value of kind {$value->kind} to integer",
-                            ),
+                            default => throw new ProtocolException("cannot convert value of kind {$value->kind} to integer"),
                         };
                     }
                 } else {
@@ -1340,9 +1241,7 @@ final class DataChunkCodec
                             Value::INT => BigInt::fromInt($value->asInt()),
                             Value::UINT, Value::HUGEINT, Value::UHUGEINT => BigInt::coerce($value->asIntOrString()),
                             Value::STRING => BigInt::fromString($value->asString()),
-                            default => throw new ProtocolException(
-                                "cannot convert value of kind {$value->kind} to integer",
-                            ),
+                            default => throw new ProtocolException("cannot convert value of kind {$value->kind} to integer"),
                         }),
                     };
                 }
@@ -1354,14 +1253,10 @@ final class DataChunkCodec
                     Value::INT => BigInt::fromInt($value->asInt()),
                     Value::UINT, Value::HUGEINT, Value::UHUGEINT => BigInt::coerce($value->asIntOrString()),
                     Value::STRING => BigInt::fromString($value->asString()),
-                    default => throw new ProtocolException(
-                        "cannot convert value of kind {$value->kind} to unsigned integer",
-                    ),
+                    default => throw new ProtocolException("cannot convert value of kind {$value->kind} to unsigned integer"),
                 };
                 if ($unsigned->isNegative()) {
-                    throw new ProtocolException(
-                        "cannot convert {$unsigned} to unsigned integer",
-                    );
+                    throw new ProtocolException("cannot convert {$unsigned} to unsigned integer");
                 }
                 $writer->writeBytes($unsigned->lowBits(64)->toBytesLE(8, false));
                 return;
@@ -1379,9 +1274,7 @@ final class DataChunkCodec
                     }
                     $float = (float) $floatText;
                 } else {
-                    throw new ProtocolException(
-                        "cannot convert value of kind {$value->kind} to float",
-                    );
+                    throw new ProtocolException("cannot convert value of kind {$value->kind} to float");
                 }
                 $writer->writeFixedF32((float) $float);
                 return;
@@ -1399,9 +1292,7 @@ final class DataChunkCodec
                     }
                     $float = (float) $floatText;
                 } else {
-                    throw new ProtocolException(
-                        "cannot convert value of kind {$value->kind} to float",
-                    );
+                    throw new ProtocolException("cannot convert value of kind {$value->kind} to float");
                 }
                 $writer->writeFixedF64($float);
                 return;
@@ -1433,9 +1324,7 @@ final class DataChunkCodec
                                 Value::INT => BigInt::fromInt($value->asInt()),
                                 Value::UINT, Value::HUGEINT, Value::UHUGEINT => BigInt::coerce($value->asIntOrString()),
                                 Value::STRING => BigInt::fromString($value->asString()),
-                                default => throw new ProtocolException(
-                                    "cannot convert value of kind {$value->kind} to integer",
-                                ),
+                                default => throw new ProtocolException("cannot convert value of kind {$value->kind} to integer"),
                             };
                         }
                     } else {
@@ -1444,9 +1333,7 @@ final class DataChunkCodec
                             Value::INT => BigInt::fromInt($value->asInt()),
                             Value::UINT, Value::HUGEINT, Value::UHUGEINT => BigInt::coerce($value->asIntOrString()),
                             Value::STRING => BigInt::fromString($value->asString()),
-                            default => throw new ProtocolException(
-                                "cannot convert value of kind {$value->kind} to integer",
-                            ),
+                            default => throw new ProtocolException("cannot convert value of kind {$value->kind} to integer"),
                         };
                     }
                     $parts = HugeIntParts::fromSignedBigInt($encoded);
@@ -1462,14 +1349,10 @@ final class DataChunkCodec
                     Value::INT => BigInt::fromInt($value->asInt()),
                     Value::UINT, Value::HUGEINT, Value::UHUGEINT => BigInt::coerce($value->asIntOrString()),
                     Value::STRING => BigInt::fromString($value->asString()),
-                    default => throw new ProtocolException(
-                        "cannot convert value of kind {$value->kind} to unsigned integer",
-                    ),
+                    default => throw new ProtocolException("cannot convert value of kind {$value->kind} to unsigned integer"),
                 };
                 if ($unsigned->isNegative()) {
-                    throw new ProtocolException(
-                        "cannot convert {$unsigned} to unsigned integer",
-                    );
+                    throw new ProtocolException("cannot convert {$unsigned} to unsigned integer");
                 }
                 $bytes = $unsigned->toBytesLE(16, false);
                 $writer->writeBytes(substr($bytes, 0, 8));
@@ -1485,9 +1368,7 @@ final class DataChunkCodec
                 $writer->writeFixedI64($interval->micros);
                 return;
             default:
-                throw new UnsupportedTypeException(
-                    "cannot encode fixed physical type {$physicalType->name}",
-                );
+                throw new UnsupportedTypeException("cannot encode fixed physical type {$physicalType->name}");
         }
     }
 
@@ -1506,7 +1387,6 @@ final class DataChunkCodec
             if ($fieldId !== 100) {
                 throw new ProtocolException("unsupported TYPE value field {$fieldId}");
             }
-
             return self::logicalTypeName(LogicalTypeId::fromId($reader->readUlebInt()));
         }
         if ($logicalType->id === LogicalTypeId::BigNum) {
@@ -1518,15 +1398,9 @@ final class DataChunkCodec
         if ($raw !== '' && preg_match('//u', $raw) !== 1) {
             throw new Utf8Exception('invalid UTF-8 string');
         }
-        if ($logicalType->id === LogicalTypeId::Varchar
-            && strcasecmp($logicalType->alias() ?? '', 'JSON') === 0) {
+        if ($logicalType->id === LogicalTypeId::Varchar && strcasecmp($logicalType->alias() ?? '', 'JSON') === 0) {
             try {
-                return json_decode(
-                    $raw,
-                    true,
-                    512,
-                    JSON_THROW_ON_ERROR | JSON_BIGINT_AS_STRING,
-                );
+                return json_decode($raw, true, 512, JSON_THROW_ON_ERROR | JSON_BIGINT_AS_STRING);
             } catch (\JsonException $error) {
                 // DuckDB writes non-finite doubles as bare tokens, which are not
                 // valid JSON but are returned verbatim by PDO_duckdb.
@@ -1534,9 +1408,7 @@ final class DataChunkCodec
                 if ($token === 'NaN' || $token === 'Infinity' || $token === '-Infinity') {
                     return $token;
                 }
-                throw new ProtocolException(
-                    'invalid JSON value: ' . $error->getMessage(),
-                );
+                throw new ProtocolException('invalid JSON value: ' . $error->getMessage());
             }
         }
         return $raw;
@@ -1606,7 +1478,6 @@ final class DataChunkCodec
     {
         if ($logicalType->id === LogicalTypeId::Decimal) {
             [$width, $scale] = LogicalTypeCodec::getDecimalWidthAndScale($logicalType);
-
             return (new DecimalValue($value, $width, $scale))->toPhp();
         }
 
@@ -1614,22 +1485,10 @@ final class DataChunkCodec
             LogicalTypeId::Time => TemporalFormatter::formatTime($value, TimeUnit::Micros),
             LogicalTypeId::TimeNs => TemporalFormatter::formatTime($value, TimeUnit::Nanos),
             LogicalTypeId::TimeTz => TemporalFormatter::formatTimeTz($value),
-            LogicalTypeId::TimestampSec => TemporalFormatter::formatTimestamp(
-                $value,
-                TimestampUnit::Seconds,
-            ),
-            LogicalTypeId::TimestampMs => TemporalFormatter::formatTimestamp(
-                $value,
-                TimestampUnit::Millis,
-            ),
-            LogicalTypeId::Timestamp => TemporalFormatter::formatTimestamp(
-                $value,
-                TimestampUnit::Micros,
-            ),
-            LogicalTypeId::TimestampNs => TemporalFormatter::formatTimestamp(
-                $value,
-                TimestampUnit::Nanos,
-            ),
+            LogicalTypeId::TimestampSec => TemporalFormatter::formatTimestamp($value, TimestampUnit::Seconds),
+            LogicalTypeId::TimestampMs => TemporalFormatter::formatTimestamp($value, TimestampUnit::Millis),
+            LogicalTypeId::Timestamp => TemporalFormatter::formatTimestamp($value, TimestampUnit::Micros),
+            LogicalTypeId::TimestampNs => TemporalFormatter::formatTimestamp($value, TimestampUnit::Nanos),
             LogicalTypeId::TimestampTz => TemporalFormatter::formatTimestamp($value, TimestampUnit::Micros, true),
             LogicalTypeId::TimestampTzNs => TemporalFormatter::formatTimestamp($value, TimestampUnit::Nanos, true),
             default => $value,
