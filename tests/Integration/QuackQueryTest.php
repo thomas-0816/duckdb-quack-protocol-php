@@ -306,11 +306,11 @@ final class QuackQueryTest extends TestCase
 
         $client->beginTransaction();
         try {
-            $client->execute("CREATE TABLE t1 (i INTEGER)");
-            $client->execute("CREATE SEQUENCE s1");
+            $client->execute('CREATE TABLE t1 (i INTEGER)');
+            $client->execute('CREATE SEQUENCE s1');
             $client->execute("INSERT INTO t1 VALUES (nextval('s1'))");
 
-            self::assertSame([['i' => 1]], $client->fetchAll("SELECT * FROM t1"));
+            self::assertSame([['i' => 1]], $client->fetchAll('SELECT * FROM t1'));
             self::assertSame(2, $client->fetchValue("SELECT nextval('s1')"));
         } finally {
             $client->rollback();
@@ -322,23 +322,23 @@ final class QuackQueryTest extends TestCase
         $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 10);
 
         $client->beginTransaction();
-        $client->execute("CREATE TABLE t1 (i INTEGER)");
-        $client->execute("CREATE SEQUENCE s1");
+        $client->execute('CREATE TABLE t1 (i INTEGER)');
+        $client->execute('CREATE SEQUENCE s1');
         $client->execute("INSERT INTO t1 VALUES (nextval('s1'))");
         $client->rollback();
 
         try {
-            $client->fetchAll("SELECT * FROM t1");
+            $client->fetchAll('SELECT * FROM t1');
             self::fail('expected the rolled back table to be gone');
         } catch (ServerException $error) {
-            self::assertStringContainsString("Table with name t1 does not exist", $error->getMessage());
+            self::assertStringContainsString('Table with name t1 does not exist', $error->getMessage());
         }
 
         try {
             $client->fetchValue("SELECT nextval('s1')");
             self::fail('expected the rolled back sequence to be gone');
         } catch (ServerException $error) {
-            self::assertStringContainsString("Sequence with name s1 does not exist", $error->getMessage());
+            self::assertStringContainsString('Sequence with name s1 does not exist', $error->getMessage());
         }
     }
 
@@ -642,6 +642,30 @@ final class QuackQueryTest extends TestCase
         }
     }
 
+    public function testQuackPrepareInlineRows(): void
+    {
+        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 10);
+
+        try {
+            $client->execute('SET quack_prepare_inline_rows = 1');
+            $result = $client->fetchAll('select s from range(100_000) t(s)');
+            self::assertSame(['s' => 0], $result[0]);
+            self::assertSame(['s' => 99_999], $result[99_999]);
+            $result = $client->fetchAll('select s from range(5) t(s)');
+            self::assertSame(['s' => 0], $result[0]);
+            self::assertSame(['s' => 4], $result[4]);
+
+            $client->execute('SET quack_prepare_inline_rows = 0');
+            $result = $client->fetchAll('select s from range(100_000) t(s)');
+            self::assertSame(['s' => 0], $result[0]);
+            self::assertSame(['s' => 99_999], $result[99_999]);
+            $result = $client->fetchAll('select s from range(5) t(s)');
+            self::assertSame(['s' => 0], $result[0]);
+            self::assertSame(['s' => 4], $result[4]);
+        } finally {
+            $client->execute('SET quack_prepare_inline_rows = 24576');
+        }
+    }
 }
 
 final class QueryJsonFixture
