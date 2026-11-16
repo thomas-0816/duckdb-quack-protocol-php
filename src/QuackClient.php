@@ -306,9 +306,7 @@ final class QuackClient
         $needsMoreFetch = $response->needsMoreFetch;
         $nextBatchIndex = 1;
         $ackIndex = 0;
-        $firstChunk = $response->results[0] ?? null;
-        $resultTypes = $firstChunk->types ?? [];
-        $resultNames = $firstChunk->resultNames ?? [];
+        $resultNames = $response->resultNames;
 
         foreach ($response->results as $chunk) {
             yield $chunk;
@@ -319,7 +317,6 @@ final class QuackClient
                 $response->resultUuid,
                 $nextBatchIndex,
                 $ackIndex,
-                $resultTypes,
                 $resultNames,
             );
             if (!$fetchResponse instanceof FetchResponseMessage) {

@@ -11,7 +11,6 @@ use DuckDB\Quack\Exceptions\TransportException;
 use DuckDB\Quack\Messages\ErrorMessage;
 use DuckDB\Quack\Messages\MessageCodec;
 use DuckDB\Quack\Messages\QuackMessage;
-use DuckDB\Quack\Types\LogicalType;
 
 /**
  * HTTP(S) transport for one Quack endpoint, backed by ext-curl.
@@ -130,13 +129,11 @@ final class Transport
     }
 
     /**
-     * @param list<LogicalType> $resultTypes schema for decoding result chunks
      * @param list<string>      $resultNames column names for decoding result chunks
      */
     public function send(
         QuackMessage $message,
         int $version,
-        array $resultTypes = [],
         array $resultNames = [],
     ): QuackMessage {
         $curl = $this->curl();
@@ -176,10 +173,7 @@ final class Transport
                 ], true) => TransportErrorKind::Connect,
                 default => TransportErrorKind::Other,
             };
-            throw new TransportException(
-                $kind,
-                $message === '' ? "curl error {$errno}" : "curl error {$errno}: {$message}",
-            );
+            throw new TransportException($kind, $message === '' ? "curl error {$errno}" : "curl error {$errno}: {$message}");
         }
 
         $status = (int) curl_getinfo($curl, CURLINFO_RESPONSE_CODE);
@@ -192,7 +186,7 @@ final class Transport
             throw new HttpStatusException($status, $raw);
         }
 
-        $decoded = MessageCodec::decodeMessageForVersion((string) $body, $version, $resultTypes, $resultNames);
+        $decoded = MessageCodec::decodeMessageForVersion((string) $body, $version, $resultNames);
         if ($decoded instanceof ErrorMessage) {
             throw new ServerException($decoded->error);
         }
