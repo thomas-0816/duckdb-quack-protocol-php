@@ -19,8 +19,11 @@ use DuckDB\Quack\Types\LogicalType;
 /**
  * One negotiated Quack session, minus the public client facade.
  *
- * This synchronous port has no background keepalive: a client sends a
- * best-effort DISCONNECT when it is dropped.
+ * Protocol v3 leases expire when a session stays silent for the agreed
+ * heartbeat timeout. This synchronous port requests a lease with headroom
+ * over the longest request it allows, so ordinary traffic renews the lease
+ * without a background timer. It sends a best-effort DISCONNECT when it is
+ * dropped.
  */
 final class ClientConnection
 {
@@ -50,7 +53,7 @@ final class ClientConnection
                 clientPlatform: 'quack-php',
                 minSupportedQuackVersion: self::QUACK_VERSION,
                 maxSupportedQuackVersion: self::QUACK_VERSION,
-                heartbeatTimeoutSeconds: (int) ceil($transport->timeout()),
+                heartbeatTimeoutSeconds: (int) min(300, ($transport->timeout() * 3) + 1),
             ),
             self::QUACK_VERSION,
         );
