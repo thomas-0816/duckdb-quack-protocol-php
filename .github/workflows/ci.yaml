@@ -59,6 +59,7 @@ jobs:
         with:
           php-version: ${{ matrix.php-version }}
           coverage: pcov
+          tools: composer
         env:
           phpts: ${{ matrix.thread-safety }}
       - name: Tests
@@ -79,6 +80,7 @@ jobs:
           uname -a
           php -v
           php -m | grep curl
+          composer install
           composer check
 
   zizmor:
