@@ -157,7 +157,7 @@ final class LogicalTypeCodec
     }
 
     /**
-     * @return array{0:string,1:DuckDBValue}
+     * @return array{0:string,1:SerializedValue}
      */
     private static function decodeExtensionProperty(BinaryReader $reader): array
     {

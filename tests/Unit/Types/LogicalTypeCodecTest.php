@@ -4,11 +4,11 @@ namespace DuckDB\Quack\Tests\Unit\Types;
 
 use DuckDB\Quack\Transport\BinaryReader;
 use DuckDB\Quack\Transport\BinaryWriter;
-use DuckDB\Quack\Types\DuckDBValue;
 use DuckDB\Quack\Types\ExtraTypeInfoType;
 use DuckDB\Quack\Types\LogicalType;
 use DuckDB\Quack\Types\LogicalTypeCodec;
 use DuckDB\Quack\Types\LogicalTypeId;
+use DuckDB\Quack\Types\SerializedValue;
 use DuckDB\Quack\Types\ValueCodec;
 use PHPUnit\Framework\TestCase;
 
@@ -92,7 +92,7 @@ final class LogicalTypeCodecTest extends TestCase
         self::assertNull(self::decodeValue($null)->toPhp());
     }
 
-    private static function decodeValue(BinaryWriter $writer): DuckDBValue
+    private static function decodeValue(BinaryWriter $writer): SerializedValue
     {
         $reader = new BinaryReader($writer->intoBytes());
         $value = ValueCodec::decode($reader);

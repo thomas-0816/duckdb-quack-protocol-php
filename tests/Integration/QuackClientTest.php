@@ -520,13 +520,15 @@ final class QuackClientTest extends TestCase
     {
         $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 10, ['timezone' => 'America/New_York']);
         $client2 = QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 10, ['timezone' => 'America/Los_Angeles']);
+        self::assertNotSame($client->getConnection()->connectionId(), $client2->getConnection()->connectionId());
+
         self::assertSame('America/New_York', $client->fetchValue("SELECT current_setting('TimeZone') AS tz"));
         self::assertSame('America/Los_Angeles', $client2->fetchValue("SELECT current_setting('TimeZone') AS tz"));
 
-        $client->execute('set session threads = 2');
-        $client2->execute('set session threads = 3');
-        self::assertSame(2, $client->fetchValue("SELECT current_setting('threads') AS threads"));
-        self::assertSame(3, $client2->fetchValue("SELECT current_setting('threads') AS threads"));
+        $client->execute("set timezone = 'Pacific/Fiji'");
+        $client2->execute("set timezone = 'Australia/Tasmania'");
+        self::assertSame('Pacific/Fiji', $client->fetchValue("SELECT current_setting('timezone') AS tz"));
+        self::assertSame('Australia/Tasmania', $client2->fetchValue("SELECT current_setting('timezone') AS tz"));
     }
 
     public function testTimestampTzUsesConfiguredTimezone(): void
