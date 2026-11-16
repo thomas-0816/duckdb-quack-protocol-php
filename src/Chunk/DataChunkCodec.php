@@ -266,11 +266,7 @@ final class DataChunkCodec
             }
             $unshreddedRow = $row[$unshreddedChild->name] ?? null;
             $unshredded = is_array($unshreddedRow) ? VariantDecoder::fromPhp(self::stringKeyedRow($unshreddedRow)) : null;
-            $values[] = VariantDecoder::decodeShredded(
-                $shreddedChild->logicalType,
-                $row[$shreddedChild->name] ?? null,
-                $unshredded,
-            );
+            $values[] = VariantDecoder::decodeShredded($shreddedChild->logicalType, $row[$shreddedChild->name] ?? null, $unshredded);
         }
         return new DecodedVector(VectorType::Shredded, $values);
     }
