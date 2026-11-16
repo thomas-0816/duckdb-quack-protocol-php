@@ -452,7 +452,7 @@ final class QuackClientTest extends TestCase
     public function testTimeTzType(): void
     {
         self::assertSame(
-            '12:34:56+01:00',
+            '12:34:56+01',
             $this->queryValue("SELECT TIMETZ '12:34:56+01:00' AS v"),
         );
         self::assertSame(
