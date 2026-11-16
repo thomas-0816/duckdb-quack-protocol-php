@@ -168,7 +168,7 @@ final class ClientConnection
             header: MessageHeader::new(MessageType::CancelRequest)
                 ->withConnection($this->connectionId)
                 ->withClientQueryId($this->queryCounter++),
-            queryUuid: $queryUuid
+            queryUuid: $queryUuid,
         );
         try {
             return $this->transport->send($message, $this->quackVersion);
