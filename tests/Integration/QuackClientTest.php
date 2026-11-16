@@ -114,30 +114,20 @@ final class QuackClientTest extends TestCase
     public function testResultNamesSurvivePrepareWithoutInlineChunks(): void
     {
         $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 10);
-        $originalInlineRows = $client->fetchValue(
-            "SELECT current_setting('quack_prepare_inline_rows')",
-        );
-        if (!is_int($originalInlineRows)) {
-            self::fail('quack_prepare_inline_rows is not an integer');
-        }
+        $originalInlineRows = $client->fetchValue("SELECT current_setting('quack_prepare_inline_rows')");
+        self::assertSame(24576, $originalInlineRows);
 
-        try {
-            $client->execute('SET quack_prepare_inline_rows = 0');
+        $prepared = $client->getConnection()->prepare('SELECT i FROM range(100000) t(i)', 0);
+        self::assertInstanceOf(PrepareResponseMessage::class, $prepared);
+        self::assertSame([], $prepared->results);
+        self::assertTrue($prepared->needsMoreFetch);
+        self::assertSame(['i'], $prepared->resultNames);
 
-            $prepared = $client->getConnection()->prepare('SELECT i FROM range(100000) t(i)');
-            self::assertInstanceOf(PrepareResponseMessage::class, $prepared);
-            self::assertSame([], $prepared->results);
-            self::assertTrue($prepared->needsMoreFetch);
-            self::assertSame(['i'], $prepared->resultNames);
+        $iterator = $client->fetchIterator('SELECT i FROM range(100000) t(i)');
+        self::assertSame(['i' => 0], $iterator->current());
+        unset($iterator);
 
-            $iterator = $client->fetchIterator('SELECT i FROM range(100000) t(i)');
-            self::assertSame(['i' => 0], $iterator->current());
-            unset($iterator);
-
-            self::assertSame(['n' => 1], $client->fetchOne('SELECT 1 AS n'));
-        } finally {
-            $client->execute("SET quack_prepare_inline_rows = {$originalInlineRows}");
-        }
+        self::assertSame(['n' => 1], $client->fetchOne('SELECT 1 AS n'));
     }
 
     public function testFetchIterator(): void
