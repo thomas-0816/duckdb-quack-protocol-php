@@ -107,7 +107,7 @@ final class Transport
         $options = [
             CURLOPT_POST => true,
             CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_HTTPHEADER => ['Accept: application/duckdb', 'Content-Type: application/duckdb', 'Expect:'],
+            CURLOPT_HTTPHEADER => ['Accept: application/vnd.duckdb', 'Content-Type: application/vnd.duckdb', 'Expect:'],
             CURLOPT_PROTOCOLS => CURLPROTO_HTTPS | CURLPROTO_HTTP,
             CURLOPT_REDIR_PROTOCOLS => CURLPROTO_HTTPS,
             CURLOPT_FOLLOWLOCATION => false,
