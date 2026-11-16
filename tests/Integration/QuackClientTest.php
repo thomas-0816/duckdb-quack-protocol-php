@@ -3,6 +3,7 @@
 namespace DuckDB\Quack\Tests\Integration;
 
 use DuckDB\Quack\Exceptions\ServerException;
+use DuckDB\Quack\Messages\PrepareResponseMessage;
 use DuckDB\Quack\QuackClient;
 use PHPUnit\Framework\TestCase;
 
@@ -108,6 +109,35 @@ final class QuackClientTest extends TestCase
             [['n' => 1], ['n' => 2]],
             $client->fetchAll('SELECT * FROM (VALUES (1), (2)) t(n)'),
         );
+    }
+
+    public function testResultNamesSurvivePrepareWithoutInlineChunks(): void
+    {
+        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 10);
+        $originalInlineRows = $client->fetchValue(
+            "SELECT current_setting('quack_prepare_inline_rows')",
+        );
+        if (!is_int($originalInlineRows)) {
+            self::fail('quack_prepare_inline_rows is not an integer');
+        }
+
+        try {
+            $client->execute('SET quack_prepare_inline_rows = 0');
+
+            $prepared = $client->getConnection()->prepare('SELECT i FROM range(100000) t(i)');
+            self::assertInstanceOf(PrepareResponseMessage::class, $prepared);
+            self::assertSame([], $prepared->results);
+            self::assertTrue($prepared->needsMoreFetch);
+            self::assertSame(['i'], $prepared->resultNames);
+
+            $iterator = $client->fetchIterator('SELECT i FROM range(100000) t(i)');
+            self::assertSame(['i' => 0], $iterator->current());
+            unset($iterator);
+
+            self::assertSame(['n' => 1], $client->fetchOne('SELECT 1 AS n'));
+        } finally {
+            $client->execute("SET quack_prepare_inline_rows = {$originalInlineRows}");
+        }
     }
 
     public function testFetchIterator(): void
@@ -703,6 +733,21 @@ final class QuackClientTest extends TestCase
         }
 
         return $pem;
+    }
+
+    public function testNonFatalServerErrorKeepsSessionUsable(): void
+    {
+        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 10);
+
+        try {
+            $client->fetchAll('SELECT * FROM missing_table');
+            self::fail('expected the missing table to be rejected');
+        } catch (ServerException $error) {
+            self::assertFalse($error->isConnectionFatal());
+        }
+
+        self::assertFalse($client->getConnection()->isClosed());
+        self::assertSame(1, $client->fetchValue('SELECT 1 AS value'));
     }
 
     public function testRejectsInvalidTimezoneBeforeConnecting(): void

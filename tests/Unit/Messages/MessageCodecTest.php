@@ -93,6 +93,27 @@ final class MessageCodecTest extends TestCase
         self::assertSame(['answer'], $decoded->results[0]->resultNames);
     }
 
+    public function testPrepareResponseRetainsResultNamesWithoutChunks(): void
+    {
+        $message = new PrepareResponseMessage(
+            new MessageHeader(MessageType::PrepareResponse, 'conn-1', 11),
+            true,
+            [],
+            new HugeIntParts(0, 5),
+            ['answer'],
+        );
+
+        $decoded = MessageCodec::decodeMessageForVersion(
+            MessageCodec::encodeMessageForVersion($message, 3),
+            3,
+        );
+
+        self::assertInstanceOf(PrepareResponseMessage::class, $decoded);
+        self::assertTrue($decoded->needsMoreFetch);
+        self::assertSame([], $decoded->results);
+        self::assertSame(['answer'], $decoded->resultNames);
+    }
+
     public function testHeartbeatCancelAndDisconnectRoundTrip(): void
     {
         $messages = [
