@@ -135,6 +135,7 @@ final class ClientConnection
             if ($error->serverError()->isFatal()) {
                 $this->closed = true;
             }
+            throw $error;
         }
     }
 
@@ -157,6 +158,7 @@ final class ClientConnection
             if ($error->serverError()->isFatal()) {
                 $this->closed = true;
             }
+            throw $error;
         }
     }
 
@@ -182,6 +184,7 @@ final class ClientConnection
             if ($error->serverError()->isFatal()) {
                 $this->closed = true;
             }
+            throw $error;
         }
     }
 
