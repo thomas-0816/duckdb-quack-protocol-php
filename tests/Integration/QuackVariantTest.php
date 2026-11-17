@@ -177,6 +177,8 @@ final class QuackVariantTest extends TestCase
         $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 10);
 
         try {
+            $client->execute("ATTACH ':memory:' AS variant_shred_db");
+            $client->execute("USE variant_shred_db");
             $client->execute('SET variant_minimum_shredding_size = 0');
             $client->execute('CREATE TABLE shredded (id INTEGER, v VARIANT)');
             $client->execute(
@@ -184,7 +186,7 @@ final class QuackVariantTest extends TestCase
                     SELECT i, {'id': i, 'tags': ['a' || i], 'nested': {'v': i * 2}}
                     FROM generate_series(1, 5_000) t(i)",
             );
-            $client->execute('CHECKPOINT');
+            $client->execute('CHECKPOINT variant_shred_db');
 
             self::assertSame(['SHREDDED_VECTOR'], $client->fetchColumn('SELECT DISTINCT vector_type(v) FROM shredded'));
             self::assertSame(5_000, $client->fetchValue('SELECT count(*) FROM shredded'));
@@ -197,7 +199,7 @@ final class QuackVariantTest extends TestCase
                 $client->fetchOne('SELECT v FROM shredded ORDER BY id DESC LIMIT 1'),
             );
         } finally {
-            $client->execute('DROP TABLE IF EXISTS shredded');
+            $client->execute('DETACH DATABASE');
             $client->execute('SET variant_minimum_shredding_size = 30000');
         }
     }
