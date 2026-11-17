@@ -20,11 +20,10 @@ final class Transport
     private ?CurlHandle $curl = null;
 
     private function __construct(
-        private readonly string $baseUrl,
-        private readonly bool $ssl,
+        private readonly ParsedQuackUri $parsedUri,
         private readonly string $authToken,
         private int $timeout,
-        private readonly int $connectTimeout,
+        private int $connectTimeout,
         private readonly ?string $sslCertificate,
     ) {
     }
@@ -36,9 +35,9 @@ final class Transport
         int $timeout,
         ?string $sslCertificate = null,
     ): self {
-        $parsed = UriParser::parseQuackUri($uri);
+        $parsedUri = UriParser::parseQuackUri($uri);
 
-        if ($sslCertificate !== null && !$parsed->ssl) {
+        if ($sslCertificate !== null && !$parsedUri->ssl) {
             throw new ProtocolException('ssl_certificate requires an https:// URL');
         }
 
@@ -50,8 +49,7 @@ final class Transport
         }
 
         return new self(
-            rtrim($parsed->baseUrl, '/'),
-            $parsed->ssl,
+            $parsedUri,
             $authToken,
             $timeout,
             $connectTimeout,
@@ -59,73 +57,27 @@ final class Transport
         );
     }
 
-    public function baseUrl(): string
-    {
-        return $this->baseUrl;
-    }
-
-    public function authToken(): string
+    public function getAuthToken(): string
     {
         return $this->authToken;
     }
 
-    public function timeout(): int
+    public function setConnectTimeout(int $connectTimeout): self
     {
-        return $this->timeout;
+        $this->connectTimeout = $connectTimeout;
+        return $this;
     }
 
-    public function withTimeout(int $timeout): self
+    public function setTimeout(int $timeout): self
     {
-        $clone = clone $this;
-        $clone->timeout = $timeout;
-        return $clone;
+        $this->timeout = $timeout;
+        return $this;
     }
 
     public function __clone()
     {
         // A cloned transport must not share the parent's connection state.
         $this->curl = null;
-    }
-
-    /**
-     * Returns the reusable curl handle, creating and configuring it on first
-     * use. Reusing the handle keeps the HTTP connection alive between
-     * requests, avoiding a TCP/TLS handshake per prepare and fetch call.
-     */
-    private function curl(): \CurlHandle
-    {
-        if ($this->curl !== null) {
-            return $this->curl;
-        }
-
-        $curl = curl_init($this->baseUrl . '/quack');
-        if ($curl === false) {
-            throw new TransportException(TransportErrorKind::Other, 'failed to initialise curl');
-        }
-
-        $options = [
-            CURLOPT_POST => true,
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_HTTPHEADER => ['Accept: application/vnd.duckdb', 'Content-Type: application/vnd.duckdb', 'Expect:'],
-            CURLOPT_PROTOCOLS => CURLPROTO_HTTPS | CURLPROTO_HTTP,
-            CURLOPT_REDIR_PROTOCOLS => CURLPROTO_HTTPS,
-            CURLOPT_FOLLOWLOCATION => false,
-            CURLOPT_MAXREDIRS => 0,
-            CURLOPT_TCP_NODELAY => true,
-            CURLOPT_TCP_KEEPALIVE => true,
-        ];
-        if ($this->ssl) {
-            $options[CURLOPT_SSL_VERIFYPEER] = true;
-            $options[CURLOPT_SSL_VERIFYHOST] = 2;
-            if ($this->sslCertificate !== null) {
-                $options[CURLOPT_CAINFO_BLOB] = $this->sslCertificate;
-            }
-        }
-        if (!curl_setopt_array($curl, $options)) {
-            throw new TransportException(TransportErrorKind::Other, 'failed to set curl options');
-        }
-
-        return $this->curl = $curl;
     }
 
     public function send(QuackMessage $message, int $version): QuackMessage
@@ -185,5 +137,46 @@ final class Transport
             throw new ServerException($decoded->error);
         }
         return $decoded;
+    }
+
+    /**
+     * Returns the reusable curl handle, creating and configuring it on first
+     * use. Reusing the handle keeps the HTTP connection alive between
+     * requests, avoiding a TCP/TLS handshake per prepare and fetch call.
+     */
+    private function curl(): \CurlHandle
+    {
+        if ($this->curl !== null) {
+            return $this->curl;
+        }
+
+        $curl = curl_init(rtrim($this->parsedUri->baseUrl, '/') . '/quack');
+        if ($curl === false) {
+            throw new TransportException(TransportErrorKind::Other, 'failed to initialise curl');
+        }
+
+        $options = [
+            CURLOPT_POST => true,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_HTTPHEADER => ['Accept: application/vnd.duckdb', 'Content-Type: application/vnd.duckdb', 'Expect:'],
+            CURLOPT_PROTOCOLS => CURLPROTO_HTTPS | CURLPROTO_HTTP,
+            CURLOPT_REDIR_PROTOCOLS => CURLPROTO_HTTPS,
+            CURLOPT_FOLLOWLOCATION => false,
+            CURLOPT_MAXREDIRS => 0,
+            CURLOPT_TCP_NODELAY => true,
+            CURLOPT_TCP_KEEPALIVE => true,
+        ];
+        if ($this->parsedUri->ssl) {
+            $options[CURLOPT_SSL_VERIFYPEER] = true;
+            $options[CURLOPT_SSL_VERIFYHOST] = 2;
+            if ($this->sslCertificate !== null) {
+                $options[CURLOPT_CAINFO_BLOB] = $this->sslCertificate;
+            }
+        }
+        if (!curl_setopt_array($curl, $options)) {
+            throw new TransportException(TransportErrorKind::Other, 'failed to set curl options');
+        }
+
+        return $this->curl = $curl;
     }
 }

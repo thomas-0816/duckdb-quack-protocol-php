@@ -15,7 +15,7 @@ final class QuackCancelTest extends TestCase
 
         try {
             $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 10);
-            $connectionId = $client->getConnection()->connectionId();
+            $connectionId = $client->getConnection()->getConnectionId();
 
             self::assertSame('idle', $admin->fetchValue('SELECT state FROM quack_active_connections() WHERE connection_id = ?', [$connectionId]));
             $admin->execute('SET quack_prepare_inline_rows = 0');

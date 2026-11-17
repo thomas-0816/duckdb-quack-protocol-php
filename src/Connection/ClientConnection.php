@@ -53,7 +53,7 @@ final class ClientConnection
         $response = $transport->send(
             new ConnectionRequestMessage(
                 header: MessageHeader::new(MessageType::ConnectionRequest),
-                authString: $transport->authToken(),
+                authString: $transport->getAuthToken(),
                 clientPlatform: 'quack-php',
                 minSupportedQuackVersion: min(self::QUACK_VERSIONS),
                 maxSupportedQuackVersion: max(self::QUACK_VERSIONS),
@@ -88,24 +88,29 @@ final class ClientConnection
         return $this->closed;
     }
 
-    public function quackVersion(): int
+    public function getQuackVersion(): int
     {
         return $this->quackVersion;
     }
 
-    public function serverDuckdbVersion(): ?string
+    public function getServerDuckdbVersion(): ?string
     {
         return $this->serverDuckdbVersion;
     }
 
-    public function serverPlatform(): ?string
+    public function getServerPlatform(): ?string
     {
         return $this->serverPlatform;
     }
 
-    public function connectionId(): string
+    public function getConnectionId(): string
     {
         return $this->connectionId;
+    }
+
+    public function getTransport(): Transport
+    {
+        return $this->transport;
     }
 
     public function prepare(string $sql, ?int $inlineRows): QuackMessage
@@ -183,7 +188,7 @@ final class ClientConnection
     /**
      * Best-effort cleanup used by the client destructor.
      */
-    public function disconnectOnDrop(): void
+    public function disconnect(): void
     {
         if ($this->closed) {
             return;
@@ -194,7 +199,7 @@ final class ClientConnection
                 ->withClientQueryId($this->queryCounter++),
         );
         try {
-            $this->transport->withTimeout(3)->send($message, $this->quackVersion);
+            $this->transport->setTimeout(3)->send($message, $this->quackVersion);
         } catch (QuackError $e) {
             // The caller is gone; nothing useful can be reported.
         } finally {

@@ -12,13 +12,13 @@ final class QuackClientTest extends TestCase
     public function testConnectSsl(): void
     {
         $client = QuackClient::connect('https://localhost:9495', 'secret', 3, 10, [], self::sslCertificate());
-        self::assertSame(3, $client->getConnection()->quackVersion());
+        self::assertSame(3, $client->getConnection()->getQuackVersion());
     }
 
     public function testConnect(): void
     {
         $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 10);
-        self::assertSame(3, $client->getConnection()->quackVersion());
+        self::assertSame(3, $client->getConnection()->getQuackVersion());
 
         self::assertSame(
             [
@@ -510,7 +510,7 @@ final class QuackClientTest extends TestCase
     {
         $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 10, ['timezone' => 'America/New_York']);
         $client2 = QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 10, ['timezone' => 'America/Los_Angeles']);
-        self::assertNotSame($client->getConnection()->connectionId(), $client2->getConnection()->connectionId());
+        self::assertNotSame($client->getConnection()->getConnectionId(), $client2->getConnection()->getConnectionId());
 
         self::assertSame('America/New_York', $client->fetchValue("SELECT current_setting('TimeZone') AS tz"));
         self::assertSame('America/Los_Angeles', $client2->fetchValue("SELECT current_setting('TimeZone') AS tz"));

@@ -40,7 +40,7 @@ final class ClientConnectionTest extends TestCase
     {
         $connection = self::retiredConnection();
 
-        $connection->disconnectOnDrop();
+        $connection->disconnect();
 
         self::assertTrue($connection->isClosed());
     }

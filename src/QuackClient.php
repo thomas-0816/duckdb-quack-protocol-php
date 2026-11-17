@@ -32,7 +32,7 @@ final class QuackClient
 
     public function __destruct()
     {
-        $this->connection->disconnectOnDrop();
+        $this->connection->disconnect();
     }
 
     /**
@@ -45,8 +45,8 @@ final class QuackClient
     public static function connect(
         string $uri,
         string $authToken,
-        int $connectTimeout,
-        int $queryTimeout,
+        int $httpConnectTimeout,
+        int $httpTimeout,
         array $configuration = [],
         ?string $sslCertificate = null,
     ): self {
@@ -61,7 +61,7 @@ final class QuackClient
             };
             $settings[] = 'SET ' . $name . ' = ' . $literal . ';';
         }
-        $transport = Transport::new($uri, $authToken, $connectTimeout, $queryTimeout, $sslCertificate);
+        $transport = Transport::new($uri, $authToken, $httpConnectTimeout, $httpTimeout, $sslCertificate);
         $connection = ClientConnection::connect($transport);
 
         $client = new self($connection);
