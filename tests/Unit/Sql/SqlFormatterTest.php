@@ -5,7 +5,6 @@ namespace DuckDB\Quack\Tests\Unit\Sql;
 use DuckDB\Quack\Exceptions\ProtocolException;
 use DuckDB\Quack\Sql\SqlFormatter;
 use DuckDB\Quack\Sql\SqlParameter;
-use DuckDB\Quack\Sql\SqlParameters;
 use DuckDB\Quack\Types\DecimalValue;
 use DuckDB\Quack\Types\Value;
 use PHPUnit\Framework\TestCase;
@@ -14,10 +13,10 @@ final class SqlFormatterTest extends TestCase
 {
     public function testFormatsPositionalParameters(): void
     {
-        $params = SqlParameters::fromArray([
+        $params = [
             SqlParameter::value(Value::int(41)),
             SqlParameter::value(Value::string("can't")),
-        ]);
+        ];
 
         self::assertSame(
             "SELECT 41 + 1 AS answer, 'can''t' AS label",
@@ -31,7 +30,7 @@ final class SqlFormatterTest extends TestCase
             SELECT '?' AS "?", ? AS real_value -- ? in a line comment
             /* ? in a block comment */
             SQL;
-        $params = SqlParameters::fromArray([SqlParameter::value(Value::int(7))]);
+        $params = [SqlParameter::value(Value::int(7))];
 
         self::assertSame(
             <<<'SQL'
@@ -44,10 +43,10 @@ final class SqlFormatterTest extends TestCase
 
     public function testFormatsNamedParameters(): void
     {
-        $params = SqlParameters::fromArray([
+        $params = [
             'id' => SqlParameter::value(Value::int(7)),
             'label' => SqlParameter::value(Value::string('seven')),
-        ]);
+        ];
 
         self::assertSame(
             "SELECT 7 AS id, 'seven' AS label",
@@ -57,14 +56,14 @@ final class SqlFormatterTest extends TestCase
 
     public function testFormatsNestedLists(): void
     {
-        $params = SqlParameters::fromArray([
+        $params = [
             SqlParameter::list([
                 SqlParameter::value(Value::int(1)),
                 SqlParameter::list([
                     SqlParameter::value(Value::string('x')),
                 ]),
             ]),
-        ]);
+        ];
 
         self::assertSame(
             "SELECT [1, ['x']] AS value",
@@ -161,7 +160,7 @@ final class SqlFormatterTest extends TestCase
 
         SqlFormatter::formatSql(
             'SELECT ?',
-            SqlParameters::fromArray([]),
+            [],
         );
     }
 
@@ -196,7 +195,7 @@ final class SqlFormatterTest extends TestCase
 
         SqlFormatter::formatSql(
             'SELECT :missing',
-            SqlParameters::fromArray(['other' => 1]),
+            ['other' => 1],
         );
     }
 }
