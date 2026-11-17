@@ -3,3 +3,4 @@
 .phpstan/
 .phpunit.cache/
 vendor/
+/tests/duckdb
