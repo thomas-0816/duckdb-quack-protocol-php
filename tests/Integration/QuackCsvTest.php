@@ -39,7 +39,7 @@ final class QuackCsvTest extends TestCase
                 ['hour' => 12, 'temp' => 26.4],
                 ['hour' => 13, 'temp' => 27.4],
             ],
-            QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 10)->fetchAll(
+            QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 30)->fetchAll(
                 "select hour, temp from read_csv('{$url}') where year = 2026 and month = 7 and day = 25 and hour > 9 limit 4",
             ),
         );
