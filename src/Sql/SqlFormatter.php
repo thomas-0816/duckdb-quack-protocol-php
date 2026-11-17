@@ -12,18 +12,36 @@ use DuckDB\Quack\Types\Value;
 final class SqlFormatter
 {
     /**
-     * @param SqlParameters|array<int|string,mixed>|null $params
+     * Formats positional (`?`) or named (`:name`) placeholders. The form is
+     * detected from the array keys: a list is positional, anything else is
+     * named.
+     *
+     * @param array<int|string,mixed>|null $params
      */
-    public static function formatSql(string $sql, SqlParameters|array|null $params = null): string
+    public static function formatSql(string $sql, ?array $params = null): string
     {
-        $params = SqlParameters::coerce($params);
         if ($params === null) {
             return $sql;
         }
-        if ($params->kind === SqlParameters::POSITIONAL) {
-            return self::formatPositionalSql($sql, $params->positionalValues());
+
+        if (array_is_list($params)) {
+            $positional = [];
+            foreach ($params as $value) {
+                $positional[] = SqlParameter::fromPhp($value);
+            }
+
+            return self::formatPositionalSql($sql, $positional);
         }
-        return self::formatNamedSql($sql, $params->namedValues());
+
+        $named = [];
+        foreach ($params as $name => $value) {
+            if (!is_string($name)) {
+                throw new ProtocolException('named SQL parameter keys must be strings');
+            }
+            $named[$name] = SqlParameter::fromPhp($value);
+        }
+
+        return self::formatNamedSql($sql, $named);
     }
 
     public static function sqlLiteral(SqlParameter $value): string
@@ -62,7 +80,7 @@ final class SqlFormatter
             return $sql;
         }
         $index = 0;
-        $formatted = self::scanSql($sql, static function (string $token) use ($params, &$index): string {
+        $formatted = implode('', self::scanSqlParts($sql, static function (string $token) use ($params, &$index): string|SqlParameter {
             if ($token !== '?') {
                 return $token;
             }
@@ -71,8 +89,8 @@ final class SqlFormatter
                 throw new ProtocolException('SQL has more positional placeholders than parameters');
             }
             $index++;
-            return self::sqlLiteral($value);
-        });
+            return $value;
+        }));
         if ($index !== count($params)) {
             throw new ProtocolException("SQL has {$index} positional placeholders but " . count($params) . ' parameters were provided');
         }
@@ -84,7 +102,12 @@ final class SqlFormatter
      */
     private static function formatNamedSql(string $sql, array $params): string
     {
-        return self::scanSql($sql, static function (string $token) use ($params): string {
+        if ($params === [] && !str_contains($sql, ':')) {
+            // Avoid scanning large statements (for example embedded JSON
+            // documents) when there is nothing that could be replaced.
+            return $sql;
+        }
+        return implode('', self::scanSqlParts($sql, static function (string $token) use ($params): string|SqlParameter {
             if (!str_starts_with($token, ':')) {
                 return $token;
             }
@@ -93,8 +116,8 @@ final class SqlFormatter
             if ($value === null) {
                 throw new ProtocolException("missing SQL parameter :{$name}");
             }
-            return self::sqlLiteral($value);
-        });
+            return $value;
+        }));
     }
 
     /**
@@ -105,15 +128,29 @@ final class SqlFormatter
      */
     public static function scanSql(string $sql, callable $replaceToken): string
     {
+        return implode('', self::scanSqlParts($sql, static fn (string $token): string => $replaceToken($token)));
+    }
+
+    /**
+     * The scan behind {@see self::scanSql()}. A replacement may be a parameter
+     * literal instead of a string, so it can be appended in pieces and joined
+     * into the statement once instead of being built into an intermediate
+     * string first.
+     *
+     * @param callable(string):(string|SqlParameter) $replaceToken
+     * @return list<string>
+     */
+    private static function scanSqlParts(string $sql, callable $replaceToken): array
+    {
         $length = strlen($sql);
-        $output = '';
+        $parts = [];
         $index = 0;
         while ($index < $length) {
             // Copy runs of ordinary characters in one step; only the
             // characters below can start something that needs handling.
             $span = strcspn($sql, "'\"-/:?", $index);
             if ($span > 0) {
-                $output .= substr($sql, $index, $span);
+                $parts[] = substr($sql, $index, $span);
                 $index += $span;
                 if ($index >= $length) {
                     break;
@@ -125,36 +162,34 @@ final class SqlFormatter
 
             if ($ch === "'") {
                 $end = self::readSingleQuoted($sql, $index);
-                $output .= substr($sql, $index, $end - $index);
+                $parts[] = substr($sql, $index, $end - $index);
                 $index = $end;
                 continue;
             }
             if ($ch === '"') {
                 $end = self::readDoubleQuoted($sql, $index);
-                $output .= substr($sql, $index, $end - $index);
+                $parts[] = substr($sql, $index, $end - $index);
                 $index = $end;
                 continue;
             }
             if ($ch === '-' && $next === '-') {
                 $newline = strpos($sql, "\n", $index + 2);
                 $end = $newline === false ? $length : $newline;
-                $output .= substr($sql, $index, $end - $index);
+                $parts[] = substr($sql, $index, $end - $index);
                 $index = $end;
                 continue;
             }
             if ($ch === '/' && $next === '*') {
                 $close = strpos($sql, '*/', $index + 2);
                 $end = $close === false ? $length : $close + 2;
-                $output .= substr($sql, $index, $end - $index);
+                $parts[] = substr($sql, $index, $end - $index);
                 $index = $end;
                 continue;
             }
             if ($ch === '?') {
-                $output .= $replaceToken('?');
+                $token = '?';
                 $index++;
-                continue;
-            }
-            if ($ch === ':'
+            } elseif ($ch === ':'
                 && ($index === 0 || $sql[$index - 1] !== ':')
                 && $next !== ':'
                 && $next !== null
@@ -164,14 +199,36 @@ final class SqlFormatter
                 while ($end < $length && self::isIdentifierPart($sql[$end])) {
                     $end++;
                 }
-                $output .= $replaceToken(substr($sql, $index, $end - $index));
+                $token = substr($sql, $index, $end - $index);
                 $index = $end;
+            } else {
+                $parts[] = $ch;
+                $index++;
                 continue;
             }
-            $output .= $ch;
-            $index++;
+
+            $replacement = $replaceToken($token);
+            if (!$replacement instanceof SqlParameter) {
+                $parts[] = $replacement;
+                continue;
+            }
+            if ($replacement->kind === SqlParameter::LIST) {
+                $parts[] = self::sqlLiteral($replacement);
+                continue;
+            }
+            $scalar = $replacement->asValue();
+            if ($scalar->kind !== Value::STRING) {
+                $parts[] = self::valueLiteral($scalar);
+                continue;
+            }
+            // Append a large string in pieces so the final statement holds the
+            // only copy of it.
+            $text = $scalar->asString();
+            $parts[] = "'";
+            $parts[] = str_contains($text, "'") ? str_replace("'", "''", $text) : $text;
+            $parts[] = "'";
         }
-        return $output;
+        return $parts;
     }
 
     private static function readSingleQuoted(string $sql, int $start): int
