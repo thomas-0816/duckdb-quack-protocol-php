@@ -57,10 +57,53 @@ print_r($db->fetchAll('SELECT * FROM table1'));
 
 more examples coming soon ...
 
+## FAQ
+
+> How much RAM and CPU do I need for DuckDB?
+
+DuckDB normally runs good with 1-4 GB RAM and 2-4 CPU cores.
+
+> How good is the compression with Parquet and zstd?
+
+For logs you normally achieve compression rates of 50-100x.
+
+> Who is owning DuckDB?
+
+The DuckDB project is owned by the [DuckDB Foundation](https://duckdb.foundation), a non-profit organization from Amsterdam.
+
+> Can I get support for DuckDB?
+
+Yes. Support is available on GitHub, see the [community support](https://duckdb.org/community_support) page for details.
+
+> Can I get support for this project?
+
+Yes. Just open an Issue or a Pull request.
+
+> Is the PHP client for DuckDB Quack Remote Protocol developed by the DuckDB project?
+
+No. This is a third-party open-source community project.
+
+> Is DuckDB fully open-source?
+
+Yes. DuckDB and all components are fully open-source under the MIT license.
+
+## Development
+
+```bash
+composer install
+composer check
+```
+
 ## DuckDB Resources
 
 - [Quack: Turn DuckDB into a client-server database](https://duckdb.org/quack/)
 - [Quack Remote Protocol](https://duckdb.org/docs/2.0/quack/overview)
+
+- [DuckDB documentation](https://duckdb.org/docs/current/)
+- [DuckDB engineering blog](https://duckdb.org/news/)
+- [Awesome DuckDB](https://github.com/davidgasquez/awesome-duckdb)
+- [DuckDB books](https://duckdb.org/library/?type=book)
+- [DuckDB talks](https://duckdb.org/library/?type=talk)
 
 ## AI Disclosure
 
