@@ -110,6 +110,17 @@ unset($db); // Disconnect
 
 more examples coming soon ...
 
+## Timeout Configuration
+
+```php
+// HTTP connect timeout 3s
+// HTTP timeout 10s
+$db = QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 10);
+```
+
+HTTP connect timeout and HTTP timeout (total request time) are applied per request.
+One query can span over multiple requests.
+
 ## HTTPs Connections with self-signed certificates
 
 ```php
@@ -125,17 +136,6 @@ echo $db->fetchValue('SELECT 42'), PHP_EOL;
 ```
 
 Read more about [Quack Security](https://duckdb.org/docs/2.0/quack/security).
-
-## Timeouts
-
-```php
-// HTTP connect timeout 3s
-// HTTP timeout 10s
-$db = QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 10);
-```
-
-HTTP connect timeout and HTTP timeout (total request time) are applied per request.
-One query can span over multiple requests.
 
 ## Monitoring
 
