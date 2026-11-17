@@ -4,7 +4,7 @@ set -euo pipefail
 
 tmpdir=$(mktemp -d)
 
-./tests/duckdb -dark-mode -c "install quack"
+./tests/duckdb -dark-mode -c "INSTALL quack; INSTALL httpfs;"
 
 start_server() {
     local sql=$1
