@@ -2,7 +2,7 @@
 
 <img width="500" height="273" alt="logo" src="logo.jpg" />
 
-The Quack Remote Protocol unlocks multi-client access for [DuckDB](https://duckdb.org), turning DuckDB into a general-purpose database management system with client(s) and server.\
+The Quack Remote Protocol unlocks multi-client access for [DuckDB](https://duckdb.org), turning DuckDB into a general-purpose database management system with client(s) and server.
 Quack uses HTTP and can be combined with load balancers, firewalls, and reverse proxies (e.g. nginx).
 
 This library provides a pure PHP implementation for the DuckDB Quack Remote Protocol.\
