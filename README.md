@@ -27,14 +27,18 @@ composer require thomas-0816/duckdb-quack-protocol-php
 
 ## Install and setup (server)
 
-Install the DuckDB cli:
+Install the DuckDB CLI:
 
 https://duckdb.org/docs/2.0/installation?environment=cli
 
-Start the server:
+Start the DuckDB Server:
 
 ```bash
+# localhost, HTTP
 duckdb --cmd "CALL quack_serve('quack:127.0.0.1:9494', token='secret');"
+
+# public server, HTTPs, creates self-signed certificates
+duckdb --cmd "CALL quack_serve('quack:0.0.0.0:9495', token='secret', allow_other_hostname=true, disable_ssl=false);"
 ```
 
 ## Usage examples
@@ -105,6 +109,22 @@ unset($db); // Disconnect
 ```
 
 more examples coming soon ...
+
+## HTTPs Connections with self-signed certificates
+
+```php
+use DuckDB\Quack\QuackClient;
+
+require __DIR__ . '/../vendor/autoload.php';
+
+// read self-signed public key
+$pem = file_get_contents(getenv('HOME') . '/.duckdb/extension_data/quack/server.pem');
+
+$db = QuackClient::connect('https://localhost:9495', 'secret', 3, 10, [], $pem);
+echo $db->fetchValue('SELECT 42'), PHP_EOL;
+```
+
+Read more about [Quack Security](https://duckdb.org/docs/2.0/quack/security).
 
 ## Timeouts
 
