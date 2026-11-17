@@ -1,42 +1,29 @@
 <?php
 
 /**
- * TLS with a self-signed certificate.
+ * TLS validation with a self-signed certificate
  *
- * Pass the server certificate as a PEM file. The client hands its contents to
- * curl as a trusted CA blob, so a self-signed server works without a CA bundle.
- * The URL scheme selects HTTPS, and the hostname must match the certificate;
+ * Pass the server certificate as a PEM file (public key).
+ * The Quack client hands its contents to curl as a trusted CA blob, so a self-signed server
+ * works without a CA bundle. The URL scheme selects HTTPS, and the hostname must match the certificate;
  * DuckDB generates one for localhost.
  *
- * Run: php examples/06_tls_pin.php '/path/to/certificate.pem'
+ * Start the DuckDB server:
+ * duckdb --cmd "CALL quack_serve('quack:127.0.0.1:9495', token='secret', disable_ssl=false);"
+ *
+ * Run: php examples/06_tls_pin.php
  */
-
-require __DIR__ . '/../vendor/autoload.php';
 
 use DuckDB\Quack\QuackClient;
 
-$pemFile = $argv[1] ?? '';
-if ($pemFile === '') {
-    echo 'Usage: php examples/06_tls_pin.php <certificate.pem>', PHP_EOL;
-    echo PHP_EOL, 'Example (self-signed certificate):', PHP_EOL;
-    echo '  openssl s_client -connect localhost:9494 -showcerts </dev/null 2>/dev/null \\', PHP_EOL;
-    echo '    | openssl x509 -outform PEM > server.pem', PHP_EOL;
-    echo PHP_EOL, 'done', PHP_EOL;
-    exit(0);
-}
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
 
-$pem = file_get_contents($pemFile);
-if ($pem === false) {
-    echo 'could not read ', $pemFile, PHP_EOL;
-    exit(1);
-}
+require __DIR__ . '/../vendor/autoload.php';
 
-$client = QuackClient::connect('https://localhost:9494', 'secret', 3, 10, [], $pem);
+$pem = file_get_contents(getenv('HOME') . '/.duckdb/extension_data/quack/server.pem');
 
-echo 'connected over TLS to https://localhost:9494', PHP_EOL;
-echo 'server DuckDB: ', $client->getConnection()->serverDuckdbVersion() ?? 'unknown', PHP_EOL;
-$row = $client->fetchOne('SELECT 1 AS pinned') ?? [];
-echo 'query result: ';
-var_dump($row['pinned'] ?? null);
+$client = QuackClient::connect('https://localhost:9495', 'secret', 3, 10, [], $pem);
+print_r($client->fetchValue('SELECT 42'));
 
-echo PHP_EOL, 'done', PHP_EOL;
+# 42
