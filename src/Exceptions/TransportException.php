@@ -19,9 +19,4 @@ final class TransportException extends QuackError
     {
         return $this->kind;
     }
-
-    public function isConnectionFatal(): bool
-    {
-        return true;
-    }
 }

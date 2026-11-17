@@ -33,9 +33,4 @@ final class HttpStatusException extends QuackError
     {
         return [$this->status, $this->body];
     }
-
-    public function isConnectionFatal(): bool
-    {
-        return true;
-    }
 }

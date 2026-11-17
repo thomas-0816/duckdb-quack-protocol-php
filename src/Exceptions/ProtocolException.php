@@ -11,9 +11,4 @@ final class ProtocolException extends QuackError
     {
         parent::__construct('quack protocol error: ' . $message, 0, $previous);
     }
-
-    public function isConnectionFatal(): bool
-    {
-        return true;
-    }
 }

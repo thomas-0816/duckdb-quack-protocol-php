@@ -17,9 +17,4 @@ final class ServerException extends QuackError
     {
         return $this->serverError;
     }
-
-    public function isConnectionFatal(): bool
-    {
-        return $this->serverError->isFatal();
-    }
 }
