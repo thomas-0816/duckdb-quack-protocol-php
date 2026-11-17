@@ -5,6 +5,7 @@ namespace DuckDB\Quack\Connection;
 use DuckDB\Quack\Error\QuackError;
 use DuckDB\Quack\Exceptions\ProtocolException;
 use DuckDB\Quack\Exceptions\ServerException;
+use DuckDB\Quack\Exceptions\TransportException;
 use DuckDB\Quack\Messages\CancelMessage;
 use DuckDB\Quack\Messages\ConnectionRequestMessage;
 use DuckDB\Quack\Messages\ConnectionResponseMessage;
@@ -136,6 +137,9 @@ final class ClientConnection
                 $this->closed = true;
             }
             throw $error;
+        } catch (TransportException $error) {
+            $this->cancel($message->queryUuid);
+            throw $error;
         }
     }
 
@@ -159,6 +163,9 @@ final class ClientConnection
                 $this->closed = true;
             }
             throw $error;
+        } catch (TransportException $error) {
+            $this->cancel($message->resultUuid);
+            throw $error;
         }
     }
 
@@ -179,7 +186,7 @@ final class ClientConnection
             queryUuid: $queryUuid,
         );
         try {
-            return $this->transport->send($message, $this->quackVersion);
+            return $this->transport->setTimeout(3)->send($message, $this->quackVersion);
         } catch (ServerException $error) {
             if ($error->serverError()->isFatal()) {
                 $this->closed = true;

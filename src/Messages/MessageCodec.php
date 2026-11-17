@@ -126,9 +126,6 @@ final class MessageCodec
         }
 
         if ($message instanceof PrepareRequestMessage) {
-            if ($message->queryUuid === null) {
-                throw new ProtocolException('protocol v3 PREPARE_REQUEST requires query_uuid');
-            }
             $writer->writeObject(static function (BinaryWriter $object) use ($message): void {
                 self::writeOptionalString($object, 1, $message->sql);
                 $object->writeField(

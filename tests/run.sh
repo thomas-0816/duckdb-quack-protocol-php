@@ -6,26 +6,15 @@ tmpdir=$(mktemp -d)
 
 ./tests/duckdb -dark-mode -c "INSTALL quack; INSTALL httpfs;"
 
-start_server() {
-    local sql=$1
-    local feed_pid_file=$2
-    bash -c 'echo $$ > "$2"; printf "%s\n" "$1"; exec sleep 3600' _ "${sql}" "${feed_pid_file}" </dev/null | ./tests/duckdb -dark-mode &
-}
-
-start_server "CALL quack_serve('quack:127.0.0.1:9494', token='secret');" "${tmpdir}/http.feed"
+sql="CALL quack_serve('quack:127.0.0.1:9494', token='secret'); CALL quack_serve('quack:127.0.0.1:9495', token='secret', disable_ssl=false);"
+bash -c 'echo $$ > "$2"; printf "%s\n" "$1"; exec sleep 3600' _ "${sql}" "${tmpdir}/http.feed" </dev/null | ./tests/duckdb -dark-mode &
 pid_http=$!
 
-start_server "CALL quack_serve('quack:127.0.0.1:9495', token='secret', disable_ssl=false);" "${tmpdir}/https.feed"
-pid_https=$!
-
 cleanup() {
-    local pid_file
-    kill "${pid_http}" "${pid_https}" || true
-    for pid_file in "${tmpdir}/http.feed" "${tmpdir}/https.feed"; do
-        if [ -s "${pid_file}" ]; then
-            kill "$(cat "${pid_file}")" || true
-        fi
-    done
+    kill "${pid_http}" || true
+    if [ -s "${tmpdir}/http.feed" ]; then
+        kill "$(cat "${tmpdir}/http.feed")" || true
+    fi
     rm -rf "${tmpdir}"
 }
 trap cleanup EXIT INT TERM

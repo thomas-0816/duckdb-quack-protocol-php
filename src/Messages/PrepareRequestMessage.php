@@ -9,7 +9,7 @@ final class PrepareRequestMessage extends QuackMessage
     public function __construct(
         public readonly MessageHeader $header,
         public readonly string $sql,
-        public readonly ?HugeIntParts $queryUuid = null,
+        public readonly HugeIntParts $queryUuid,
         public readonly int|string|null $inlineRows = null,
     ) {
     }
