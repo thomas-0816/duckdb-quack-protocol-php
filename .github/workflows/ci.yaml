@@ -76,7 +76,10 @@ jobs:
             *) echo "unsupported platform: $RUNNER_OS-$RUNNER_ARCH" >&2; exit 1 ;;
           esac
           curl -fsSL "https://install.duckdb.org/v2.0.0/duckdb-cli-${arch}.tar.gz" | tar -xz -C "tests/"
-          ./tests/duckdb --version
+          if [ -f tests/duckdb.exe ]; then
+            mv tests/duckdb.exe tests/duckdb
+          fi
+          tests/duckdb --version
           uname -a
           php -v
           php -m | grep curl
