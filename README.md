@@ -57,6 +57,19 @@ print_r($db->fetchAll('SELECT * FROM table1'));
 
 more examples coming soon ...
 
+## Why DuckDB?
+
+https://duckdb.org/why_duckdb
+
+DuckDB uses columnar storage and vectorized processing, running analytics 10–100x faster than traditional row-oriented databases.
+It spills data to disk if needed, allowing to process datasets much larger than available system RAM.
+DuckDB includes an advanced query optimizer that handles joins, subqueries, expressions and filters.\
+It can directly query flat files (JSON, CSV, and Parquet) directly via SQL without needing to import the data first.
+Flat files can be read directly from disk, network attached storage or S3 comatible cloud storage.\
+Data is processed in cache-friendly batches on a multi-core architecture, allowing modern hardware to operate on arrays of data simultaneously.
+For analytical queries that only require a few metrics, DuckDB reads only the relevant columns from disk/memory, saving I/O and CPU cycles.
+This brings data warehouse-level performance to any laptop or server.
+
 ## FAQ
 
 > How much RAM and CPU do I need for DuckDB?
