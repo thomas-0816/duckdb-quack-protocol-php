@@ -5,8 +5,10 @@
 The Quack Remote Protocol unlocks multi-client access for [DuckDB](https://duckdb.org), turning DuckDB into a general-purpose database management system with client(s) and server.
 Quack uses HTTP and can be combined with load balancers, firewalls, and reverse proxies (e.g. nginx).
 
-This library provides a pure PHP implementation for the DuckDB Quack Remote Protocol.\
-It does not require FFI or C code. Only the PHP curl extension is required for the HTTP(s) connection.
+This library provides a pure PHP implementation for the DuckDB Quack Remote Protocol (DuckDB client).\
+It implements Quack Remote Protocol v3 and is tested against Duckdb 2.x.\
+As a pure PHP implementation, it does not include FFI or C code.\
+The only runtime requirement is the PHP curl extension for the HTTP(s) connections.
 
 All DuckDB types are supported: Text, Numeric, Date, Time, Interval, JSON, Array, Struct, Map, List, Tuple, Type, Enum, Variant, Geometry, Union, Bitstring, Blob, and Boolean.
 
@@ -103,6 +105,17 @@ unset($db); // Disconnect
 ```
 
 more examples coming soon ...
+
+## Timeouts
+
+```php
+// HTTP connect timeout 3s
+// HTTP timeout 10s
+$db = QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 10);
+```
+
+HTTP connect timeout and HTTP timeout (total request time) are applied per request.
+One query can span over multiple requests.
 
 ## Monitoring
 
