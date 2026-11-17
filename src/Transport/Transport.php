@@ -19,6 +19,8 @@ final class Transport
 {
     private ?CurlHandle $curl = null;
 
+    private bool $debug = false;
+
     private function __construct(
         private readonly ParsedQuackUri $parsedUri,
         private readonly string $authToken,
@@ -74,6 +76,12 @@ final class Transport
         return $this;
     }
 
+    public function setDebug(bool $debug): self
+    {
+        $this->debug = $debug;
+        return $this;
+    }
+
     public function __clone()
     {
         // A cloned transport must not share the parent's connection state.
@@ -122,6 +130,20 @@ final class Transport
             throw new TransportException($kind, $message === '' ? "curl error {$errno}" : "curl error {$errno}: {$message}");
         }
 
+        if ($this->debug) {
+            echo substr((isset($message->sql) && is_string($message->sql)) ? $message->sql : '', 0, 256), PHP_EOL;
+            $info = curl_getinfo($curl);
+            echo json_encode([
+                'size_upload' => $info['size_upload'],
+                'size_download' => $info['size_download'],
+                'appconnect_time_us' => $info['appconnect_time_us'],
+                'connect_time_us' => $info['connect_time_us'],
+                'namelookup_time_us' => $info['namelookup_time_us'],
+                'pretransfer_time_us' => $info['pretransfer_time_us'],
+                'starttransfer_time_us' => $info['starttransfer_time_us'],
+                'total_time_us' => $info['total_time_us'],
+            ]), PHP_EOL, PHP_EOL;
+        }
         $status = (int) curl_getinfo($curl, CURLINFO_RESPONSE_CODE);
 
         if ($status < 200 || $status >= 300) {
@@ -165,6 +187,8 @@ final class Transport
             CURLOPT_MAXREDIRS => 0,
             CURLOPT_TCP_NODELAY => true,
             CURLOPT_TCP_KEEPALIVE => true,
+            // CURLOPT_BUFFERSIZE => keep default 16kB
+            // CURLOPT_UPLOAD_BUFFERSIZE => keep default 64kB
         ];
         if ($this->parsedUri->ssl) {
             $options[CURLOPT_SSL_VERIFYPEER] = true;
