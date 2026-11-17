@@ -39,8 +39,8 @@ duckdb --cmd "CALL quack_serve('quack:127.0.0.1:9494', token='secret');"
 ```php
 require __DIR__ . '/vendor/autoload.php';
 
-
-$db = QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 10); // connect-timeout 3s, query-timeout 10s
+$db = QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 10);
+// connect-timeout 3s, query-timeout 10s
 
 $db->execute('CREATE TABLE table1 (id INTEGER, amount DECIMAL(10, 2), description VARCHAR)');
 
