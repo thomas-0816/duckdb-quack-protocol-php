@@ -11,10 +11,10 @@
 
 use DuckDB\Quack\QuackClient;
 
-require __DIR__ . '/../vendor/autoload.php';
-
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
+
+require __DIR__ . '/../vendor/autoload.php';
 
 $db = QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 10);
 $db->execute('CREATE TABLE table1 (id INTEGER, amount DECIMAL(10, 2), description VARCHAR)');
