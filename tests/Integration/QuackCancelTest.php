@@ -2,6 +2,8 @@
 
 namespace DuckDB\Quack\Tests\Integration;
 
+use DuckDB\Quack\Error\TransportErrorKind;
+use DuckDB\Quack\Exceptions\TransportException;
 use DuckDB\Quack\QuackClient;
 use PHPUnit\Framework\TestCase;
 
@@ -31,5 +33,26 @@ final class QuackCancelTest extends TestCase
         } finally {
             $admin->execute('SET quack_prepare_inline_rows = ' . $previousInlineRows);
         }
+    }
+
+    public function testTimeoutCancelsServerQuery(): void
+    {
+        $admin = QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 10);
+        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 10);
+        $connectionId = $client->getConnection()->getConnectionId();
+
+        $client->getConnection()->getTransport()->setTimeout(1);
+
+        try {
+            $client->fetchValue('SELECT sum(i) FROM range(100000000000) t(i)');
+            self::fail('expected the slow query to time out');
+        } catch (TransportException $error) {
+            self::assertSame(TransportErrorKind::Timeout, $error->kind());
+        }
+
+        // The server keeps running a statement after the HTTP request times
+        // out. Retiring the connection must interrupt it, or its transaction
+        // outlives the client and blocks later CHECKPOINTs.
+        self::assertSame('cancelled', $admin->fetchValue('SELECT state FROM quack_active_connections() WHERE connection_id = ?', [$connectionId]));
     }
 }
