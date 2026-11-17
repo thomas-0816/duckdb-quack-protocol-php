@@ -23,7 +23,7 @@ require __DIR__ . '/../vendor/autoload.php';
 
 $pem = file_get_contents(getenv('HOME') . '/.duckdb/extension_data/quack/server.pem');
 
-$client = QuackClient::connect('https://localhost:9495', 'secret', 3, 10, [], $pem);
-print_r($client->fetchValue('SELECT 42'));
+$db = QuackClient::connect('https://localhost:9495', 'secret', 3, 10, [], $pem);
+echo $db->fetchValue('SELECT 42'), PHP_EOL;
 
 # 42
