@@ -4,6 +4,7 @@ namespace DuckDB\Quack\Connection;
 
 use DuckDB\Quack\Error\QuackError;
 use DuckDB\Quack\Exceptions\ProtocolException;
+use DuckDB\Quack\Exceptions\ServerException;
 use DuckDB\Quack\Messages\CancelMessage;
 use DuckDB\Quack\Messages\ConnectionRequestMessage;
 use DuckDB\Quack\Messages\ConnectionResponseMessage;
@@ -38,6 +39,8 @@ final class ClientConnection
     private int $queryUuidCounter = 1;
 
     private bool $closed = false;
+
+    private bool $disconnected = false;
 
     private function __construct(
         private readonly Transport $transport,
@@ -128,11 +131,10 @@ final class ClientConnection
         );
         try {
             return $this->transport->send($message, $this->quackVersion);
-        } catch (QuackError $error) {
-            if ($error->isConnectionFatal()) {
+        } catch (ServerException $error) {
+            if ($error->serverError()->isFatal()) {
                 $this->closed = true;
             }
-            throw $error;
         }
     }
 
@@ -151,11 +153,10 @@ final class ClientConnection
         );
         try {
             return $this->transport->send($message, $this->quackVersion);
-        } catch (QuackError $error) {
-            if ($error->isConnectionFatal()) {
+        } catch (ServerException $error) {
+            if ($error->serverError()->isFatal()) {
                 $this->closed = true;
             }
-            throw $error;
         }
     }
 
@@ -177,20 +178,24 @@ final class ClientConnection
         );
         try {
             return $this->transport->send($message, $this->quackVersion);
-        } catch (QuackError $error) {
-            if ($error->isConnectionFatal()) {
+        } catch (ServerException $error) {
+            if ($error->serverError()->isFatal()) {
                 $this->closed = true;
             }
-            throw $error;
         }
     }
 
     /**
      * Best-effort cleanup used by the client destructor.
+     *
+     * A server exception closes the connection for further queries, but the server-side
+     * session can still exist. Always make one attempt to disconnect,
+     * so the server drops the session instead of keeping
+     * it until the heartbeat lease expires.
      */
     public function disconnect(): void
     {
-        if ($this->closed) {
+        if ($this->disconnected) {
             return;
         }
         $message = new DisconnectMessage(
@@ -200,9 +205,10 @@ final class ClientConnection
         );
         try {
             $this->transport->setTimeout(3)->send($message, $this->quackVersion);
-        } catch (QuackError $e) {
+        } catch (QuackError) {
             // The caller is gone; nothing useful can be reported.
         } finally {
+            $this->disconnected = true;
             $this->closed = true;
         }
     }

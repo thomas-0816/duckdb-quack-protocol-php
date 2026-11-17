@@ -4,7 +4,6 @@ namespace DuckDB\Quack\Error;
 
 use DuckDB\Quack\Exceptions\ProtocolException;
 use DuckDB\Quack\Exceptions\UnsupportedTypeException;
-use DuckDB\Quack\Transport\Transport;
 
 /**
  * Base class for every error raised by this package.
@@ -30,18 +29,5 @@ class QuackError extends \RuntimeException
     public function httpStatus(): ?array
     {
         return null;
-    }
-
-    /**
-     * Whether the connection that produced this error is no longer usable.
-     *
-     * Transport and framing failures leave no way to tell what the server did
-     * with the request, so the connection must not be used again. Errors
-     * raised without touching the wire - bad arguments, unsupported types -
-     * are not counted.
-     */
-    public function isConnectionFatal(): bool
-    {
-        return false;
     }
 }
