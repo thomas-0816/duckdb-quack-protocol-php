@@ -78,7 +78,7 @@ final class QuackJsonTest extends TestCase
 
         self::assertSame(
             [['id' => '10381', 'en' => 'Berlin / Dahlem'], ['id' => '10382', 'en' => 'Berlin / Tegel']],
-            QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 10)->fetchAll(
+            QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 30)->fetchAll(
                 "select id, name.en from read_json('{$url}') WHERE name.en like '%Berlin%' limit 2",
             ),
         );
@@ -111,7 +111,7 @@ final class QuackJsonTest extends TestCase
     public function testHttpBearerToken(): void
     {
         $url = 'https://mockhttp.org/headers';
-        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 10);
+        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 30);
 
         $client->execute("CREATE OR REPLACE SECRET http_auth (TYPE http, SCOPE '{$url}', BEARER_TOKEN 'some secret')");
         $client->execute('SET force_download=true');
