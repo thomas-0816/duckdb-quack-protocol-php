@@ -57,6 +57,7 @@ final class ClientConnectionTest extends TestCase
     {
         $connection = self::connection();
         (new ReflectionProperty(ClientConnection::class, 'closed'))->setValue($connection, true);
+        (new ReflectionProperty(ClientConnection::class, 'disconnected'))->setValue($connection, true);
 
         return $connection;
     }
