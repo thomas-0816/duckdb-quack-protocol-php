@@ -27,6 +27,23 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM
 
+# The CLI starts listening asynchronously; PHPUnit would otherwise race it and
+# fail the first test with "couldn't connect to server".
+wait_for_server() {
+    local url=$1
+    local deadline=$((SECONDS + 30))
+    until curl -ks --max-time 1 -o /dev/null "${url}" 2>/dev/null; do
+        if (( SECONDS >= deadline )); then
+            echo "timed out waiting for ${url}" >&2
+            return 1
+        fi
+        sleep 0.1
+    done
+}
+
+wait_for_server "http://127.0.0.1:9494/quack"
+wait_for_server "https://127.0.0.1:9495/quack"
+
 status=0
 vendor/bin/phpunit "$@" || status=$?
 exit "${status}"
