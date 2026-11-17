@@ -4,12 +4,12 @@ set -euo pipefail
 
 tmpdir=$(mktemp -d)
 
-./tests/duckdb -c "install quack"
+./tests/duckdb -dark-mode -c "install quack"
 
 start_server() {
     local sql=$1
     local feed_pid_file=$2
-    bash -c 'echo $$ > "$2"; printf "%s\n" "$1"; exec sleep 3600' _ "${sql}" "${feed_pid_file}" </dev/null | ./tests/duckdb &
+    bash -c 'echo $$ > "$2"; printf "%s\n" "$1"; exec sleep 3600' _ "${sql}" "${feed_pid_file}" </dev/null | ./tests/duckdb -dark-mode &
 }
 
 start_server "CALL quack_serve('quack:127.0.0.1:9494', token='secret');" "${tmpdir}/http.feed"
