@@ -10,7 +10,6 @@ use DuckDB\Quack\Exceptions\ProtocolException;
 use DuckDB\Quack\Messages\FetchResponseMessage;
 use DuckDB\Quack\Messages\PrepareResponseMessage;
 use DuckDB\Quack\Sql\SqlFormatter;
-use DuckDB\Quack\Sql\SqlParameters;
 use DuckDB\Quack\Transport\Transport;
 use Generator;
 use Throwable;
@@ -87,7 +86,7 @@ final class QuackClient
         if ($this->connection->isClosed()) {
             throw new ProtocolException('Quack client is not connected');
         }
-        $query = SqlFormatter::formatSql($sql, SqlParameters::coerce($params));
+        $query = SqlFormatter::formatSql($sql, $params);
         // Changed-row results have a single Count column, so only the first
         // value matters. Returning early is safe because the next PREPARE
         // resets the server's result cursor.
@@ -159,7 +158,7 @@ final class QuackClient
         if ($this->connection->isClosed()) {
             throw new ProtocolException('Quack client is not connected');
         }
-        $query = SqlFormatter::formatSql($sql, SqlParameters::coerce($params));
+        $query = SqlFormatter::formatSql($sql, $params);
         $rows = [];
         foreach ($this->fetchChunks($this->connection, $query) as $chunk) {
             $names = $chunk->columnNames;
@@ -186,7 +185,7 @@ final class QuackClient
         if ($this->connection->isClosed()) {
             throw new ProtocolException('Quack client is not connected');
         }
-        $query = SqlFormatter::formatSql($sql, SqlParameters::coerce($params));
+        $query = SqlFormatter::formatSql($sql, $params);
         $rows = [];
         foreach ($this->fetchChunks($this->connection, $query) as $chunk) {
             for ($rowIndex = 0; $rowIndex < $chunk->rowCount; $rowIndex++) {
@@ -211,7 +210,7 @@ final class QuackClient
         if ($this->connection->isClosed()) {
             throw new ProtocolException('Quack client is not connected');
         }
-        $query = SqlFormatter::formatSql($sql, SqlParameters::coerce($params));
+        $query = SqlFormatter::formatSql($sql, $params);
         $result = [];
         foreach ($this->fetchChunks($this->connection, $query) as $chunk) {
             $keys = $chunk->columns[0]->values ?? [];
@@ -237,7 +236,7 @@ final class QuackClient
         if ($this->connection->isClosed()) {
             throw new ProtocolException('Quack client is not connected');
         }
-        $query = SqlFormatter::formatSql($sql, SqlParameters::coerce($params));
+        $query = SqlFormatter::formatSql($sql, $params);
         foreach ($this->fetchChunks($this->connection, $query) as $chunk) {
             $names = $chunk->columnNames;
             for ($rowIndex = 0; $rowIndex < $chunk->rowCount; $rowIndex++) {
@@ -263,7 +262,7 @@ final class QuackClient
         if ($this->connection->isClosed()) {
             throw new ProtocolException('Quack client is not connected');
         }
-        $query = SqlFormatter::formatSql($sql, SqlParameters::coerce($params));
+        $query = SqlFormatter::formatSql($sql, $params);
         foreach ($this->fetchChunks($this->connection, $query) as $chunk) {
             for ($rowIndex = 0; $rowIndex < $chunk->rowCount; $rowIndex++) {
                 $row = [];
@@ -287,7 +286,7 @@ final class QuackClient
         if ($this->connection->isClosed()) {
             throw new ProtocolException('Quack client is not connected');
         }
-        $query = SqlFormatter::formatSql($sql, SqlParameters::coerce($params));
+        $query = SqlFormatter::formatSql($sql, $params);
         foreach ($this->fetchChunks($this->connection, $query) as $chunk) {
             $names = $chunk->columnNames;
             for ($rowIndex = 0; $rowIndex < $chunk->rowCount; $rowIndex++) {
@@ -312,7 +311,7 @@ final class QuackClient
         if ($this->connection->isClosed()) {
             throw new ProtocolException('Quack client is not connected');
         }
-        $query = SqlFormatter::formatSql($sql, SqlParameters::coerce($params));
+        $query = SqlFormatter::formatSql($sql, $params);
         foreach ($this->fetchChunks($this->connection, $query) as $chunk) {
             for ($rowIndex = 0; $rowIndex < $chunk->rowCount; $rowIndex++) {
                 $row = [];
@@ -335,7 +334,7 @@ final class QuackClient
         if ($this->connection->isClosed()) {
             throw new ProtocolException('Quack client is not connected');
         }
-        $query = SqlFormatter::formatSql($sql, SqlParameters::coerce($params));
+        $query = SqlFormatter::formatSql($sql, $params);
         $values = [];
         foreach ($this->fetchChunks($this->connection, $query) as $chunk) {
             foreach ($chunk->columns[0]->values ?? [] as $value) {
@@ -355,7 +354,7 @@ final class QuackClient
         if ($this->connection->isClosed()) {
             throw new ProtocolException('Quack client is not connected');
         }
-        $query = SqlFormatter::formatSql($sql, SqlParameters::coerce($params));
+        $query = SqlFormatter::formatSql($sql, $params);
         foreach ($this->fetchChunks($this->connection, $query) as $chunk) {
             foreach ($chunk->columns[0]->values ?? [] as $value) {
                 return $value;
