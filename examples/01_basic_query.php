@@ -44,7 +44,7 @@ print_r($db->fetchOne('SELECT * FROM table1'));
 #     [amount] => 42.21
 #     [description] => Hello DuckDB! 🐘 💓 🦆
 
-print_r($db->fetchValue('SELECT id FROM table1'));
+echo $db->fetchValue('SELECT id FROM table1'), PHP_EOL;
 
 # 1
 
