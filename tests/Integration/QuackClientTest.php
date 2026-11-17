@@ -738,7 +738,7 @@ final class QuackClientTest extends TestCase
             $client->fetchAll('SELECT * FROM missing_table');
             self::fail('expected the missing table to be rejected');
         } catch (ServerException $error) {
-            self::assertFalse($error->isConnectionFatal());
+            self::assertFalse($error->serverError()->isFatal());
         }
 
         self::assertFalse($client->getConnection()->isClosed());
