@@ -2,12 +2,13 @@
 
 <img width="500" height="273" alt="logo" src="logo.jpg" />
 
-The Quack Remote Protocol unlocks multi-client access for [DuckDB](https://duckdb.org), turning DuckDB into a general-purpose database management system with client(s) and server.
+The Quack Remote Protocol unlocks multi-client access for [DuckDB](https://duckdb.org), turning DuckDB into a general-purpose database management system with client(s) and server.\
+Quack uses HTTP and can be combined with load balancers, firewalls, and reverse proxies (e.g. nginx).
 
 This library provides a pure PHP implementation for the DuckDB Quack Remote Protocol.\
 It does not require FFI or C code. Only the PHP curl extension is required for the HTTP(s) connection.
 
-This library supports all DuckDB types: Text, Numeric, Date, Time, Interval, JSON, Array, Struct, Map, List, Tuple, Type, Enum, Variant, Geometry, Union, Bitstring, Blob, and Boolean.
+All DuckDB types are supported: Text, Numeric, Date, Time, Interval, JSON, Array, Struct, Map, List, Tuple, Type, Enum, Variant, Geometry, Union, Bitstring, Blob, and Boolean.
 
 Supported PHP versions (nts & zts): 8.2, 8.3, 8.4, 8.5, 8.6
 
@@ -50,6 +51,8 @@ $db->execute('INSERT INTO table1 VALUES (?, ?, ?)', [1, 42.21, 'Hello DuckDB! ðŸ
 
 print_r($db->fetchAll('SELECT * FROM table1'));
 
+unset($db); // Disconnect
+
 # Array
 #     [0] => Array
 #         [id] => 1
@@ -58,6 +61,26 @@ print_r($db->fetchAll('SELECT * FROM table1'));
 ```
 
 more examples coming soon ...
+
+## Monitoring
+
+```php
+use DuckDB\Quack\QuackClient;
+
+require __DIR__ . '/vendor/autoload.php';
+
+$db = QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 10);
+
+print_r($db->fetchAll('SELECT * FROM quack_active_connections()'));
+
+# Array
+#     [0] => Array
+#         [server_id] => quack:127.0.0.1:9494
+#         [connection_id] => 83FA7408F5D392C23C6CADDDB1F579F2
+#         [query] => SELECT * FROM quack_active_connections()
+#         [state] => active
+#         [query_started_at] => 2026-11-17 02:22:16.402055
+```
 
 ## Why DuckDB?
 
