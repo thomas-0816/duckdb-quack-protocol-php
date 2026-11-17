@@ -1,6 +1,6 @@
 {
     "name": "thomas-0816/duckdb-quack-protocol-php",
-    "description": "PHP client for DuckDB Quack Remote Protocol, modern analytics",
+    "description": "PHP client for DuckDB Quack Remote Protocol, modern analytics, pure PHP, no C or FFI",
     "keywords": ["duckdb", "database", "quack", "analytics"],
     "type": "library",
     "license": "MIT",
