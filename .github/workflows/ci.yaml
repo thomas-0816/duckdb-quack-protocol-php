@@ -75,7 +75,7 @@ jobs:
             Windows-X64) arch=windows-amd64 ;;
             *) echo "unsupported platform: $RUNNER_OS-$RUNNER_ARCH" >&2; exit 1 ;;
           esac
-          curl -fsSL "https://install.duckdb.org/v2.0.0/duckdb-cli-${arch}.tar.gz" | tar -xz -C "tests/"
+          curl -fsSL "https://install.duckdb.org/v2.0.1/duckdb-cli-${arch}.tar.gz" | tar -xz -C "tests/"
           if [ -f tests/duckdb.exe ]; then
             mv tests/duckdb.exe tests/duckdb
           fi
