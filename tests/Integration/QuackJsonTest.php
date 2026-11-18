@@ -74,13 +74,13 @@ final class QuackJsonTest extends TestCase
 
     public function testReadRemoteJson(): void
     {
+        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 1, 1, ['force_download' => true]);
+
         $url = 'https://bulk.meteostat.net/v2/stations/lite.json.gz';
 
         self::assertSame(
             [['id' => '10381', 'en' => 'Berlin / Dahlem'], ['id' => '10382', 'en' => 'Berlin / Tegel']],
-            QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 30)->fetchAll(
-                "select id, name.en from read_json('{$url}') WHERE name.en like '%Berlin%' limit 2",
-            ),
+            $client->fetchAll("select id, name.en from read_json('{$url}') WHERE name.en like '%Berlin%' limit 2"),
         );
     }
 
