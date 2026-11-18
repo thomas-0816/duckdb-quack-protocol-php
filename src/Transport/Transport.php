@@ -194,6 +194,7 @@ final class Transport
         if ($this->parsedUri->ssl) {
             $options[CURLOPT_SSL_VERIFYPEER] = true;
             $options[CURLOPT_SSL_VERIFYHOST] = 2;
+            $options[CURLOPT_SSLVERSION] = CURL_SSLVERSION_TLSv1_2; // TLSv1.2 or later
             if ($this->sslCertificate !== null) {
                 $options[CURLOPT_CAINFO_BLOB] = $this->sslCertificate;
             }
