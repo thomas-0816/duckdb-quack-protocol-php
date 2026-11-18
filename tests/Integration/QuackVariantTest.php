@@ -184,7 +184,7 @@ final class QuackVariantTest extends TestCase
                     SELECT i, {'id': i, 'tags': ['a' || i], 'nested': {'v': i * 2}}
                     FROM generate_series(1, 5_000) t(i)",
             );
-            $client->execute('CHECKPOINT');
+            $client->execute('FORCE CHECKPOINT');
 
             self::assertSame(['SHREDDED_VECTOR'], $client->fetchColumn('SELECT DISTINCT vector_type(v) FROM shredded'));
             self::assertSame(5_000, $client->fetchValue('SELECT count(*) FROM shredded'));
