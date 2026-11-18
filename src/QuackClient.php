@@ -381,12 +381,6 @@ final class QuackClient
         try {
             foreach ($response->results as $chunk) {
                 $chunk->columnNames = $response->resultNames;
-                /* TODO add method to emulate getColumnMeta:
-                    ["native_type"]=> "decimal"
-                    ["php_type"]=> "string"
-                    ["duckdb:decl_type"]=> "DECIMAL(10,2)"
-                    ["name"]=> "foo"
-                */
                 $chunk->columnTypes = $response->resultTypes;
                 yield $chunk;
             }

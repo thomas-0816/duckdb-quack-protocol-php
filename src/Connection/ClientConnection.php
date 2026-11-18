@@ -138,7 +138,7 @@ final class ClientConnection
             }
             throw $error;
         } catch (TransportException $error) {
-            $this->cancel($message->queryUuid);
+            $this->cancel($message->queryUuid); // TODO combine both exceptions?
             throw $error;
         }
     }
@@ -164,7 +164,7 @@ final class ClientConnection
             }
             throw $error;
         } catch (TransportException $error) {
-            $this->cancel($message->resultUuid);
+            $this->cancel($message->resultUuid); // TODO combine both exceptions?
             throw $error;
         }
     }
