@@ -11,6 +11,7 @@ use DuckDB\Quack\Exceptions\TransportException;
 use DuckDB\Quack\Messages\ErrorMessage;
 use DuckDB\Quack\Messages\MessageCodec;
 use DuckDB\Quack\Messages\QuackMessage;
+use SensitiveParameter;
 
 /**
  * HTTP(S) transport for one Quack endpoint, backed by ext-curl.
@@ -23,6 +24,7 @@ final class Transport
 
     private function __construct(
         private readonly ParsedQuackUri $parsedUri,
+        #[SensitiveParameter]
         private readonly string $authToken,
         private int $timeout,
         private int $connectTimeout,
