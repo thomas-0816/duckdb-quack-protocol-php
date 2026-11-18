@@ -102,6 +102,21 @@ final class Transport
         }
 
         $body = curl_exec($curl);
+        if ($this->debug) {
+            echo substr((isset($message->sql) && is_string($message->sql)) ? $message->sql : $message::class, 0, 256), PHP_EOL;
+            $info = curl_getinfo($curl);
+            echo json_encode([
+                'http_code' => $info['http_code'],
+                'size_upload' => $info['size_upload'],
+                'size_download' => $info['size_download'],
+                'appconnect_time_us' => $info['appconnect_time_us'],
+                'connect_time_us' => $info['connect_time_us'],
+                'namelookup_time_us' => $info['namelookup_time_us'],
+                'pretransfer_time_us' => $info['pretransfer_time_us'],
+                'starttransfer_time_us' => $info['starttransfer_time_us'],
+                'total_time_us' => $info['total_time_us'],
+            ]), PHP_EOL, PHP_EOL;
+        }
         if ($body === false) {
             $errno = curl_errno($curl);
             $message = curl_error($curl);
@@ -130,20 +145,6 @@ final class Transport
             throw new TransportException($kind, $message === '' ? "curl error {$errno}" : "curl error {$errno}: {$message}");
         }
 
-        if ($this->debug) {
-            echo substr((isset($message->sql) && is_string($message->sql)) ? $message->sql : '', 0, 256), PHP_EOL;
-            $info = curl_getinfo($curl);
-            echo json_encode([
-                'size_upload' => $info['size_upload'],
-                'size_download' => $info['size_download'],
-                'appconnect_time_us' => $info['appconnect_time_us'],
-                'connect_time_us' => $info['connect_time_us'],
-                'namelookup_time_us' => $info['namelookup_time_us'],
-                'pretransfer_time_us' => $info['pretransfer_time_us'],
-                'starttransfer_time_us' => $info['starttransfer_time_us'],
-                'total_time_us' => $info['total_time_us'],
-            ]), PHP_EOL, PHP_EOL;
-        }
         $status = (int) curl_getinfo($curl, CURLINFO_RESPONSE_CODE);
 
         if ($status < 200 || $status >= 300) {
