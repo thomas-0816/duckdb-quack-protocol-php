@@ -4,3 +4,4 @@
 .phpunit.cache/
 vendor/
 /tests/duckdb
+examples/test.php
