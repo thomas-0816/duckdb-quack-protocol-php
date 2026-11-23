@@ -6,8 +6,10 @@
     "license": "MIT",
     "require": {
         "php": ">=8.2",
-        "ext-curl": "*",
         "ext-json": "*"
+    },
+    "suggest": {
+        "ext-curl": "Recommended HTTP transport, without curl the pure PHP stream transport is used"
     },
     "require-dev": {
         "ergebnis/phpunit-slow-test-detector": "^2.27",
