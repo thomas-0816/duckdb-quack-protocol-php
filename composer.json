@@ -9,7 +9,7 @@
         "ext-json": "*"
     },
     "suggest": {
-        "ext-curl": "Recommended HTTP transport, without curl the pure PHP stream transport is used"
+        "ext-curl": "Recommended HTTP transport, without curl, plain PHP streams are used"
     },
     "require-dev": {
         "ergebnis/phpunit-slow-test-detector": "^2.27",
