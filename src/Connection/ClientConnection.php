@@ -15,7 +15,7 @@ use DuckDB\Quack\Messages\MessageHeader;
 use DuckDB\Quack\Messages\MessageType;
 use DuckDB\Quack\Messages\PrepareRequestMessage;
 use DuckDB\Quack\Messages\QuackMessage;
-use DuckDB\Quack\Transport\Transport;
+use DuckDB\Quack\Transport\TransportInterface;
 use DuckDB\Quack\Types\HugeIntParts;
 
 /**
@@ -44,7 +44,7 @@ final class ClientConnection
     private bool $disconnected = false;
 
     private function __construct(
-        private readonly Transport $transport,
+        private readonly TransportInterface $transport,
         private readonly string $connectionId,
         private readonly ?string $serverDuckdbVersion,
         private readonly ?string $serverPlatform,
@@ -52,7 +52,7 @@ final class ClientConnection
     ) {
     }
 
-    public static function connect(Transport $transport): self
+    public static function connect(TransportInterface $transport): self
     {
         $response = $transport->send(
             new ConnectionRequestMessage(
@@ -112,7 +112,7 @@ final class ClientConnection
         return $this->connectionId;
     }
 
-    public function getTransport(): Transport
+    public function getTransport(): TransportInterface
     {
         return $this->transport;
     }
