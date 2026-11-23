@@ -10,7 +10,8 @@ use DuckDB\Quack\Exceptions\ProtocolException;
 use DuckDB\Quack\Messages\FetchResponseMessage;
 use DuckDB\Quack\Messages\PrepareResponseMessage;
 use DuckDB\Quack\Sql\SqlFormatter;
-use DuckDB\Quack\Transport\Transport;
+use DuckDB\Quack\Transport\TransportCurl;
+use DuckDB\Quack\Transport\TransportPhp;
 use Generator;
 use Throwable;
 
@@ -60,7 +61,9 @@ final class QuackClient
             };
             $settings[] = 'SET ' . $name . ' = ' . $literal . ';';
         }
-        $transport = Transport::new($uri, $authToken, $httpConnectTimeout, $httpTimeout, $sslCertificate);
+        $transport = extension_loaded('curl')
+            ? TransportCurl::new($uri, $authToken, $httpConnectTimeout, $httpTimeout, $sslCertificate)
+            : TransportPhp::new($uri, $authToken, $httpConnectTimeout, $httpTimeout, $sslCertificate);
         $connection = ClientConnection::connect($transport);
 
         $client = new self($connection);
