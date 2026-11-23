@@ -8,7 +8,7 @@ The Quack Remote Protocol unlocks multi-client access for [DuckDB](https://duckd
 This library provides a pure PHP implementation for the DuckDB Quack Remote Protocol (DuckDB client).\
 It implements Quack Remote Protocol v3 and is tested against Duckdb 2.x.\
 As a pure PHP implementation, it does not include FFI or C code.\
-The only runtime requirement is the PHP curl extension for the HTTP(s) connections.
+The HTTP transport uses plain PHP streams or the curl extension (curl preferred).
 
 All DuckDB types are supported: Text, Numeric, Date, Time, Interval, JSON, Array, Struct, Map, List, Tuple, Type, Enum, Variant, Geometry, Union, Bitstring, Blob, and Boolean.
 
@@ -17,7 +17,7 @@ Supported PHP versions (nts & zts): 8.2, 8.3, 8.4, 8.5, 8.6
 ## Requirements
 
 - PHP 8.2+
-- curl extension
+- curl extension (optional)
 
 ## Install and setup (client)
 
