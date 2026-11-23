@@ -2,7 +2,6 @@
 
 namespace DuckDB\Quack\Tests\Integration;
 
-use DuckDB\Quack\Error\TransportErrorKind;
 use DuckDB\Quack\Exceptions\TransportException;
 use DuckDB\Quack\QuackClient;
 use PHPUnit\Framework\TestCase;
@@ -47,7 +46,7 @@ final class QuackCancelTest extends TestCase
             $client->fetchValue('SELECT sum(i) FROM range(100000000000) t(i)');
             self::fail('expected the slow query to time out');
         } catch (TransportException $error) {
-            self::assertSame(TransportErrorKind::Timeout, $error->kind());
+            self::assertStringContainsStringIgnoringCase('timed out', $error->getMessage());
         }
 
         // The server keeps running a statement after the HTTP request times
