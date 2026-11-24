@@ -14,7 +14,7 @@ interface TransportInterface
         string $authToken,
         int $connectTimeout,
         int $timeout,
-        ?string $sslCertificate = null,
+        ?string $sslCertificateFile = null,
     ): static;
 
     public function getAuthToken(): string;

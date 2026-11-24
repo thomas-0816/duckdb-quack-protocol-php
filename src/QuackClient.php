@@ -48,7 +48,7 @@ final class QuackClient
         int $httpConnectTimeout,
         int $httpTimeout,
         array $configuration = [],
-        ?string $sslCertificate = null,
+        ?string $sslCertificateFile = null,
     ): self {
         $settings = [];
         foreach ($configuration as $name => $value) {
@@ -62,8 +62,8 @@ final class QuackClient
             $settings[] = 'SET ' . $name . ' = ' . $literal . ';';
         }
         $transport = extension_loaded('curl')
-            ? TransportCurl::new($uri, $authToken, $httpConnectTimeout, $httpTimeout, $sslCertificate)
-            : TransportPhp::new($uri, $authToken, $httpConnectTimeout, $httpTimeout, $sslCertificate);
+            ? TransportCurl::new($uri, $authToken, $httpConnectTimeout, $httpTimeout, $sslCertificateFile)
+            : TransportPhp::new($uri, $authToken, $httpConnectTimeout, $httpTimeout, $sslCertificateFile);
         $connection = ClientConnection::connect($transport);
 
         $client = new self($connection);
