@@ -27,7 +27,7 @@ final class TransportPhp implements TransportInterface
         private readonly string $authToken,
         private int $timeout,
         private int $connectTimeout,
-        private readonly ?string $sslCertificateFile,
+        private readonly string $sslCertificateFile,
     ) {
     }
 
@@ -36,18 +36,13 @@ final class TransportPhp implements TransportInterface
         string $authToken,
         int $connectTimeout,
         int $timeout,
-        ?string $sslCertificateFile = null,
+        string $sslCertificateFile,
     ): static {
         $parsedUri = UriParser::parseQuackUri($uri);
 
-        if ($sslCertificateFile !== null && !$parsedUri->ssl) {
+        if ($sslCertificateFile !== '' && !$parsedUri->ssl) {
             throw new ProtocolException('ssl_certificate requires an https:// URL');
         }
-
-        if ($sslCertificateFile === '') {
-            throw new ProtocolException('ssl_certificate file path must not be empty');
-        }
-
         if ($timeout <= 0) {
             throw new ProtocolException('Quack request timeout must be greater than zero');
         }
@@ -102,7 +97,7 @@ final class TransportPhp implements TransportInterface
             'peer_name' => $this->parsedUri->host,
             'crypto_method' => STREAM_CRYPTO_METHOD_TLSv1_2_CLIENT | STREAM_CRYPTO_METHOD_TLSv1_3_CLIENT,
         ];
-        if ($this->sslCertificateFile !== null) {
+        if ($this->sslCertificateFile !== '') {
             $ssl['cafile'] = $this->sslCertificateFile;
         }
         $context = stream_context_create(['ssl' => $ssl]);

@@ -48,7 +48,7 @@ final class QuackClient
         int $httpConnectTimeout,
         int $httpTimeout,
         array $configuration = [],
-        ?string $sslCertificateFile = null,
+        string $sslCertificateFile = '',
     ): self {
         $settings = [];
         foreach ($configuration as $name => $value) {

@@ -27,7 +27,7 @@ final class TransportCurl implements TransportInterface
         private readonly string $authToken,
         private int $timeout,
         private int $connectTimeout,
-        private readonly ?string $sslCertificateFile,
+        private readonly string $sslCertificateFile,
     ) {
     }
 
@@ -36,15 +36,12 @@ final class TransportCurl implements TransportInterface
         string $authToken,
         int $connectTimeout,
         int $timeout,
-        ?string $sslCertificateFile = null,
+        string $sslCertificateFile,
     ): static {
         $parsedUri = UriParser::parseQuackUri($uri);
 
-        if ($sslCertificateFile !== null && !$parsedUri->ssl) {
+        if ($sslCertificateFile !== '' && !$parsedUri->ssl) {
             throw new ProtocolException('ssl_certificate requires https in the base URL');
-        }
-        if ($sslCertificateFile === '') {
-            throw new ProtocolException('ssl_certificate file path must not be empty');
         }
         if ($timeout <= 0) {
             throw new ProtocolException('Quack request timeout must be greater than zero');
@@ -176,7 +173,7 @@ final class TransportCurl implements TransportInterface
             $options[CURLOPT_SSL_VERIFYPEER] = true;
             $options[CURLOPT_SSL_VERIFYHOST] = 2;
             $options[CURLOPT_SSLVERSION] = CURL_SSLVERSION_TLSv1_2; // TLSv1.2 or later
-            if ($this->sslCertificateFile !== null) {
+            if ($this->sslCertificateFile !== '') {
                 $options[CURLOPT_CAINFO] = $this->sslCertificateFile;
             }
         }
