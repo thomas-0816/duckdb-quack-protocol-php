@@ -21,10 +21,10 @@ ini_set('display_errors', 1);
 
 require __DIR__ . '/../vendor/autoload.php';
 
-// read self signed public key
-$pem = file_get_contents(getenv('HOME') . '/.duckdb/extension_data/quack/server.pem');
+// self signed public key
+$pemFile = getenv('HOME') . '/.duckdb/extension_data/quack/server.pem';
 
-$db = QuackClient::connect('https://localhost:9495', 'secret', 3, 10, [], $pem);
+$db = QuackClient::connect('https://localhost:9495', 'secret', 3, 10, [], $pemFile);
 echo $db->fetchValue('SELECT 42'), PHP_EOL;
 
 # 42

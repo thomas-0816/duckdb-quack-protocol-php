@@ -11,7 +11,7 @@ final class QuackClientTest extends TestCase
 {
     public function testConnectSsl(): void
     {
-        $client = QuackClient::connect('https://localhost:9495', 'secret', 3, 10, [], self::sslCertificate());
+        $client = QuackClient::connect('https://localhost:9495', 'secret', 3, 10, [], self::sslCertificateFile());
         self::assertSame(3, $client->getConnection()->getQuackVersion());
     }
 
@@ -713,21 +713,21 @@ final class QuackClientTest extends TestCase
 
     /**
      * Certificate DuckDB generates when the test server starts with SSL
-     * enabled; passing it lets the client pin the server without trusting a CA.
+     * enabled; passing its path lets the client pin the server without
+     * trusting a CA.
      */
-    private static function sslCertificate(): string
+    private static function sslCertificateFile(): string
     {
         $home = getenv('HOME');
         if ($home === false) {
             self::fail('HOME is not set; cannot locate the DuckDB SSL certificate.');
         }
         $certFile = $home . '/.duckdb/extension_data/quack/server.pem';
-        $pem = file_get_contents($certFile);
-        if ($pem === false) {
+        if (!is_readable($certFile)) {
             self::fail("Could not read the SSL certificate at {$certFile}.");
         }
 
-        return $pem;
+        return $certFile;
     }
 
     public function testNonFatalServerErrorKeepsSessionUsable(): void
