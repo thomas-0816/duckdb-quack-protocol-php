@@ -19,8 +19,6 @@ use SensitiveParameter;
  */
 final class TransportPhp implements TransportInterface
 {
-    private ?string $caFile = null;
-
     private bool $debug = false;
 
     private function __construct(
@@ -29,7 +27,7 @@ final class TransportPhp implements TransportInterface
         private readonly string $authToken,
         private int $timeout,
         private int $connectTimeout,
-        private readonly ?string $sslCertificate,
+        private readonly ?string $sslCertificateFile,
     ) {
     }
 
@@ -38,12 +36,16 @@ final class TransportPhp implements TransportInterface
         string $authToken,
         int $connectTimeout,
         int $timeout,
-        ?string $sslCertificate = null,
+        ?string $sslCertificateFile = null,
     ): static {
         $parsedUri = UriParser::parseQuackUri($uri);
 
-        if ($sslCertificate !== null && !$parsedUri->ssl) {
+        if ($sslCertificateFile !== null && !$parsedUri->ssl) {
             throw new ProtocolException('ssl_certificate requires an https:// URL');
+        }
+
+        if ($sslCertificateFile === '') {
+            throw new ProtocolException('ssl_certificate file path must not be empty');
         }
 
         if ($timeout <= 0) {
@@ -58,7 +60,7 @@ final class TransportPhp implements TransportInterface
             $authToken,
             $timeout,
             $connectTimeout,
-            $sslCertificate,
+            $sslCertificateFile,
         );
     }
 
@@ -85,20 +87,6 @@ final class TransportPhp implements TransportInterface
         return $this;
     }
 
-    public function __clone()
-    {
-        // A cloned transport must not share the temporary CA file.
-        $this->caFile = null;
-    }
-
-    public function __destruct()
-    {
-        if ($this->caFile !== null) {
-            @unlink($this->caFile);
-            $this->caFile = null;
-        }
-    }
-
     public function send(QuackMessage $message, int $version): QuackMessage
     {
         $payload = MessageCodec::encodeMessageForVersion($message, $version);
@@ -114,8 +102,8 @@ final class TransportPhp implements TransportInterface
             'peer_name' => $this->parsedUri->host,
             'crypto_method' => STREAM_CRYPTO_METHOD_TLSv1_2_CLIENT | STREAM_CRYPTO_METHOD_TLSv1_3_CLIENT,
         ];
-        if ($this->sslCertificate !== null) {
-            $ssl['cafile'] = $this->caFile();
+        if ($this->sslCertificateFile !== null) {
+            $ssl['cafile'] = $this->sslCertificateFile;
         }
         $context = stream_context_create(['ssl' => $ssl]);
         $remote = ($this->parsedUri->ssl ? 'tls' : 'tcp') . '://' . $host;
@@ -197,28 +185,5 @@ final class TransportPhp implements TransportInterface
         }
 
         return [(int) $matches[1], $body];
-    }
-
-    private function caFile(): string
-    {
-        if ($this->caFile !== null) {
-            return $this->caFile;
-        }
-
-        $certificate = $this->sslCertificate;
-        if ($certificate === null) {
-            throw new TransportException('no CA certificate configured');
-        }
-
-        $path = tempnam(sys_get_temp_dir(), 'quack-ca-');
-        if ($path === false) {
-            throw new TransportException('failed to create temporary CA file');
-        }
-        if (@file_put_contents($path, $certificate) === false) {
-            @unlink($path);
-            throw new TransportException('failed to write temporary CA file');
-        }
-        @chmod($path, 0o600);
-        return $this->caFile = $path;
     }
 }

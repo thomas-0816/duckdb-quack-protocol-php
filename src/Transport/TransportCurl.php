@@ -27,7 +27,7 @@ final class TransportCurl implements TransportInterface
         private readonly string $authToken,
         private int $timeout,
         private int $connectTimeout,
-        private readonly ?string $sslCertificate,
+        private readonly ?string $sslCertificateFile,
     ) {
     }
 
@@ -36,14 +36,16 @@ final class TransportCurl implements TransportInterface
         string $authToken,
         int $connectTimeout,
         int $timeout,
-        ?string $sslCertificate = null,
+        ?string $sslCertificateFile = null,
     ): static {
         $parsedUri = UriParser::parseQuackUri($uri);
 
-        if ($sslCertificate !== null && !$parsedUri->ssl) {
-            throw new ProtocolException('ssl_certificate requires an https:// URL');
+        if ($sslCertificateFile !== null && !$parsedUri->ssl) {
+            throw new ProtocolException('ssl_certificate requires https in the base URL');
         }
-
+        if ($sslCertificateFile === '') {
+            throw new ProtocolException('ssl_certificate file path must not be empty');
+        }
         if ($timeout <= 0) {
             throw new ProtocolException('Quack request timeout must be greater than zero');
         }
@@ -56,7 +58,7 @@ final class TransportCurl implements TransportInterface
             $authToken,
             $timeout,
             $connectTimeout,
-            $sslCertificate,
+            $sslCertificateFile,
         );
     }
 
@@ -166,7 +168,7 @@ final class TransportCurl implements TransportInterface
             CURLOPT_FOLLOWLOCATION => false,
             CURLOPT_MAXREDIRS => 0,
             CURLOPT_TCP_NODELAY => true,
-            CURLOPT_TCP_KEEPALIVE => true,
+            CURLOPT_TCP_KEEPALIVE => 1,
             // CURLOPT_BUFFERSIZE => keep default 16kB
             // CURLOPT_UPLOAD_BUFFERSIZE => keep default 64kB
         ];
@@ -174,8 +176,8 @@ final class TransportCurl implements TransportInterface
             $options[CURLOPT_SSL_VERIFYPEER] = true;
             $options[CURLOPT_SSL_VERIFYHOST] = 2;
             $options[CURLOPT_SSLVERSION] = CURL_SSLVERSION_TLSv1_2; // TLSv1.2 or later
-            if ($this->sslCertificate !== null) {
-                $options[CURLOPT_CAINFO_BLOB] = $this->sslCertificate;
+            if ($this->sslCertificateFile !== null) {
+                $options[CURLOPT_CAINFO] = $this->sslCertificateFile;
             }
         }
         if (!curl_setopt_array($curl, $options)) {
