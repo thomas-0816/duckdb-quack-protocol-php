@@ -11,6 +11,7 @@ final class ValueLiteralTest extends TestCase
     public function testFloatLiterals(): void
     {
         self::assertSame('1.5', Value::float(1.5)->asFloatLiteral());
+        self::assertSame('-1.5', Value::float(-1.5)->asFloatLiteral());
         self::assertSame("'NaN'::FLOAT", Value::float(NAN)->asFloatLiteral());
         self::assertSame("'Infinity'::FLOAT", Value::float(INF)->asFloatLiteral());
         self::assertSame("'-Infinity'::FLOAT", Value::float(-INF)->asFloatLiteral());
@@ -19,6 +20,7 @@ final class ValueLiteralTest extends TestCase
     public function testDoubleLiterals(): void
     {
         self::assertSame('1.5', Value::double(1.5)->asDoubleLiteral());
+        self::assertSame('-1.5', Value::double(-1.5)->asDoubleLiteral());
         self::assertSame("'NaN'::DOUBLE", Value::double(NAN)->asDoubleLiteral());
         self::assertSame("'Infinity'::DOUBLE", Value::double(INF)->asDoubleLiteral());
         self::assertSame("'-Infinity'::DOUBLE", Value::double(-INF)->asDoubleLiteral());
