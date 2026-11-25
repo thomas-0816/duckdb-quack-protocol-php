@@ -80,6 +80,12 @@ final class SqlFormatterTest extends TestCase
             [Value::int(-3), '-3'],
             [Value::hugeInt('170141183460469231731687303715884105727'), '170141183460469231731687303715884105727'],
             [Value::double(1.5), '1.5'],
+            [Value::double(NAN), "'NaN'::DOUBLE"],
+            [Value::double(INF), "'Infinity'::DOUBLE"],
+            [Value::double(-INF), "'-Infinity'::DOUBLE"],
+            [Value::float(NAN), "'NaN'::FLOAT"],
+            [Value::float(INF), "'Infinity'::FLOAT"],
+            [Value::float(-INF), "'-Infinity'::FLOAT"],
             [Value::bytes("\x00\xff"), "from_hex('00ff')"],
             [Value::decimal(new DecimalValue('1234', 10, 2)), '12.34'],
         ];
