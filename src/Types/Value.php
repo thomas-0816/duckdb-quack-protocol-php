@@ -278,6 +278,46 @@ final class Value
         return $result;
     }
 
+    /**
+     * SQL literal for this FLOAT value. Non-finite values use DuckDB's
+     * `'NaN'`, `'Infinity'`, and `'-Infinity'` casts so they stay valid SQL.
+     */
+    public function asFloatLiteral(): string
+    {
+        if ($this->kind !== self::FLOAT) {
+            throw $this->kindMismatch('float');
+        }
+
+        $value = $this->asFloat();
+        if (is_nan($value)) {
+            return "'NaN'::FLOAT";
+        }
+        if (is_infinite($value)) {
+            return $value > 0 ? "'Infinity'::FLOAT" : "'-Infinity'::FLOAT";
+        }
+        return (string) $value;
+    }
+
+    /**
+     * SQL literal for this DOUBLE value. Non-finite values use DuckDB's
+     * `'NaN'`, `'Infinity'`, and `'-Infinity'` casts so they stay valid SQL.
+     */
+    public function asDoubleLiteral(): string
+    {
+        if ($this->kind !== self::DOUBLE) {
+            throw $this->kindMismatch('double');
+        }
+
+        $value = $this->asFloat();
+        if (is_nan($value)) {
+            return "'NaN'::DOUBLE";
+        }
+        if (is_infinite($value)) {
+            return $value > 0 ? "'Infinity'::DOUBLE" : "'-Infinity'::DOUBLE";
+        }
+        return (string) $value;
+    }
+
     public function asString(): string
     {
         if ($this->kind !== self::STRING || !is_string($this->value)) {
