@@ -121,8 +121,8 @@ final class SqlFormatter
     }
 
     /**
-     * Replaces tokens outside single quotes, double quotes, line comments, and
-     * block comments.
+     * Replaces tokens outside single quotes, double quotes, escape strings,
+     * dollar-quoted strings, line comments, and block comments.
      *
      * @param callable(string):string $replaceToken
      */
@@ -131,11 +131,62 @@ final class SqlFormatter
         return implode('', self::scanSqlParts($sql, static fn (string $token): string => $replaceToken($token)));
     }
 
+    // This scanner is the equivalent of the lexer behind PDO's emulated
+    // prepares (PDO::ATTR_EMULATE_PREPARES), implemented in php-src by
+    // pdo_parse_params() with the re2c grammars in ext/pdo/pdo_sql_parser.re
+    // and ext/pdo_pgsql/pgsql_sql_parser.re.
+    //
+    // For comparison, the pdo_pgsql grammar translates to roughly this PCRE
+    // pattern. PCRE alternation is first-match while re2c uses longest-match,
+    // so the alternatives are ordered by hand:
+    //
+    //   ~\G(?:
+    //       (?<equote> [eE]' (?: [^'\\]+ | '' | \\[\s\S] )* ' )
+    //     | (?<dquote> " (?: [^"]+ | "" )* " )
+    //     | (?<squote> ' (?: [^']+ | '' )* ' )
+    //     | (?<dollar> \$ (?:(?<tag>[A-Za-z_\x80-\xff][A-Za-z0-9_\x80-\xff]*))?
+    //                     \$ [\s\S]*? \$(?(tag)\k<tag>|\$) )
+    //     | (?<multichar> ::+ )
+    //     | (?<bind> :[A-Za-z0-9_]+ )
+    //     | (?<question> \? )
+    //     | (?<comment> /\* (?: [^*]+ | \*+[^*/] )* \*+ / | --[^\n]* )
+    //     | (?<unterminated> (?: [eE]' | " | ' ) [\s\S]* \z )
+    //     | (?<text> (?: [eE]* [^$eE:?"'/-] )+ )
+    //     | (?<special> [\s\S] )
+    //   )~x
+    //
+    // A regex-based implementation would then loop over the remaining input:
+    //
+    //   $offset = 0;
+    //   while ($offset < strlen($sql)) {
+    //       if (preg_match($pattern, $sql, $match, 0, $offset) !== 1) {
+    //           throw new ProtocolException(preg_last_error_msg());
+    //       }
+    //       $out .= $replaceToken($match[0]);
+    //       $offset += strlen($match[0]);
+    //   }
+    //
+    // The explicit loop below is used instead because:
+    //  - it is faster: the PCRE version was measured 1.9-5.5x slower with
+    //    pcre.jit and 2.4-12x slower without it (PHP 8.6);
+    //  - PCRE JIT can fail with PREG_JIT_STACKLIMIT_ERROR on ordinary large
+    //    literals or comments, for example a 40 KB single-quoted string;
+    //  - re2c's longest-match has to be recreated by hand with ordered
+    //    alternatives;
+    //  - dollar quotes are a custom-quote state in pdo_pgsql and are simpler
+    //    with strpos() than with a conditional backreference.
+    //
+    // Both implementations copy literals and comments verbatim; only '?' and
+    // ':name' tokens outside them are passed to the replacement callback.
     /**
      * The scan behind {@see self::scanSql()}. A replacement may be a parameter
      * literal instead of a string, so it can be appended in pieces and joined
      * into the statement once instead of being built into an intermediate
      * string first.
+     *
+     * Handles DuckDB's escape strings (`e'...'`, where a backslash escapes the
+     * following character) and dollar-quoted strings (`$$...$$`,
+     * `$tag$...$tag$`), in addition to plain literals and comments.
      *
      * @param callable(string):(string|SqlParameter) $replaceToken
      * @return list<string>
@@ -148,7 +199,7 @@ final class SqlFormatter
         while ($index < $length) {
             // Copy runs of ordinary characters in one step; only the
             // characters below can start something that needs handling.
-            $span = strcspn($sql, "'\"-/:?", $index);
+            $span = strcspn($sql, "'\"-/:?$", $index);
             if ($span > 0) {
                 $parts[] = substr($sql, $index, $span);
                 $index += $span;
@@ -161,13 +212,111 @@ final class SqlFormatter
             $next = $index + 1 < $length ? $sql[$index + 1] : null;
 
             if ($ch === "'") {
-                $end = self::readSingleQuoted($sql, $index);
+                // `e'...'` / `E'...'` is an escape string only when the prefix
+                // is directly attached and not the last character of an
+                // identifier, as in `fooe'...'`.
+                $prefix = $index > 0 ? $sql[$index - 1] : '';
+                $before = $index > 1 ? $sql[$index - 2] : '';
+                $escapeString = ($prefix === 'e' || $prefix === 'E')
+                    && ($before === ''
+                        || !($before === '_'
+                            || ($before >= 'a' && $before <= 'z')
+                            || ($before >= 'A' && $before <= 'Z')
+                            || ($before >= '0' && $before <= '9')
+                            || ord($before) >= 0x80));
+                if ($escapeString) {
+                    // Backslashes escape the next character: \', \\, \xHH,
+                    // octal, and so on. Doubled quotes remain valid too.
+                    $end = $index + 1;
+                    while ($end < $length) {
+                        $end += strcspn($sql, "'\\", $end);
+                        if ($end >= $length) {
+                            break;
+                        }
+                        if ($sql[$end] === '\\') {
+                            $end = min($end + 2, $length);
+                            continue;
+                        }
+                        if ($end + 1 < $length && $sql[$end + 1] === "'") {
+                            $end += 2;
+                            continue;
+                        }
+                        $end++;
+                        break;
+                    }
+                } else {
+                    $end = $length;
+                    $scan = $index + 1;
+                    while (($quote = strpos($sql, "'", $scan)) !== false) {
+                        if ($quote + 1 < $length && $sql[$quote + 1] === "'") {
+                            $scan = $quote + 2;
+                            continue;
+                        }
+                        $end = $quote + 1;
+                        break;
+                    }
+                }
                 $parts[] = substr($sql, $index, $end - $index);
                 $index = $end;
                 continue;
             }
             if ($ch === '"') {
-                $end = self::readDoubleQuoted($sql, $index);
+                $end = $length;
+                $scan = $index + 1;
+                while (($quote = strpos($sql, '"', $scan)) !== false) {
+                    if ($quote + 1 < $length && $sql[$quote + 1] === '"') {
+                        $scan = $quote + 2;
+                        continue;
+                    }
+                    $end = $quote + 1;
+                    break;
+                }
+                $parts[] = substr($sql, $index, $end - $index);
+                $index = $end;
+                continue;
+            }
+            if ($ch === '$') {
+                // DuckDB dollar quotes: $$...$$ or $tag$...$tag$. Tags follow
+                // identifier rules and are case-sensitive.
+                $scan = $index + 1;
+                if ($scan >= $length) {
+                    $parts[] = $ch;
+                    $index++;
+                    continue;
+                }
+                if ($sql[$scan] === '$') {
+                    $delimiter = '$$';
+                } else {
+                    $tag = $sql[$scan];
+                    if ($tag !== '_'
+                        && ($tag < 'a' || $tag > 'z')
+                        && ($tag < 'A' || $tag > 'Z')
+                        && ord($tag) < 0x80) {
+                        $parts[] = $ch;
+                        $index++;
+                        continue;
+                    }
+                    $end = $scan + 1;
+                    while ($end < $length) {
+                        $tag = $sql[$end];
+                        if ($tag !== '_'
+                            && ($tag < 'a' || $tag > 'z')
+                            && ($tag < 'A' || $tag > 'Z')
+                            && ($tag < '0' || $tag > '9')
+                            && ord($tag) < 0x80) {
+                            break;
+                        }
+                        $end++;
+                    }
+                    if ($end >= $length || $sql[$end] !== '$') {
+                        $parts[] = $ch;
+                        $index++;
+                        continue;
+                    }
+                    $delimiter = substr($sql, $index, $end + 1 - $index);
+                }
+                $close = strpos($sql, $delimiter, $index + strlen($delimiter));
+                $end = $close === false ? $length : $close + strlen($delimiter);
                 $parts[] = substr($sql, $index, $end - $index);
                 $index = $end;
                 continue;
@@ -193,10 +342,17 @@ final class SqlFormatter
                 && ($index === 0 || $sql[$index - 1] !== ':')
                 && $next !== ':'
                 && $next !== null
-                && self::isIdentifierStart($next)) {
+                && ($next === '_' || ($next >= 'a' && $next <= 'z') || ($next >= 'A' && $next <= 'Z'))) {
                 $start = $index + 1;
                 $end = $start + 1;
-                while ($end < $length && self::isIdentifierPart($sql[$end])) {
+                while ($end < $length) {
+                    $part = $sql[$end];
+                    if ($part !== '_'
+                        && ($part < 'a' || $part > 'z')
+                        && ($part < 'A' || $part > 'Z')
+                        && ($part < '0' || $part > '9')) {
+                        break;
+                    }
                     $end++;
                 }
                 $token = substr($sql, $index, $end - $index);
@@ -229,44 +385,6 @@ final class SqlFormatter
             $parts[] = "'";
         }
         return $parts;
-    }
-
-    private static function readSingleQuoted(string $sql, int $start): int
-    {
-        $length = strlen($sql);
-        $index = $start + 1;
-        while (($quote = strpos($sql, "'", $index)) !== false) {
-            if ($quote + 1 < $length && $sql[$quote + 1] === "'") {
-                $index = $quote + 2;
-                continue;
-            }
-            return $quote + 1;
-        }
-        return $length;
-    }
-
-    private static function readDoubleQuoted(string $sql, int $start): int
-    {
-        $length = strlen($sql);
-        $index = $start + 1;
-        while (($quote = strpos($sql, '"', $index)) !== false) {
-            if ($quote + 1 < $length && $sql[$quote + 1] === '"') {
-                $index = $quote + 2;
-                continue;
-            }
-            return $quote + 1;
-        }
-        return $length;
-    }
-
-    private static function isIdentifierStart(string $ch): bool
-    {
-        return $ch === '_' || ($ch >= 'a' && $ch <= 'z') || ($ch >= 'A' && $ch <= 'Z');
-    }
-
-    private static function isIdentifierPart(string $ch): bool
-    {
-        return self::isIdentifierStart($ch) || ($ch >= '0' && $ch <= '9');
     }
 
     private static function floatLiteral(float $value): string
