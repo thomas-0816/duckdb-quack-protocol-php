@@ -65,7 +65,8 @@ final class SqlFormatter
             Value::NULL => 'NULL',
             Value::BOOL => $value->asBool() ? 'TRUE' : 'FALSE',
             Value::INT, Value::UINT, Value::HUGEINT, Value::UHUGEINT => (string) $value->asIntOrString(),
-            Value::FLOAT, Value::DOUBLE => self::floatLiteral($value->asFloat()),
+            Value::FLOAT => $value->asFloatLiteral(),
+            Value::DOUBLE => $value->asDoubleLiteral(),
             Value::STRING => "'" . str_replace("'", "''", $value->asString()) . "'",
             Value::BYTES => "from_hex('" . bin2hex($value->asBytes()) . "')",
             Value::DECIMAL => $value->asDecimal()->toString(),
@@ -406,13 +407,5 @@ final class SqlFormatter
             $parts[] = "'";
         }
         return $parts;
-    }
-
-    private static function floatLiteral(float $value): string
-    {
-        if (!is_finite($value)) {
-            throw new ProtocolException("cannot encode non-finite SQL number {$value}");
-        }
-        return (string) $value;
     }
 }
