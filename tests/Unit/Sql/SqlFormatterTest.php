@@ -216,11 +216,11 @@ final class SqlFormatterTest extends TestCase
         self::assertSame($sql, SqlFormatter::formatSql($sql, []));
     }
 
-    public function testTreatsLoneDollarAndDollarParametersAsText(): void
+    public function testTreatsLoneDollarAndPositionalDollarParametersAsText(): void
     {
-        $sql = "SELECT '$', \$1, \$name, ?";
+        $sql = "SELECT '$', \$1, \$123abc, ?";
 
-        self::assertSame("SELECT '$', \$1, \$name, 7", SqlFormatter::formatSql($sql, [7]));
+        self::assertSame("SELECT '$', \$1, \$123abc, 7", SqlFormatter::formatSql($sql, [7]));
     }
 
     public function testEmptyParametersStillIgnorePlaceholdersInsideDollarAndEscapeStrings(): void
@@ -248,6 +248,100 @@ final class SqlFormatterTest extends TestCase
             'SELECT :missing',
             ['other' => 1],
         );
+    }
+
+    public function testFormatsDollarNamedParameters(): void
+    {
+        self::assertSame(
+            "SELECT 7 AS id, 'seven' AS label, 1 AS n",
+            SqlFormatter::formatSql(
+                'SELECT $id AS id, $label AS label, $foo_bar123 AS n',
+                ['id' => 7, 'label' => 'seven', 'foo_bar123' => 1],
+            ),
+        );
+    }
+
+    public function testDollarNamedParametersAreCaseSensitive(): void
+    {
+        self::assertSame(
+            'SELECT 1 AS lower_value, 2 AS upper_value',
+            SqlFormatter::formatSql(
+                'SELECT $foo AS lower_value, $FOO AS upper_value',
+                ['foo' => 1, 'FOO' => 2],
+            ),
+        );
+    }
+
+    public function testRejectsDollarNamedParameterWithWrongCase(): void
+    {
+        $this->expectException(ProtocolException::class);
+
+        SqlFormatter::formatSql('SELECT $Foo', ['foo' => 1]);
+    }
+
+    public function testDollarQuoteTakesPrecedenceOverDollarParameter(): void
+    {
+        self::assertSame(
+            'SELECT $tag$ ? $tag$ AS quoted, 7 AS id',
+            SqlFormatter::formatSql(
+                'SELECT $tag$ ? $tag$ AS quoted, $id AS id',
+                ['tag' => 1, 'id' => 7],
+            ),
+        );
+    }
+
+    public function testDollarNamedParametersInsideStringsAndCommentsAreUntouched(): void
+    {
+        $sql = <<<'SQL'
+            SELECT '$name' AS a, "$name" AS b, e'it\'s $name' AS c, $$ $name $$ AS d, $tag$ $name $tag$ AS e, $id AS id -- $name
+            /* $name */
+            SQL;
+
+        self::assertSame(
+            <<<'SQL'
+                SELECT '$name' AS a, "$name" AS b, e'it\'s $name' AS c, $$ $name $$ AS d, $tag$ $name $tag$ AS e, 7 AS id -- $name
+                /* $name */
+                SQL,
+            SqlFormatter::formatSql($sql, ['id' => 7]),
+        );
+    }
+
+    public function testPositionalDollarParametersRemainTextInNamedMode(): void
+    {
+        self::assertSame(
+            'SELECT $1, $123abc, 7 AS id',
+            SqlFormatter::formatSql('SELECT $1, $123abc, $id AS id', ['id' => 7]),
+        );
+    }
+
+    public function testAllowsMixingColonAndDollarNamedParameters(): void
+    {
+        self::assertSame(
+            'SELECT 1 AS a, 2 AS b, 3 AS c',
+            SqlFormatter::formatSql(
+                'SELECT :a AS a, $b AS b, :c AS c',
+                ['a' => 1, 'b' => 2, 'c' => 3],
+            ),
+        );
+    }
+
+    public function testRejectsMixedPositionalAndNamedPlaceholders(): void
+    {
+        $cases = [
+            ['SELECT ?, :id', [1]],
+            ['SELECT ?, $id', [1]],
+            ['SELECT :id, ?', ['id' => 1]],
+            ['SELECT $id, ?', ['id' => 1]],
+        ];
+
+        foreach ($cases as [$sql, $params]) {
+            try {
+                SqlFormatter::formatSql($sql, $params);
+                self::fail("expected mixed-style rejection for {$sql}");
+            } catch (ProtocolException) {
+                self::addToAssertionCount(1);
+            }
+        }
     }
 }
 
