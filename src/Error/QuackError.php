@@ -4,11 +4,12 @@ namespace DuckDB\Quack\Error;
 
 use DuckDB\Quack\Exceptions\ProtocolException;
 use DuckDB\Quack\Exceptions\UnsupportedTypeException;
+use RuntimeException;
 
 /**
  * Base class for every error raised by this package.
  */
-class QuackError extends \RuntimeException
+class QuackError extends RuntimeException
 {
     public static function protocol(string $message): ProtocolException
     {
