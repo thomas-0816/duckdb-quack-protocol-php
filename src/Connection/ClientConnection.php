@@ -141,7 +141,7 @@ final class ClientConnection
             try {
                 $this->cancel($message->queryUuid);
             } catch (QuackError $cancelError) {
-                trigger_error('cancel: ' . $cancelError->getMessage(), E_USER_WARNING);
+                $error->appendMessage(' cancel: ' . $cancelError->getMessage());
             }
             throw $error;
         }
@@ -171,7 +171,7 @@ final class ClientConnection
             try {
                 $this->cancel($message->resultUuid);
             } catch (QuackError $cancelError) {
-                trigger_error('cancel: ' . $cancelError->getMessage(), E_USER_WARNING);
+                $error->appendMessage(' cancel: ' . $cancelError->getMessage());
             }
             throw $error;
         }
@@ -223,8 +223,7 @@ final class ClientConnection
         );
         try {
             $this->transport->send($message, $this->quackVersion, 3);
-        } catch (QuackError $error) {
-            trigger_error('disconnect: ' . $error->getMessage(), E_USER_WARNING);
+        } catch (QuackError) {
             // The caller is gone; nothing useful can be reported.
         } finally {
             $this->disconnected = true;

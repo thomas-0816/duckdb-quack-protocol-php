@@ -11,4 +11,9 @@ final class TransportException extends QuackError
     {
         parent::__construct('quack transport error: ' . $message);
     }
+
+    public function appendMessage(string $message): void
+    {
+        $this->message = $this->message . $message;
+    }
 }
