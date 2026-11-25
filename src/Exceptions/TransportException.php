@@ -14,6 +14,6 @@ final class TransportException extends QuackError
 
     public function appendMessage(string $message): void
     {
-        $this->message = $this->message . $message;
+        $this->message = $this->message . ' ' . $message;
     }
 }

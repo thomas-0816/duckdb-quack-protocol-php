@@ -141,7 +141,7 @@ final class ClientConnection
             try {
                 $this->cancel($message->queryUuid);
             } catch (QuackError $cancelError) {
-                $error->appendMessage(' cancel: ' . $cancelError->getMessage());
+                $error->appendMessage('cancel: ' . $cancelError->getMessage());
             }
             throw $error;
         }
@@ -171,7 +171,7 @@ final class ClientConnection
             try {
                 $this->cancel($message->resultUuid);
             } catch (QuackError $cancelError) {
-                $error->appendMessage(' cancel: ' . $cancelError->getMessage());
+                $error->appendMessage('cancel: ' . $cancelError->getMessage());
             }
             throw $error;
         }
