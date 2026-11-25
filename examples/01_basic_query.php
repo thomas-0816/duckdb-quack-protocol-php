@@ -23,6 +23,9 @@ $db->execute('CREATE TABLE IF NOT EXISTS table1 (id INTEGER, amount DECIMAL(10, 
 $db->beginTransaction();
 $db->execute('INSERT INTO table1 VALUES (?, ?, ?)', [1, 42.21, 'Hello DuckDB! 🐘 💓 🦆']);
 $db->execute('INSERT INTO table1 VALUES (?, ?, ?)', [2, 21.01, 'Hello PHP! 🐘']);
+// named parameter binding
+$db->execute('INSERT INTO table1 VALUES (:id, :amount, :description)',
+    ['id' => 3, 'amount' => 12.34, 'description' => 'Hello Duck! 🦆']);
 $db->commit();
 
 print_r($db->fetchAll('SELECT * FROM table1'));
@@ -36,6 +39,10 @@ print_r($db->fetchAll('SELECT * FROM table1'));
 #         [id] => 2
 #         [amount] => 21.01
 #         [description] => Hello PHP! 🐘
+#     [2] => Array
+#         [id] => 3
+#         [amount] => 12.34
+#         [description] => Hello Duck! 🦆
 
 print_r($db->fetchOne('SELECT * FROM table1'));
 
