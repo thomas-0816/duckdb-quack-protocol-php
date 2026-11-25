@@ -25,5 +25,5 @@ interface TransportInterface
 
     public function setDebug(bool $debug): static;
 
-    public function send(QuackMessage $message, int $version): QuackMessage;
+    public function send(QuackMessage $message, int $version, ?int $timeout = null): QuackMessage;
 }

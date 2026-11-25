@@ -74,7 +74,7 @@ final class QuackJsonTest extends TestCase
 
     public function testReadRemoteJson(): void
     {
-        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 1, 1, ['force_download' => true]);
+        $client = QuackClient::connect('http://127.0.0.1:9494', 'secret', 3, 10, ['force_download' => true]);
 
         $url = 'https://bulk.meteostat.net/v2/stations/lite.json.gz';
 
