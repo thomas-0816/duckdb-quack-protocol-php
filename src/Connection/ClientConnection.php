@@ -138,7 +138,11 @@ final class ClientConnection
             }
             throw $error;
         } catch (TransportException $error) {
-            $this->cancel($message->queryUuid); // TODO combine both exceptions?
+            try {
+                $this->cancel($message->queryUuid);
+            } catch (QuackError $cancelError) {
+                trigger_error('cancel: ' . $cancelError->getMessage(), E_USER_WARNING);
+            }
             throw $error;
         }
     }
@@ -164,7 +168,11 @@ final class ClientConnection
             }
             throw $error;
         } catch (TransportException $error) {
-            $this->cancel($message->resultUuid); // TODO combine both exceptions?
+            try {
+                $this->cancel($message->resultUuid);
+            } catch (QuackError $cancelError) {
+                trigger_error('cancel: ' . $cancelError->getMessage(), E_USER_WARNING);
+            }
             throw $error;
         }
     }
@@ -186,7 +194,7 @@ final class ClientConnection
             queryUuid: $queryUuid,
         );
         try {
-            return $this->transport->setTimeout(3)->send($message, $this->quackVersion);
+            return $this->transport->send($message, $this->quackVersion, 3);
         } catch (ServerException $error) {
             if ($error->serverError()->isFatal()) {
                 $this->closed = true;
@@ -214,8 +222,9 @@ final class ClientConnection
                 ->withClientQueryId($this->queryCounter++),
         );
         try {
-            $this->transport->setTimeout(3)->send($message, $this->quackVersion);
-        } catch (QuackError) {
+            $this->transport->send($message, $this->quackVersion, 3);
+        } catch (QuackError $error) {
+            trigger_error('disconnect: ' . $error->getMessage(), E_USER_WARNING);
             // The caller is gone; nothing useful can be reported.
         } finally {
             $this->disconnected = true;

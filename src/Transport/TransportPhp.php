@@ -49,6 +49,9 @@ final class TransportPhp implements TransportInterface
         if ($connectTimeout <= 0) {
             throw new ProtocolException('Quack connect timeout must be greater than zero');
         }
+        if ($connectTimeout >= $timeout) {
+            throw new ProtocolException('Quack connect timeout must be smaller than request timeout');
+        }
 
         return new static(
             $parsedUri,
@@ -82,7 +85,7 @@ final class TransportPhp implements TransportInterface
         return $this;
     }
 
-    public function send(QuackMessage $message, int $version): QuackMessage
+    public function send(QuackMessage $message, int $version, ?int $timeout = null): QuackMessage
     {
         $payload = MessageCodec::encodeMessageForVersion($message, $version);
 
@@ -102,15 +105,14 @@ final class TransportPhp implements TransportInterface
         }
         $context = stream_context_create(['ssl' => $ssl]);
         $remote = ($this->parsedUri->ssl ? 'tls' : 'tcp') . '://' . $host;
-        $timeout = (float) min($this->connectTimeout, $this->timeout);
         $errno = 0;
         $errstr = '';
-        $stream = @stream_socket_client($remote, $errno, $errstr, $timeout, STREAM_CLIENT_CONNECT, $context);
+        $stream = @stream_socket_client($remote, $errno, $errstr, (float) $this->connectTimeout, STREAM_CLIENT_CONNECT, $context);
         if ($stream === false) {
             $detail = $errstr !== '' ? "{$errstr} (errno {$errno})" : "errno {$errno}";
             throw new TransportException("failed to connect to {$remote}: {$detail}");
         }
-        stream_set_timeout($stream, $this->timeout);
+        stream_set_timeout($stream, $timeout ?? $this->timeout);
 
         try {
             $head = 'POST /quack HTTP/1.1' . "\r\n"

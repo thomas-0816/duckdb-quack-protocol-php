@@ -49,6 +49,9 @@ final class TransportCurl implements TransportInterface
         if ($connectTimeout <= 0) {
             throw new ProtocolException('Quack connect timeout must be greater than zero');
         }
+        if ($connectTimeout >= $timeout) {
+            throw new ProtocolException('Quack connect timeout must be smaller than request timeout');
+        }
 
         return new static(
             $parsedUri,
@@ -88,14 +91,14 @@ final class TransportCurl implements TransportInterface
         $this->curl = null;
     }
 
-    public function send(QuackMessage $message, int $version): QuackMessage
+    public function send(QuackMessage $message, int $version, ?int $timeout = null): QuackMessage
     {
         $curl = $this->curl();
 
         $options = [
             CURLOPT_POSTFIELDS => MessageCodec::encodeMessageForVersion($message, $version),
-            CURLOPT_TIMEOUT_MS => (int) max(1, round($this->timeout * 1000)),
-            CURLOPT_CONNECTTIMEOUT_MS => (int) max(1, round(min($this->connectTimeout, $this->timeout) * 1000)),
+            CURLOPT_TIMEOUT_MS => ($timeout ?? $this->timeout) * 1000,
+            CURLOPT_CONNECTTIMEOUT_MS => $this->connectTimeout * 1000,
         ];
         if (!curl_setopt_array($curl, $options)) {
             throw new TransportException('failed to set curl options');
