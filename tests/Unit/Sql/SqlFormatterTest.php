@@ -181,6 +181,57 @@ final class SqlFormatterTest extends TestCase
         );
     }
 
+    public function testIgnoresPlaceholdersInsideEscapeStrings(): void
+    {
+        $sql = <<<'SQL'
+            SELECT e'it\'s ?' AS a, E'line1\nline2 ?' AS b, e'it''s :name' AS c, ? AS real_value
+            SQL;
+
+        self::assertSame(
+            <<<'SQL'
+                SELECT e'it\'s ?' AS a, E'line1\nline2 ?' AS b, e'it''s :name' AS c, 7 AS real_value
+                SQL,
+            SqlFormatter::formatSql($sql, [7]),
+        );
+    }
+
+    public function testIgnoresNamedPlaceholdersInsideDollarQuotedStrings(): void
+    {
+        $sql = <<<'SQL'
+            SELECT $$ ? :secret $$ AS a, $tag$ ? :secret $tag$ AS b, $outer$ $$ :x $$ $outer$ AS c, :id AS id
+            SQL;
+
+        self::assertSame(
+            <<<'SQL'
+                SELECT $$ ? :secret $$ AS a, $tag$ ? :secret $tag$ AS b, $outer$ $$ :x $$ $outer$ AS c, 7 AS id
+                SQL,
+            SqlFormatter::formatSql($sql, ['id' => 7]),
+        );
+    }
+
+    public function testUnterminatedDollarQuoteIsCopiedToEnd(): void
+    {
+        $sql = 'SELECT $tag$ ? :x';
+
+        self::assertSame($sql, SqlFormatter::formatSql($sql, []));
+    }
+
+    public function testTreatsLoneDollarAndDollarParametersAsText(): void
+    {
+        $sql = "SELECT '$', \$1, \$name, ?";
+
+        self::assertSame("SELECT '$', \$1, \$name, 7", SqlFormatter::formatSql($sql, [7]));
+    }
+
+    public function testEmptyParametersStillIgnorePlaceholdersInsideDollarAndEscapeStrings(): void
+    {
+        $sql = <<<'SQL'
+            SELECT e'it\'s ?', $$?$$, $tag$ ? $tag$, '?'
+            SQL;
+
+        self::assertSame($sql, SqlFormatter::formatSql($sql, []));
+    }
+
     public function testEmptyParametersIgnoreDoubleColonCasts(): void
     {
         self::assertSame(
