@@ -50,16 +50,20 @@ jobs:
         thread-safety:
           - nts
           - zts
+        curl:
+          - curl
+          - :curl
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - name: Setup PHP ${{ matrix.php-version }} ${{ matrix.thread-safety }}
+      - name: Setup PHP
         uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # 2.40.0
         with:
           php-version: ${{ matrix.php-version }}
           coverage: pcov
           tools: composer
+          extensions: ${{ matrix.curl }}
         env:
           phpts: ${{ matrix.thread-safety }}
       - name: Tests
@@ -82,7 +86,7 @@ jobs:
           tests/duckdb --version
           uname -a
           php -v
-          php -m | grep curl
+          (php -m | grep curl) || (php -m | grep sockets)
           rm composer.lock
           composer install
           composer check
