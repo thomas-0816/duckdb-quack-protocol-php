@@ -222,11 +222,11 @@ final class SqlFormatterTest extends TestCase
         self::assertSame($sql, SqlFormatter::formatSql($sql, []));
     }
 
-    public function testTreatsLoneDollarAndPositionalDollarParametersAsText(): void
+    public function testTreatsDollarVariablesAsText(): void
     {
-        $sql = "SELECT '$', \$1, \$123abc, ?";
+        $sql = "SELECT '$', \$1, \$123abc, \$name, ?";
 
-        self::assertSame("SELECT '$', \$1, \$123abc, 7", SqlFormatter::formatSql($sql, [7]));
+        self::assertSame("SELECT '$', \$1, \$123abc, \$name, 7", SqlFormatter::formatSql($sql, [7]));
     }
 
     public function testEmptyParametersStillIgnorePlaceholdersInsideDollarAndEscapeStrings(): void
@@ -256,78 +256,29 @@ final class SqlFormatterTest extends TestCase
         );
     }
 
-    public function testFormatsDollarNamedParameters(): void
+    public function testLeavesDuckDbVariablesUntouched(): void
+    {
+        $sql = "SET VARIABLE foo = 'bar'; SELECT \$foo;";
+
+        self::assertSame($sql, SqlFormatter::formatSql($sql, ['foo' => 'ignored']));
+    }
+
+    public function testDollarVariablesAreNotReplacedByNamedParameters(): void
     {
         self::assertSame(
-            "SELECT 7 AS id, 'seven' AS label, 1 AS n",
+            'SELECT $foo AS variable, 7 AS id',
             SqlFormatter::formatSql(
-                'SELECT $id AS id, $label AS label, $foo_bar123 AS n',
-                ['id' => 7, 'label' => 'seven', 'foo_bar123' => 1],
+                'SELECT $foo AS variable, :id AS id',
+                ['foo' => 'ignored', 'id' => 7],
             ),
         );
     }
 
-    public function testDollarNamedParametersAreCaseSensitive(): void
+    public function testDollarVariablesCanAppearAlongsidePositionalPlaceholders(): void
     {
         self::assertSame(
-            'SELECT 1 AS lower_value, 2 AS upper_value',
-            SqlFormatter::formatSql(
-                'SELECT $foo AS lower_value, $FOO AS upper_value',
-                ['foo' => 1, 'FOO' => 2],
-            ),
-        );
-    }
-
-    public function testRejectsDollarNamedParameterWithWrongCase(): void
-    {
-        $this->expectException(ProtocolException::class);
-
-        SqlFormatter::formatSql('SELECT $Foo', ['foo' => 1]);
-    }
-
-    public function testDollarQuoteTakesPrecedenceOverDollarParameter(): void
-    {
-        self::assertSame(
-            'SELECT $tag$ ? $tag$ AS quoted, 7 AS id',
-            SqlFormatter::formatSql(
-                'SELECT $tag$ ? $tag$ AS quoted, $id AS id',
-                ['tag' => 1, 'id' => 7],
-            ),
-        );
-    }
-
-    public function testDollarNamedParametersInsideStringsAndCommentsAreUntouched(): void
-    {
-        $sql = <<<'SQL'
-            SELECT '$name' AS a, "$name" AS b, e'it\'s $name' AS c, $$ $name $$ AS d, $tag$ $name $tag$ AS e, $id AS id -- $name
-            /* $name */
-            SQL;
-
-        self::assertSame(
-            <<<'SQL'
-                SELECT '$name' AS a, "$name" AS b, e'it\'s $name' AS c, $$ $name $$ AS d, $tag$ $name $tag$ AS e, 7 AS id -- $name
-                /* $name */
-                SQL,
-            SqlFormatter::formatSql($sql, ['id' => 7]),
-        );
-    }
-
-    public function testPositionalDollarParametersRemainTextInNamedMode(): void
-    {
-        self::assertSame(
-            'SELECT $1, $123abc, 7 AS id',
-            SqlFormatter::formatSql('SELECT $1, $123abc, $id AS id', ['id' => 7]),
-        );
-    }
-
-    public function testAllowsMixingColonAndDollarNamedParameters(): void
-    {
-        self::assertSame(
-            'SELECT 1 AS a, 2 AS b, 3 AS c',
-            SqlFormatter::formatSql(
-                'SELECT :a AS a, $b AS b, :c AS c',
-                ['a' => 1, 'b' => 2, 'c' => 3],
-            ),
+            'SELECT $foo, 7',
+            SqlFormatter::formatSql('SELECT $foo, ?', [7]),
         );
     }
 
@@ -335,9 +286,7 @@ final class SqlFormatterTest extends TestCase
     {
         $cases = [
             ['SELECT ?, :id', [1]],
-            ['SELECT ?, $id', [1]],
             ['SELECT :id, ?', ['id' => 1]],
-            ['SELECT $id, ?', ['id' => 1]],
         ];
 
         foreach ($cases as [$sql, $params]) {
