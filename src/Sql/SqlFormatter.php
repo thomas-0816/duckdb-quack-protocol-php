@@ -12,13 +12,12 @@ use DuckDB\Quack\Types\Value;
 final class SqlFormatter
 {
     /**
-     * Formats positional (`?`) or named (`:name`, `$name`) placeholders. The
-     * form is detected from the array keys: a list is positional, anything
-     * else is named. `:name` and `$name` may be mixed, but positional `?`
-     * cannot be combined with named placeholders.
+     * Formats positional (`?`) or named (`:name`) placeholders. The form is
+     * detected from the array keys: a list is positional, anything else is
+     * named. Positional `?` cannot be combined with named placeholders.
      *
-     * `$name` lookups are case-sensitive, even though DuckDB itself binds
-     * `$foo` and `$Foo` to the same parameter.
+     * `$name` is not a placeholder: it is left untouched as a DuckDB variable
+     * reference, for example with `SET VARIABLE foo = 'bar'; SELECT $foo;`.
      *
      * @param array<int|string,mixed>|null $params
      */
@@ -87,7 +86,7 @@ final class SqlFormatter
         $index = 0;
         $formatted = implode('', self::scanSqlParts($sql, static function (string $token) use ($params, &$index): string|SqlParameter {
             if ($token !== '?') {
-                if ($token[0] === ':' || $token[0] === '$') {
+                if ($token[0] === ':') {
                     throw new ProtocolException("cannot mix positional '?' placeholders with named {$token} placeholders");
                 }
                 return $token;
@@ -110,7 +109,7 @@ final class SqlFormatter
      */
     private static function formatNamedSql(string $sql, array $params): string
     {
-        if ($params === [] && !str_contains($sql, ':') && !str_contains($sql, '$')) {
+        if ($params === [] && !str_contains($sql, ':')) {
             // Avoid scanning large statements (for example embedded JSON
             // documents) when there is nothing that could be replaced.
             return $sql;
@@ -119,14 +118,13 @@ final class SqlFormatter
             if ($token === '?') {
                 throw new ProtocolException("cannot mix named placeholders with positional '?' placeholders");
             }
-            $prefix = $token[0];
-            if ($prefix !== ':' && $prefix !== '$') {
+            if ($token[0] !== ':') {
                 return $token;
             }
             $name = substr($token, 1);
             $value = $params[$name] ?? null;
             if ($value === null) {
-                throw new ProtocolException("missing SQL parameter {$prefix}{$name}");
+                throw new ProtocolException("missing SQL parameter :{$name}");
             }
             return $value;
         }));
@@ -158,7 +156,6 @@ final class SqlFormatter
     //     | (?<squote> ' (?: [^']+ | '' )* ' )
     //     | (?<dollar> \$ (?:(?<tag>[A-Za-z_\x80-\xff][A-Za-z0-9_\x80-\xff]*))?
     //                     \$ [\s\S]*? \$(?(tag)\k<tag>|\$) )
-    //     | (?<dollar_param> \$ [A-Za-z_\x80-\xff][A-Za-z0-9_\x80-\xff]* )
     //     | (?<multichar> ::+ )
     //     | (?<bind> :[A-Za-z0-9_]+ )
     //     | (?<question> \? )
@@ -167,9 +164,6 @@ final class SqlFormatter
     //     | (?<text> (?: [eE]* [^$eE:?"'/-] )+ )
     //     | (?<special> [\s\S] )
     //   )~x
-    //
-    // `dollar_param` is DuckDB's `$name` extension and is placed after
-    // `dollar` so that `$tag$...$tag$` is still lexed as a dollar quote.
     //
     // A regex-based implementation would then loop over the remaining input:
     //
@@ -192,9 +186,10 @@ final class SqlFormatter
     //  - dollar quotes are a custom-quote state in pdo_pgsql and are simpler
     //    with strpos() than with a conditional backreference.
     //
-    // Both implementations copy literals and comments verbatim; only '?',
-    // ':name', and '$name' tokens outside them are passed to the replacement
-    // callback.
+    // Both implementations copy literals and comments verbatim; only '?' and
+    // ':name' tokens outside them are passed to the replacement callback.
+    // `$name` is copied verbatim too, so DuckDB variables such as
+    // `SET VARIABLE foo = 'bar'; SELECT $foo;` keep working.
     /**
      * The scan behind {@see self::scanSql()}. A replacement may be a parameter
      * literal instead of a string, so it can be appended in pieces and joined
@@ -203,8 +198,8 @@ final class SqlFormatter
      *
      * Handles DuckDB's escape strings (`e'...'`, where a backslash escapes the
      * following character) and dollar-quoted strings (`$$...$$`,
-     * `$tag$...$tag$`), in addition to plain literals and comments. A `$tag`
-     * that is not followed by `$` is emitted as a `$name` token.
+     * `$tag$...$tag$`), in addition to plain literals and comments. Dollar
+     * variable references (`$name`) are left untouched.
      *
      * @param callable(string):(string|SqlParameter) $replaceToken
      * @return list<string>
@@ -331,10 +326,8 @@ final class SqlFormatter
                 $index = $end;
             } elseif ($ch === '$') {
                 // DuckDB dollar quotes: $$...$$ or $tag$...$tag$. Tags follow
-                // identifier rules and are case-sensitive. A `$tag` that is
-                // not followed by `$` is a `$name` parameter; `$1` and
-                // similar stay text.
-                $token = '';
+                // identifier rules and are case-sensitive. Anything else,
+                // including `$name` variable references and `$1`, is text.
                 $delimiter = null;
                 $scan = $index + 1;
                 if ($scan < $length) {
@@ -360,9 +353,6 @@ final class SqlFormatter
                             }
                             if ($end < $length && $sql[$end] === '$') {
                                 $delimiter = substr($sql, $index, $end + 1 - $index);
-                            } else {
-                                $token = substr($sql, $index, $end - $index);
-                                $index = $end;
                             }
                         }
                     }
@@ -374,11 +364,9 @@ final class SqlFormatter
                     $index = $end;
                     continue;
                 }
-                if ($token === '') {
-                    $parts[] = $ch;
-                    $index++;
-                    continue;
-                }
+                $parts[] = $ch;
+                $index++;
+                continue;
             } else {
                 $parts[] = $ch;
                 $index++;
