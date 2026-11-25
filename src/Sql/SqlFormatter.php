@@ -157,13 +157,17 @@ final class SqlFormatter
     //     | (?<dollar> \$ (?:(?<tag>[A-Za-z_\x80-\xff][A-Za-z0-9_\x80-\xff]*))?
     //                     \$ [\s\S]*? \$(?(tag)\k<tag>|\$) )
     //     | (?<multichar> ::+ )
-    //     | (?<bind> :[A-Za-z0-9_]+ )
+    //     | (?<bind> (?<![A-Za-z0-9]) :[A-Za-z0-9_]+ )
     //     | (?<question> \? )
     //     | (?<comment> /\* (?: [^*]+ | \*+[^*/] )* \*+ / | --[^\n]* )
     //     | (?<unterminated> (?: [eE]' | " | ' ) [\s\S]* \z )
     //     | (?<text> (?: [eE]* [^$eE:?"'/-] )+ )
     //     | (?<special> [\s\S] )
     //   )~x
+    //
+    // The negative lookbehind on `bind` reproduces PDO's rule that a bind
+    // preceded by an alphanumeric byte is not a placeholder. It succeeds at
+    // the start of the subject.
     //
     // A regex-based implementation would then loop over the remaining input:
     //
@@ -309,7 +313,19 @@ final class SqlFormatter
                 && ($index === 0 || $sql[$index - 1] !== ':')
                 && $next !== ':'
                 && $next !== null
-                && ($next === '_' || ($next >= 'a' && $next <= 'z') || ($next >= 'A' && $next <= 'Z'))) {
+                && ($next === '_'
+                    || ($next >= 'a' && $next <= 'z')
+                    || ($next >= 'A' && $next <= 'Z')
+                    || ($next >= '0' && $next <= '9'))
+                && ($index === 0
+                    || !(($sql[$index - 1] >= 'a' && $sql[$index - 1] <= 'z')
+                        || ($sql[$index - 1] >= 'A' && $sql[$index - 1] <= 'Z')
+                        || ($sql[$index - 1] >= '0' && $sql[$index - 1] <= '9')))) {
+                // PDO only treats a bind as a placeholder when it is not
+                // preceded by an alphanumeric byte. This keeps DuckDB slices
+                // like `list[1:2]` and identifier-like text such as `foo:bar`
+                // intact. Names may start with a digit, matching PDO's
+                // `:[A-Za-z0-9_]+` grammar.
                 $start = $index + 1;
                 $end = $start + 1;
                 while ($end < $length) {

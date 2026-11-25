@@ -54,6 +54,47 @@ final class SqlFormatterTest extends TestCase
         );
     }
 
+    public function testBindsPrecededByAlphanumericCharactersAreNotPlaceholders(): void
+    {
+        self::assertSame(
+            'SELECT [10, 20, 30][i:j] AS slice, 7 AS id FROM (VALUES (2, 3)) t(i, j)',
+            SqlFormatter::formatSql(
+                'SELECT [10, 20, 30][i:j] AS slice, :id AS id FROM (VALUES (2, 3)) t(i, j)',
+                ['id' => 7],
+            ),
+        );
+    }
+
+    public function testBindsInsideDuckDbListSlicesAreNotPlaceholders(): void
+    {
+        self::assertSame(
+            'SELECT list_value(1, 2, 3)[1:2] AS slice, 7 AS id',
+            SqlFormatter::formatSql(
+                'SELECT list_value(1, 2, 3)[1:2] AS slice, :id AS id',
+                ['id' => 7],
+            ),
+        );
+    }
+
+    public function testAllowsDigitLeadingNamedParameters(): void
+    {
+        self::assertSame(
+            'SELECT 1 AS a, 2 AS b',
+            SqlFormatter::formatSql(
+                'SELECT :1a AS a, :01 AS b',
+                ['1a' => 1, '01' => 2],
+            ),
+        );
+    }
+
+    public function testKeepsDoubleColonCastsWithNamedParameters(): void
+    {
+        self::assertSame(
+            'SELECT 7::INT AS id',
+            SqlFormatter::formatSql('SELECT :id::INT AS id', ['id' => 7]),
+        );
+    }
+
     public function testFormatsNestedLists(): void
     {
         $params = [
