@@ -260,11 +260,10 @@ final class SqlFormatterTest extends TestCase
         );
     }
 
-    public function testUnterminatedDollarQuoteIsCopiedToEnd(): void
+    public function testUnterminatedDollarQuoteOnlyCopiesTheDelimiter(): void
     {
-        $sql = 'SELECT $tag$ ? :x';
-
-        self::assertSame($sql, SqlFormatter::formatSql($sql, []));
+        // DuckDB rejects this statement, so the `?` is still a placeholder.
+        self::assertSame('SELECT $tag$ 7', SqlFormatter::formatSql('SELECT $tag$ ?', [7]));
     }
 
     public function testTreatsDollarVariablesAsText(): void

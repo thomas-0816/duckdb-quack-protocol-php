@@ -195,6 +195,8 @@ final class SqlFormatter
     //
     // Both implementations copy literals and comments verbatim; only '?' and
     // ':name' tokens outside them are passed to the replacement callback.
+    // A dollar quote without a closing delimiter is not a literal, so only its
+    // opening delimiter is copied and scanning continues.
     // `$name` is copied verbatim too, so DuckDB variables such as
     // `SET VARIABLE foo = 'bar'; SELECT $foo;` keep working.
     /**
@@ -345,9 +347,17 @@ final class SqlFormatter
                 }
                 if ($delimiter !== null) {
                     $close = strpos($sql, $delimiter, $index + strlen($delimiter));
-                    $end = $close === false ? $length : $close + strlen($delimiter);
-                    $parts[] = substr($sql, $index, $end - $index);
-                    $index = $end;
+                    if ($close !== false) {
+                        $end = $close + strlen($delimiter);
+                        $parts[] = substr($sql, $index, $end - $index);
+                        $index = $end;
+                        continue;
+                    }
+                    // An unterminated dollar quote is a syntax error in DuckDB,
+                    // so only the opening delimiter is text; scanning continues
+                    // and any `?` or `:name` after it is still a placeholder.
+                    $parts[] = $delimiter;
+                    $index += strlen($delimiter);
                     continue;
                 }
                 $parts[] = $ch;
