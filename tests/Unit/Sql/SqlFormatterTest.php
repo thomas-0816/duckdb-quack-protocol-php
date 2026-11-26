@@ -317,21 +317,18 @@ final class SqlFormatterTest extends TestCase
         );
     }
 
-    public function testRejectsMixedPositionalAndNamedPlaceholders(): void
+    public function testRejectsPositionalPlaceholderBeforeNamedPlaceholder(): void
     {
-        $cases = [
-            ['SELECT ?, :id', [1]],
-            ['SELECT :id, ?', ['id' => 1]],
-        ];
+        $this->expectException(ProtocolException::class);
 
-        foreach ($cases as [$sql, $params]) {
-            try {
-                SqlFormatter::formatSql($sql, $params);
-                self::fail("expected mixed-style rejection for {$sql}");
-            } catch (ProtocolException) {
-                self::addToAssertionCount(1);
-            }
-        }
+        SqlFormatter::formatSql('SELECT ?, :id', [1]);
+    }
+
+    public function testRejectsNamedPlaceholderBeforePositionalPlaceholder(): void
+    {
+        $this->expectException(ProtocolException::class);
+
+        SqlFormatter::formatSql('SELECT :id, ?', ['id' => 1]);
     }
 }
 
