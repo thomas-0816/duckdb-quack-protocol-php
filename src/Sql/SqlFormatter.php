@@ -154,7 +154,7 @@ final class SqlFormatter
     //       (?<dquote> " (?: [^"]+ | "" )* " )
     //     | (?<squote> ' (?: [^']+ | '' )* ' )
     //     | (?<dollar> \$ (?:(?<tag>[A-Za-z_\x80-\xff][A-Za-z0-9_\x80-\xff]*))?
-    //                     \$ [\s\S]*? \$(?(tag)\k<tag>|\$) )
+    //                     \$ [\s\S]*? \$(?(tag)\k<tag>\$|\$) )
     //     | (?<multichar> ::+ )
     //     | (?<bind> (?<![A-Za-z0-9]) :[A-Za-z0-9_]+ )
     //     | (?<question> \? )
@@ -168,9 +168,9 @@ final class SqlFormatter
     // preceded by an alphanumeric byte is not a placeholder. It succeeds at
     // the start of the subject.
     //
-    // DuckDB's `e'...'` literals are scanned as regular strings: a quote is
-    // escaped with `''`, not with `\'`, so there is no separate `equote`
-    // alternative.
+    // DuckDB's `e'...'` literals are scanned as regular strings: `e` is
+    // matched by `text`, the quote by `squote`, and a quote is escaped with
+    // `''`, not with `\'`, so there is no separate `equote` alternative.
     //
     // A regex-based implementation would then loop over the remaining input:
     //
