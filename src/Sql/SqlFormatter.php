@@ -155,6 +155,7 @@ final class SqlFormatter
     //     | (?<squote> ' (?: [^']+ | '' )* ' )
     //     | (?<dollar> \$ (?:(?<tag>[A-Za-z_\x80-\xff][A-Za-z0-9_\x80-\xff]*))?
     //                     \$ [\s\S]*? \$(?(tag)\k<tag>\$|\$) )
+    //     | (?<dollar_unterminated> \$ (?:[A-Za-z_\x80-\xff][A-Za-z0-9_\x80-\xff]*)? \$ )
     //     | (?<multichar> ::+ )
     //     | (?<bind> (?<![A-Za-z0-9]) :[A-Za-z0-9_]+ )
     //     | (?<question> \? )
@@ -195,8 +196,9 @@ final class SqlFormatter
     //
     // Both implementations copy literals and comments verbatim; only '?' and
     // ':name' tokens outside them are passed to the replacement callback.
-    // A dollar quote without a closing delimiter is not a literal, so only its
-    // opening delimiter is copied and scanning continues.
+    // A dollar quote without a closing delimiter matches `dollar_unterminated`
+    // instead of `dollar`; only the opening delimiter is copied and scanning
+    // continues.
     // `$name` is copied verbatim too, so DuckDB variables such as
     // `SET VARIABLE foo = 'bar'; SELECT $foo;` keep working.
     /**

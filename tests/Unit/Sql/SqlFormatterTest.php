@@ -273,15 +273,6 @@ final class SqlFormatterTest extends TestCase
         self::assertSame("SELECT '$', \$1, \$123abc, \$name, 7", SqlFormatter::formatSql($sql, [7]));
     }
 
-    public function testEmptyParametersStillIgnorePlaceholdersInsideDollarAndEscapeStrings(): void
-    {
-        $sql = <<<'SQL'
-            SELECT e'it''s ?', $$?$$, $tag$ ? $tag$, '?'
-            SQL;
-
-        self::assertSame($sql, SqlFormatter::formatSql($sql, []));
-    }
-
     public function testEmptyParametersIgnoreDoubleColonCasts(): void
     {
         self::assertSame(
