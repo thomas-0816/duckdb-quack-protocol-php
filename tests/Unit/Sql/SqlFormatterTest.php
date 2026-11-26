@@ -65,14 +65,21 @@ final class SqlFormatterTest extends TestCase
         );
     }
 
-    public function testBindsInsideDuckDbListSlicesAreNotPlaceholders(): void
+    public function testStructLiteralKeysRequireASpaceAfterTheColon(): void
     {
         self::assertSame(
-            'SELECT list_value(1, 2, 3)[1:2] AS slice, 7 AS id',
+            "SELECT {'a': 1} AS a, {'b': true} AS b, 7 AS id",
             SqlFormatter::formatSql(
-                'SELECT list_value(1, 2, 3)[1:2] AS slice, :id AS id',
+                "SELECT {'a': 1} AS a, {'b': true} AS b, :id AS id",
                 ['id' => 7],
             ),
+        );
+
+        $this->expectException(ProtocolException::class);
+        $this->expectExceptionMessage('missing SQL parameter :1');
+        SqlFormatter::formatSql(
+            "SELECT {'a':1} AS a, {'b':true} AS b, :id AS id",
+            ['id' => 7],
         );
     }
 
@@ -225,6 +232,20 @@ final class SqlFormatterTest extends TestCase
         );
     }
 
+    public function testBackslashDoesNotEscapeQuotesInEscapeStrings(): void
+    {
+        $sql = <<<'SQL'
+            SELECT e'it\'s ?'
+            SQL;
+
+        self::assertSame(
+            <<<'SQL'
+                SELECT e'it\'s 7'
+                SQL,
+            SqlFormatter::formatSql($sql, [7]),
+        );
+    }
+
     public function testIgnoresNamedPlaceholdersInsideDollarQuotedStrings(): void
     {
         $sql = <<<'SQL'
@@ -256,7 +277,7 @@ final class SqlFormatterTest extends TestCase
     public function testEmptyParametersStillIgnorePlaceholdersInsideDollarAndEscapeStrings(): void
     {
         $sql = <<<'SQL'
-            SELECT e'it\'s ?', $$?$$, $tag$ ? $tag$, '?'
+            SELECT e'it''s ?', $$?$$, $tag$ ? $tag$, '?'
             SQL;
 
         self::assertSame($sql, SqlFormatter::formatSql($sql, []));

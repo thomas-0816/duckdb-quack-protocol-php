@@ -146,13 +146,12 @@ final class SqlFormatter
     // pdo_parse_params() with the re2c grammars in ext/pdo/pdo_sql_parser.re
     // and ext/pdo_pgsql/pgsql_sql_parser.re.
     //
-    // For comparison, the pdo_pgsql grammar translates to roughly this PCRE
+    // Adapted from pdo_pgsql, the grammar translates to roughly this PCRE
     // pattern. PCRE alternation is first-match while re2c uses longest-match,
     // so the alternatives are ordered by hand:
     //
     //   ~\G(?:
-    //       (?<equote> [eE]' (?: [^'\\]+ | '' | \\[\s\S] )* ' )
-    //     | (?<dquote> " (?: [^"]+ | "" )* " )
+    //       (?<dquote> " (?: [^"]+ | "" )* " )
     //     | (?<squote> ' (?: [^']+ | '' )* ' )
     //     | (?<dollar> \$ (?:(?<tag>[A-Za-z_\x80-\xff][A-Za-z0-9_\x80-\xff]*))?
     //                     \$ [\s\S]*? \$(?(tag)\k<tag>|\$) )
@@ -160,14 +159,18 @@ final class SqlFormatter
     //     | (?<bind> (?<![A-Za-z0-9]) :[A-Za-z0-9_]+ )
     //     | (?<question> \? )
     //     | (?<comment> /\* (?: [^*]+ | \*+[^*/] )* \*+ / | --[^\n]* )
-    //     | (?<unterminated> (?: [eE]' | " | ' ) [\s\S]* \z )
-    //     | (?<text> (?: [eE]* [^$eE:?"'/-] )+ )
+    //     | (?<unterminated> (?: " | ' ) [\s\S]* \z )
+    //     | (?<text> (?: [^$:?"'/-] )+ )
     //     | (?<special> [\s\S] )
     //   )~x
     //
     // The negative lookbehind on `bind` reproduces PDO's rule that a bind
     // preceded by an alphanumeric byte is not a placeholder. It succeeds at
     // the start of the subject.
+    //
+    // DuckDB's `e'...'` literals are scanned as regular strings: a quote is
+    // escaped with `''`, not with `\'`, so there is no separate `equote`
+    // alternative.
     //
     // A regex-based implementation would then loop over the remaining input:
     //
@@ -200,10 +203,9 @@ final class SqlFormatter
      * into the statement once instead of being built into an intermediate
      * string first.
      *
-     * Handles DuckDB's escape strings (`e'...'`, where a backslash escapes the
-     * following character) and dollar-quoted strings (`$$...$$`,
-     * `$tag$...$tag$`), in addition to plain literals and comments. Dollar
-     * variable references (`$name`) are left untouched.
+     * Handles single-quoted strings (including `e'...'`), double-quoted
+     * identifiers, dollar-quoted strings (`$$...$$`, `$tag$...$tag$`), and
+     * comments. Dollar variable references (`$name`) are left untouched.
      *
      * @param callable(string):(string|SqlParameter) $replaceToken
      * @return list<string>
@@ -229,49 +231,17 @@ final class SqlFormatter
             $next = $index + 1 < $length ? $sql[$index + 1] : null;
 
             if ($ch === "'") {
-                // `e'...'` / `E'...'` is an escape string only when the prefix
-                // is directly attached and not the last character of an
-                // identifier, as in `fooe'...'`.
-                $prefix = $index > 0 ? $sql[$index - 1] : '';
-                $before = $index > 1 ? $sql[$index - 2] : '';
-                $escapeString = ($prefix === 'e' || $prefix === 'E')
-                    && ($before === ''
-                        || !($before === '_'
-                            || ($before >= 'a' && $before <= 'z')
-                            || ($before >= 'A' && $before <= 'Z')
-                            || ($before >= '0' && $before <= '9')
-                            || ord($before) >= 0x80));
-                if ($escapeString) {
-                    // Backslashes escape the next character: \', \\, \xHH,
-                    // octal, and so on. Doubled quotes remain valid too.
-                    $end = $index + 1;
-                    while ($end < $length) {
-                        $end += strcspn($sql, "'\\", $end);
-                        if ($end >= $length) {
-                            break;
-                        }
-                        if ($sql[$end] === '\\') {
-                            $end = min($end + 2, $length);
-                            continue;
-                        }
-                        if ($end + 1 < $length && $sql[$end + 1] === "'") {
-                            $end += 2;
-                            continue;
-                        }
-                        $end++;
-                        break;
+                // `e'...'` uses `''` for quotes, so it scans like a regular
+                // string; a backslash does not escape the closing quote.
+                $end = $length;
+                $scan = $index + 1;
+                while (($quote = strpos($sql, "'", $scan)) !== false) {
+                    if ($quote + 1 < $length && $sql[$quote + 1] === "'") {
+                        $scan = $quote + 2;
+                        continue;
                     }
-                } else {
-                    $end = $length;
-                    $scan = $index + 1;
-                    while (($quote = strpos($sql, "'", $scan)) !== false) {
-                        if ($quote + 1 < $length && $sql[$quote + 1] === "'") {
-                            $scan = $quote + 2;
-                            continue;
-                        }
-                        $end = $quote + 1;
-                        break;
-                    }
+                    $end = $quote + 1;
+                    break;
                 }
                 $parts[] = substr($sql, $index, $end - $index);
                 $index = $end;
