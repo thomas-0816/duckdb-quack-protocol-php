@@ -5,7 +5,7 @@
 The Quack Remote Protocol unlocks multi-client access for [DuckDB](https://duckdb.org), turning DuckDB into a general-purpose database management system with client(s) and server.
 [Quack](https://duckdb.org/quack/) uses HTTP and can be combined with load balancers, firewalls, and reverse proxies (e.g. nginx).
 
-This library provides a pure PHP implementation for the DuckDB Quack Remote Protocol (DuckDB client).\
+This library provides a pure PHP implementation of the DuckDB Quack Remote Protocol (DuckDB client).\
 It implements Quack Remote Protocol v3 and is tested against Duckdb 2.x.\
 As a pure PHP implementation, it does not include FFI or C code.\
 The HTTP transport uses plain PHP streams or the curl extension (curl preferred).
@@ -34,10 +34,10 @@ https://duckdb.org/docs/2.0/installation?environment=cli
 Start the DuckDB Server:
 
 ```bash
-# localhost, HTTP
+# localhost, port 9494, HTTP
 duckdb --cmd "CALL quack_serve('quack:127.0.0.1:9494', token='secret');"
 
-# public server, HTTPs, creates self-signed certificates
+# public server, port 9495, HTTPs, creates self-signed certificates
 duckdb --cmd "CALL quack_serve('quack:0.0.0.0:9495', token='secret', allow_other_hostname=true, disable_ssl=false);"
 ```
 
@@ -137,7 +137,7 @@ use DuckDB\Quack\QuackClient;
 
 require __DIR__ . '/../vendor/autoload.php';
 
-// self-signed public key
+// file location of self-signed public key
 $pemFile = getenv('HOME') . '/.duckdb/extension_data/quack/server.pem';
 
 $db = QuackClient::connect('https://localhost:9495', 'secret', 3, 10, [], $pemFile);

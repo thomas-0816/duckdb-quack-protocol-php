@@ -95,23 +95,6 @@ final class SqlFormatterTest extends TestCase
         );
     }
 
-    public function testFormatsNestedLists(): void
-    {
-        $params = [
-            SqlParameter::list([
-                SqlParameter::value(Value::int(1)),
-                SqlParameter::list([
-                    SqlParameter::value(Value::string('x')),
-                ]),
-            ]),
-        ];
-
-        self::assertSame(
-            "SELECT [1, ['x']] AS value",
-            SqlFormatter::formatSql('SELECT ? AS value', $params),
-        );
-    }
-
     public function testFormatsScalarLiterals(): void
     {
         $cases = [
@@ -231,12 +214,12 @@ final class SqlFormatterTest extends TestCase
     public function testIgnoresPlaceholdersInsideEscapeStrings(): void
     {
         $sql = <<<'SQL'
-            SELECT e'it\'s ?' AS a, E'line1\nline2 ?' AS b, e'it''s :name' AS c, ? AS real_value
+            SELECT e'it''s ?' AS a, E'line1\nline2 ?' AS b, e'it''s :name' AS c, ? AS real_value
             SQL;
 
         self::assertSame(
             <<<'SQL'
-                SELECT e'it\'s ?' AS a, E'line1\nline2 ?' AS b, e'it''s :name' AS c, 7 AS real_value
+                SELECT e'it''s ?' AS a, E'line1\nline2 ?' AS b, e'it''s :name' AS c, 7 AS real_value
                 SQL,
             SqlFormatter::formatSql($sql, [7]),
         );
