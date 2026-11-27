@@ -58,10 +58,7 @@ final class SqlFormatterTest extends TestCase
     {
         self::assertSame(
             'SELECT [10, 20, 30][i:j] AS slice, 7 AS id FROM (VALUES (2, 3)) t(i, j)',
-            SqlFormatter::formatSql(
-                'SELECT [10, 20, 30][i:j] AS slice, :id AS id FROM (VALUES (2, 3)) t(i, j)',
-                ['id' => 7],
-            ),
+            SqlFormatter::formatSql('SELECT [10, 20, 30][i:j] AS slice, :id AS id FROM (VALUES (2, 3)) t(i, j)', ['id' => 7]),
         );
     }
 
@@ -69,28 +66,24 @@ final class SqlFormatterTest extends TestCase
     {
         self::assertSame(
             "SELECT {'a': 1} AS a, {'b': true} AS b, 7 AS id",
-            SqlFormatter::formatSql(
-                "SELECT {'a': 1} AS a, {'b': true} AS b, :id AS id",
-                ['id' => 7],
-            ),
+            SqlFormatter::formatSql("SELECT {'a': 1} AS a, {'b': true} AS b, :id AS id", ['id' => 7]),
         );
 
         $this->expectException(ProtocolException::class);
-        $this->expectExceptionMessage('missing SQL parameter :1');
-        SqlFormatter::formatSql(
-            "SELECT {'a':1} AS a, {'b':true} AS b, :id AS id",
-            ['id' => 7],
-        );
+        $this->expectExceptionMessage('missing SQL parameter :true');
+        SqlFormatter::formatSql("SELECT {'a':1} AS a, {'b':true} AS b, :id AS id", ['id' => 7]);
     }
 
-    public function testAllowsDigitLeadingNamedParameters(): void
+    public function testNamedParametersMustStartWithALetterOrUnderscore(): void
     {
         self::assertSame(
+            'SELECT :1a AS a, :01 AS b, 7 AS id',
+            SqlFormatter::formatSql('SELECT :1a AS a, :01 AS b, :id AS id', ['id' => 7]),
+        );
+
+        self::assertSame(
             'SELECT 1 AS a, 2 AS b',
-            SqlFormatter::formatSql(
-                'SELECT :1a AS a, :01 AS b',
-                ['1a' => 1, '01' => 2],
-            ),
+            SqlFormatter::formatSql('SELECT :a1 AS a, :b01 AS b', ['a1' => 1, 'b01' => 2]),
         );
     }
 
@@ -130,10 +123,7 @@ final class SqlFormatterTest extends TestCase
     {
         self::assertSame(
             "SELECT 41, 'can''t', TRUE, 1.5, NULL",
-            SqlFormatter::formatSql(
-                'SELECT ?, ?, ?, ?, ?',
-                [41, "can't", true, 1.5, null],
-            ),
+            SqlFormatter::formatSql('SELECT ?, ?, ?, ?, ?', [41, "can't", true, 1.5, null]),
         );
     }
 
@@ -149,10 +139,7 @@ final class SqlFormatterTest extends TestCase
     {
         self::assertSame(
             'SELECT \'{"name":"Ada","tags":["math","code"]}\' AS value',
-            SqlFormatter::formatSql(
-                'SELECT ? AS value',
-                [['name' => 'Ada', 'tags' => ['math', 'code']]],
-            ),
+            SqlFormatter::formatSql('SELECT ? AS value', [['name' => 'Ada', 'tags' => ['math', 'code']]]),
         );
     }
 
@@ -160,10 +147,7 @@ final class SqlFormatterTest extends TestCase
     {
         self::assertSame(
             "SELECT 7 AS id, 'seven' AS label",
-            SqlFormatter::formatSql(
-                'SELECT :id AS id, :label AS label',
-                ['id' => 7, 'label' => 'seven'],
-            ),
+            SqlFormatter::formatSql('SELECT :id AS id, :label AS label', ['id' => 7, 'label' => 'seven']),
         );
     }
 
@@ -176,10 +160,7 @@ final class SqlFormatterTest extends TestCase
 
         self::assertSame(
             "SELECT 2, 'Object', from_hex('00ff')",
-            SqlFormatter::formatSql(
-                'SELECT ?, ?, ?',
-                [ExampleBackedEnum::Two, ExampleUnitEnum::Object, $stream],
-            ),
+            SqlFormatter::formatSql('SELECT ?, ?, ?', [ExampleBackedEnum::Two, ExampleUnitEnum::Object, $stream]),
         );
     }
 
@@ -195,16 +176,13 @@ final class SqlFormatterTest extends TestCase
     {
         $this->expectException(ProtocolException::class);
 
-        SqlFormatter::formatSql(
-            'SELECT ?',
-            [],
-        );
+        SqlFormatter::formatSql('SELECT ?', []);
     }
 
     public function testEmptyParametersReturnSqlWithoutScanning(): void
     {
         $sql = <<<'SQL'
-            INSERT INTO t SELECT value->>'id' FROM json_each('[{"id":1},{"id":2}]') -- no placeholders
+                INSERT INTO t SELECT value->>'id' FROM json_each('[{"id":1},{"id":2}]') -- no placeholders
             SQL;
 
         self::assertSame($sql, SqlFormatter::formatSql($sql, []));
@@ -221,12 +199,12 @@ final class SqlFormatterTest extends TestCase
     public function testIgnoresPlaceholdersInsideEscapeStrings(): void
     {
         $sql = <<<'SQL'
-            SELECT e'it''s ?' AS a, E'line1\nline2 ?' AS b, e'it''s :name' AS c, ? AS real_value
+                SELECT e'it''s ?' AS a, E'line1\nline2 ?' AS b, e'it''s :name' AS c, ? AS real_value
             SQL;
 
         self::assertSame(
             <<<'SQL'
-                SELECT e'it''s ?' AS a, E'line1\nline2 ?' AS b, e'it''s :name' AS c, 7 AS real_value
+                    SELECT e'it''s ?' AS a, E'line1\nline2 ?' AS b, e'it''s :name' AS c, 7 AS real_value
                 SQL,
             SqlFormatter::formatSql($sql, [7]),
         );
@@ -235,12 +213,12 @@ final class SqlFormatterTest extends TestCase
     public function testBackslashDoesNotEscapeQuotesInEscapeStrings(): void
     {
         $sql = <<<'SQL'
-            SELECT e'it\'s ?'
+                SELECT e'it\'s ?'
             SQL;
 
         self::assertSame(
             <<<'SQL'
-                SELECT e'it\'s 7'
+                    SELECT e'it\'s 7'
                 SQL,
             SqlFormatter::formatSql($sql, [7]),
         );
@@ -249,12 +227,12 @@ final class SqlFormatterTest extends TestCase
     public function testIgnoresNamedPlaceholdersInsideDollarQuotedStrings(): void
     {
         $sql = <<<'SQL'
-            SELECT $$ ? :secret $$ AS a, $tag$ ? :secret $tag$ AS b, $outer$ $$ :x $$ $outer$ AS c, :id AS id
+                SELECT $$ ? :secret $$ AS a, $tag$ ? :secret $tag$ AS b, $outer$ $$ :x $$ $outer$ AS c, :id AS id
             SQL;
 
         self::assertSame(
             <<<'SQL'
-                SELECT $$ ? :secret $$ AS a, $tag$ ? :secret $tag$ AS b, $outer$ $$ :x $$ $outer$ AS c, 7 AS id
+                    SELECT $$ ? :secret $$ AS a, $tag$ ? :secret $tag$ AS b, $outer$ $$ :x $$ $outer$ AS c, 7 AS id
                 SQL,
             SqlFormatter::formatSql($sql, ['id' => 7]),
         );
@@ -285,10 +263,7 @@ final class SqlFormatterTest extends TestCase
     {
         $this->expectException(ProtocolException::class);
 
-        SqlFormatter::formatSql(
-            'SELECT :missing',
-            ['other' => 1],
-        );
+        SqlFormatter::formatSql('SELECT :missing', ['other' => 1]);
     }
 
     public function testLeavesDuckDbVariablesUntouched(): void
@@ -302,10 +277,7 @@ final class SqlFormatterTest extends TestCase
     {
         self::assertSame(
             'SELECT $foo AS variable, 7 AS id',
-            SqlFormatter::formatSql(
-                'SELECT $foo AS variable, :id AS id',
-                ['foo' => 'ignored', 'id' => 7],
-            ),
+            SqlFormatter::formatSql('SELECT $foo AS variable, :id AS id', ['foo' => 'ignored', 'id' => 7]),
         );
     }
 
